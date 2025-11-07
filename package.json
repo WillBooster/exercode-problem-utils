@@ -16,6 +16,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./presets/*": {
+      "types": "./dist/presets/*.d.ts",
+      "import": "./dist/presets/*.js",
+      "require": "./dist/presets/*.cjs"
     }
   },
   "main": "dist/index.cjs",
@@ -25,7 +30,7 @@
     "dist/"
   ],
   "scripts": {
-    "build": "build-ts lib",
+    "build": "build-ts lib --input src/index.ts src/presets/*.ts",
     "check-all-for-ai": "yarn check-for-ai && yarn test",
     "check-for-ai": "yarn install > /dev/null && yarn format > /dev/null 2> /dev/null || true && yarn lint-fix --quiet && yarn typecheck",
     "cleanup": "yarn format && yarn lint-fix",
@@ -42,7 +47,12 @@
     "typecheck": "tsc --noEmit --Pretty"
   },
   "prettier": "@willbooster/prettier-config",
+  "dependencies": {
+    "front-matter": "4.0.2",
+    "zod": "4.1.12"
+  },
   "devDependencies": {
+    "@tsconfig/node24": "24.0.1",
     "@types/eslint": "8.56.11",
     "@willbooster/eslint-config-ts": "11.4.10",
     "@willbooster/prettier-config": "10.2.1",
