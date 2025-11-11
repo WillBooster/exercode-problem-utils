@@ -1,7 +1,6 @@
 import { DecisionCode } from '../types/decisionCode.js';
 import type { TestCaseResult } from '../types/testCaseResult.js';
-
-const TEST_CASE_RESULT_PREFIX = 'TEST_CASE_RESULT ';
+import { TEST_CASE_RESULT_PREFIX } from '../types/testCaseResult.js';
 
 const defaultTestCaseResult = {
   testCaseId: '',

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+export const TEST_CASE_RESULT_PREFIX = 'TEST_CASE_RESULT ';
+
 const fileSchema = z.object({
   path: z.string(),
   data: z.string(),
