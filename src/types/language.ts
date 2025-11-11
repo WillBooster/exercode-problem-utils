@@ -7,8 +7,8 @@ export interface LanguageDefinition {
   /** File extensions to judge with this config. */
   fileExtension: string | readonly string[];
 
-  /** Function executed before the build. Returns updated file paths. */
-  prebuild?(cwd: string, filePaths: readonly string[]): Promise<readonly string[]>;
+  /** Function executed before the build. */
+  prebuild?(cwd: string): Promise<void>;
 
   /** Returns the command to build a user program. */
   buildCommand?(filePath: string): [string, ...string[]];
@@ -57,7 +57,7 @@ export const languageIdToDefinition: Readonly<Record<string, Readonly<LanguageDe
 
   csharp: {
     fileExtension: '.cs',
-    prebuild: async (cwd, filePaths) => {
+    prebuild: async (cwd) => {
       await fs.promises.writeFile(
         path.join(cwd, 'Main.csproj'),
         `<Project Sdk="Microsoft.NET.Sdk">
@@ -71,7 +71,6 @@ export const languageIdToDefinition: Readonly<Record<string, Readonly<LanguageDe
   </PropertyGroup>
 </Project>`
       );
-      return filePaths;
     },
     buildCommand: () => ['dotnet', 'build', 'Main.csproj', '--configuration', 'Release', '--verbosity', 'quiet'],
     command: () => ['dotnet', 'bin/Release/net8.0/Main.dll'],
@@ -87,17 +86,14 @@ export const languageIdToDefinition: Readonly<Record<string, Readonly<LanguageDe
 
   java: {
     fileExtension: '.java',
-    prebuild: async (cwd, filePaths) => {
+    prebuild: async (cwd) => {
       const publicClassRegex = /\bpublic\s+class\s+(\w+)\b/;
-      const newFilePaths: string[] = [];
-      for (const filePath of filePaths) {
-        const data = await fs.promises.readFile(path.join(cwd, filePath), 'utf8');
+      for (const dirent of await fs.promises.readdir(cwd, { withFileTypes: true })) {
+        if (!dirent.isFile() || !dirent.name.endsWith('.java')) continue;
+        const data = await fs.promises.readFile(path.join(cwd, dirent.name), 'utf8');
         const [, className] = publicClassRegex.exec(deleteCommentsInSourceCode(cLikeGrammer, data)) ?? [];
-        const newFilePath = className ? path.join(path.dirname(filePath), `${className}.java`) : filePath;
-        await fs.promises.rename(path.join(cwd, filePath), path.join(cwd, newFilePath));
-        newFilePaths.push(newFilePath);
+        if (className) await fs.promises.rename(path.join(cwd, dirent.name), path.join(cwd, `${className}.java`));
       }
-      return newFilePaths;
     },
     buildCommand: (fileName) => ['javac', fileName],
     // For example, Problem 7-3 in WillBooster's Java lecture uses at least 256MB.
