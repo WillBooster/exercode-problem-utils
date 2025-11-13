@@ -1669,6 +1669,38 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@exercode/problem-utils@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "@exercode/problem-utils@workspace:."
+  dependencies:
+    "@types/eslint": "npm:8.56.11"
+    "@willbooster/eslint-config-ts": "npm:11.4.10"
+    "@willbooster/prettier-config": "npm:10.2.1"
+    build-ts: "npm:16.0.12"
+    conventional-changelog-conventionalcommits: "npm:9.1.0"
+    eslint: "npm:9.39.1"
+    eslint-config-flat-gitignore: "npm:2.1.0"
+    eslint-config-prettier: "npm:10.1.8"
+    eslint-import-resolver-typescript: "npm:4.4.4"
+    eslint-plugin-import-x: "npm:4.16.1"
+    eslint-plugin-sort-class-members: "npm:1.21.0"
+    eslint-plugin-sort-destructure-keys: "npm:2.0.0"
+    eslint-plugin-unicorn: "npm:62.0.0"
+    eslint-plugin-unused-imports: "npm:4.3.0"
+    globals: "npm:16.5.0"
+    husky: "npm:9.1.7"
+    lint-staged: "npm:16.2.6"
+    micromatch: "npm:4.0.8"
+    pinst: "npm:3.0.0"
+    prettier: "npm:3.6.2"
+    prettier-plugin-java: "npm:2.7.7"
+    semantic-release: "npm:25.0.1"
+    sort-package-json: "npm:3.4.0"
+    typescript: "npm:5.9.3"
+    typescript-eslint: "npm:8.46.3"
+  languageName: unknown
+  linkType: soft
+
 "@fastify/busboy@npm:^2.0.0":
   version: 2.1.1
   resolution: "@fastify/busboy@npm:2.1.1"
@@ -6977,38 +7009,6 @@ __metadata:
   checksum: 10c0/555ea39a1de48a30601938aedb76d682871d33b6dee015281c37108921514b11e1792928b1648c2e5589acc73c8ef0fb5e585fb4c718e340a28b86799e90fb34
   languageName: node
   linkType: hard
-
-"problem-utils@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "problem-utils@workspace:."
-  dependencies:
-    "@types/eslint": "npm:8.56.11"
-    "@willbooster/eslint-config-ts": "npm:11.4.10"
-    "@willbooster/prettier-config": "npm:10.2.1"
-    build-ts: "npm:16.0.12"
-    conventional-changelog-conventionalcommits: "npm:9.1.0"
-    eslint: "npm:9.39.1"
-    eslint-config-flat-gitignore: "npm:2.1.0"
-    eslint-config-prettier: "npm:10.1.8"
-    eslint-import-resolver-typescript: "npm:4.4.4"
-    eslint-plugin-import-x: "npm:4.16.1"
-    eslint-plugin-sort-class-members: "npm:1.21.0"
-    eslint-plugin-sort-destructure-keys: "npm:2.0.0"
-    eslint-plugin-unicorn: "npm:62.0.0"
-    eslint-plugin-unused-imports: "npm:4.3.0"
-    globals: "npm:16.5.0"
-    husky: "npm:9.1.7"
-    lint-staged: "npm:16.2.6"
-    micromatch: "npm:4.0.8"
-    pinst: "npm:3.0.0"
-    prettier: "npm:3.6.2"
-    prettier-plugin-java: "npm:2.7.7"
-    semantic-release: "npm:25.0.1"
-    sort-package-json: "npm:3.4.0"
-    typescript: "npm:5.9.3"
-    typescript-eslint: "npm:8.46.3"
-  languageName: unknown
-  linkType: soft
 
 "proc-log@npm:^5.0.0":
   version: 5.0.0
