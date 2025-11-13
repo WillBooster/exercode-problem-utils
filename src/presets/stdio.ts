@@ -193,6 +193,8 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
       memoryBytes: spawnResult.memoryBytes,
       outputFiles: outputFiles.length > 0 ? outputFiles : undefined,
     });
+
+    if (decisionCode !== DecisionCode.ACCEPTED) break;
   }
 }
 
