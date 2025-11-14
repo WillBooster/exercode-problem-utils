@@ -1,6 +1,7 @@
 {
   "name": "example",
   "version": "0.0.0-semantically-released",
+  "private": true,
   "author": "WillBooster Inc.",
   "sideEffects": false,
   "type": "module",
