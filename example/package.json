@@ -1,0 +1,17 @@
+{
+  "name": "example",
+  "version": "0.0.0-semantically-released",
+  "private": true,
+  "author": "WillBooster Inc.",
+  "sideEffects": false,
+  "type": "module",
+  "dependencies": {
+    "@exercode/problem-utils": "file:.."
+  },
+  "devDependencies": {
+    "@tsconfig/node24": "24.0.1",
+    "@types/node": "24.10.0",
+    "typescript": "5.9.3"
+  },
+  "packageManager": "bun@1.3.1"
+}

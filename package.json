@@ -16,6 +16,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./presets/*": {
+      "types": "./dist/presets/*.d.ts",
+      "import": "./dist/presets/*.js",
+      "require": "./dist/presets/*.cjs"
     }
   },
   "main": "dist/index.cjs",
@@ -25,7 +30,7 @@
     "dist/"
   ],
   "scripts": {
-    "build": "build-ts lib",
+    "build": "build-ts lib --input src/index.ts src/presets/*.ts",
     "check-all-for-ai": "yarn check-for-ai && yarn test",
     "check-for-ai": "yarn install > /dev/null && yarn format > /dev/null 2> /dev/null || true && yarn lint-fix --quiet && yarn typecheck",
     "cleanup": "yarn format && yarn lint-fix",
@@ -38,12 +43,19 @@
     "prepare": "husky || true",
     "prettify": "prettier --cache --color --write \"**/{.*/,}*.{cjs,css,cts,htm,html,java,js,json,json5,jsonc,jsx,md,mjs,mts,scss,ts,tsx,vue,yaml,yml}\" \"!**/test{-,/}fixtures/**\" || true",
     "start": "build-ts run src/index.ts",
-    "test": "echo 'no tests'",
+    "test": "rm -fr temp && vitest test",
+    "test/ci-setup": "yarn build && bun install --cwd example",
     "typecheck": "tsc --noEmit --Pretty"
   },
   "prettier": "@willbooster/prettier-config",
+  "dependencies": {
+    "front-matter": "4.0.2",
+    "zod": "4.1.12"
+  },
   "devDependencies": {
+    "@tsconfig/node24": "24.0.1",
     "@types/eslint": "8.56.11",
+    "@types/node": "24.10.1",
     "@willbooster/eslint-config-ts": "11.4.10",
     "@willbooster/prettier-config": "10.2.1",
     "build-ts": "16.0.12",
@@ -67,7 +79,8 @@
     "semantic-release": "25.0.1",
     "sort-package-json": "3.4.0",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.46.3"
+    "typescript-eslint": "8.46.3",
+    "vitest": "4.0.8"
   },
   "packageManager": "yarn@4.10.3",
   "engines": {
