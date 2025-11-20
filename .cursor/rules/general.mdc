@@ -6,8 +6,8 @@ alwaysApply: true
 
 ## Project Information
 
-- Name: problem-utils
-- Description: undefined
+- Name: @exercode/problem-utils
+- Description: :100: A set of utilities for judging programs on Exercode (https://exercode.willbooster.com/).
 - Package Manager: yarn
 
 ## General Instructions
