@@ -160,7 +160,7 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
     const spawnResult = spawnSyncWithTimeout(
       command[0],
       command.slice(1),
-      { cwd: params.cwd, encoding: 'utf8', input: testCase.stdin, env },
+      { cwd: params.cwd, encoding: 'utf8', input: testCase.input, env },
       timeoutSeconds
     );
 
@@ -178,7 +178,7 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
       decisionCode = DecisionCode.OUTPUT_SIZE_LIMIT_EXCEEDED;
     } else if (outputFiles.length < (problemMarkdownFrontMatter.requiredOutputFilePaths?.length ?? 0)) {
       decisionCode = DecisionCode.MISSING_REQUIRED_OUTPUT_FILE_ERROR;
-    } else if (!compareStdoutAsSpaceSeparatedTokens(spawnResult.stdout, testCase.stdout ?? '')) {
+    } else if (!compareStdoutAsSpaceSeparatedTokens(spawnResult.stdout, testCase.output ?? '')) {
       decisionCode = DecisionCode.WRONG_ANSWER;
     }
 
@@ -186,7 +186,7 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
       testCaseId: testCase.id,
       decisionCode,
       exitStatus: spawnResult.status ?? undefined,
-      stdin: testCase.stdin,
+      stdin: testCase.input,
       stdout: spawnResult.stdout.slice(0, MAX_STDOUT_LENGTH) || undefined,
       stderr: spawnResult.stderr.slice(0, MAX_STDOUT_LENGTH) || undefined,
       timeSeconds: spawnResult.timeSeconds,
