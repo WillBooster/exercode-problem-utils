@@ -9,8 +9,8 @@
     "@exercode/problem-utils": "file:.."
   },
   "devDependencies": {
-    "@tsconfig/node24": "24.0.1",
-    "@types/node": "24.10.0",
+    "@tsconfig/node24": "24.0.3",
+    "@types/node": "24.10.1",
     "typescript": "5.9.3"
   },
   "packageManager": "bun@1.3.1"

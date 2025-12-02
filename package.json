@@ -50,15 +50,15 @@
   "prettier": "@willbooster/prettier-config",
   "dependencies": {
     "front-matter": "4.0.2",
-    "zod": "4.1.12"
+    "zod": "4.1.13"
   },
   "devDependencies": {
-    "@tsconfig/node24": "24.0.1",
+    "@tsconfig/node24": "24.0.3",
     "@types/eslint": "8.56.11",
     "@types/node": "24.10.1",
     "@willbooster/eslint-config-ts": "11.4.11",
     "@willbooster/prettier-config": "10.2.2",
-    "build-ts": "16.0.12",
+    "build-ts": "16.0.15",
     "conventional-changelog-conventionalcommits": "9.1.0",
     "eslint": "9.39.1",
     "eslint-config-flat-gitignore": "2.1.0",
@@ -76,11 +76,11 @@
     "pinst": "3.0.0",
     "prettier": "3.6.2",
     "prettier-plugin-java": "2.7.7",
-    "semantic-release": "25.0.1",
-    "sort-package-json": "3.4.0",
+    "semantic-release": "25.0.2",
+    "sort-package-json": "3.5.0",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.47.0",
-    "vitest": "4.0.8"
+    "typescript-eslint": "8.48.0",
+    "vitest": "4.0.14"
   },
   "packageManager": "yarn@4.12.0",
   "engines": {
