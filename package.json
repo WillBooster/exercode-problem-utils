@@ -58,7 +58,7 @@
     "@types/node": "24.10.1",
     "@willbooster/eslint-config-ts": "11.4.11",
     "@willbooster/prettier-config": "10.2.2",
-    "build-ts": "16.0.15",
+    "build-ts": "17.0.4",
     "conventional-changelog-conventionalcommits": "9.1.0",
     "eslint": "9.39.1",
     "eslint-config-flat-gitignore": "2.1.0",
