@@ -9,7 +9,7 @@ import { problemMarkdownFrontMatterSchema } from '../types/problem.js';
 export async function readProblemMarkdownFrontMatter(problemDir: string): Promise<ProblemMarkdownFrontMatter> {
   for (const dirent of await fs.promises.readdir(problemDir, { withFileTypes: true })) {
     if (!dirent.isFile()) continue;
-    if (!dirent.name.endsWith('.problem.md')) continue;
+    if (!(dirent.name === 'problem.md' || dirent.name.endsWith('.problem.md'))) continue;
 
     const markdown = await fs.promises.readFile(path.join(dirent.parentPath, dirent.name), 'utf8');
 
