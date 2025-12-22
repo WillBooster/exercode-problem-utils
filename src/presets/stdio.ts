@@ -3,6 +3,7 @@ import path from 'node:path';
 import { z } from 'zod';
 
 import { compareStdoutAsSpaceSeparatedTokens } from '../helpers/compareStdoutAsSpaceSeparatedTokens.js';
+import { copyTestCaseFileInput } from '../helpers/copyTestCaseFileInput.js';
 import { findEntryPointFile } from '../helpers/findEntryPointFile.js';
 import { findLanguageDefinitionByPath } from '../helpers/findLanguageDefinitionByPath.js';
 import { judgeByStaticAnalysis } from '../helpers/judgeByStaticAnalysis.js';
@@ -150,6 +151,11 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
   }
 
   for (const testCase of testCases) {
+    // prepare test case
+    if (testCases.shared?.fileInputPath) await copyTestCaseFileInput(testCases.shared.fileInputPath, params.cwd);
+    if (testCase.fileInputPath) await copyTestCaseFileInput(testCase.fileInputPath, params.cwd);
+
+    // run
     const timeoutSeconds =
       typeof problemMarkdownFrontMatter.timeLimitMs === 'number'
         ? problemMarkdownFrontMatter.timeLimitMs / 1000
@@ -166,6 +172,10 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
 
     const outputFiles = await readOutputFiles(params.cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
 
+    // TODO: clean up test case
+    // if (testCase.fileInputPath) await cleanTestCaseFileInput(testCase.fileInputPath, params.cwd);
+
+    // calculate decision
     let decisionCode: DecisionCode = DecisionCode.ACCEPTED;
 
     if (spawnResult.status !== 0) {
@@ -196,6 +206,9 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
 
     if (decisionCode !== DecisionCode.ACCEPTED) break;
   }
+
+  // TODO: clean up
+  // if (testCases.shared?.fileInputPath) await cleanTestCaseFileInput(testCases.shared.fileInputPath, params.cwd);
 }
 
 /**
