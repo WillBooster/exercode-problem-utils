@@ -2,6 +2,7 @@ import path from 'node:path';
 
 import { z } from 'zod';
 
+import { cleanWorkingDirectory, snapshotWorkingDirectory } from '../helpers/cleanWorkingDirectory.js';
 import { compareStdoutAsSpaceSeparatedTokens } from '../helpers/compareStdoutAsSpaceSeparatedTokens.js';
 import { copyTestCaseFileInput } from '../helpers/copyTestCaseFileInput.js';
 import { findEntryPointFile } from '../helpers/findEntryPointFile.js';
@@ -150,6 +151,8 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
     }
   }
 
+  const cwdSnapshot = await snapshotWorkingDirectory(params.cwd);
+
   for (const testCase of testCases) {
     // prepare test case
     if (testCases.shared?.fileInputPath) await copyTestCaseFileInput(testCases.shared.fileInputPath, params.cwd);
@@ -172,8 +175,8 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
 
     const outputFiles = await readOutputFiles(params.cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
 
-    // TODO: clean up test case
-    // if (testCase.fileInputPath) await cleanTestCaseFileInput(testCase.fileInputPath, params.cwd);
+    // clean up
+    await cleanWorkingDirectory(params.cwd, cwdSnapshot);
 
     // calculate decision
     let decisionCode: DecisionCode = DecisionCode.ACCEPTED;
@@ -206,9 +209,6 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
 
     if (decisionCode !== DecisionCode.ACCEPTED) break;
   }
-
-  // TODO: clean up
-  // if (testCases.shared?.fileInputPath) await cleanTestCaseFileInput(testCases.shared.fileInputPath, params.cwd);
 }
 
 /**
