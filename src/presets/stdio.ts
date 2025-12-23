@@ -1,8 +1,11 @@
+import fs from 'node:fs';
 import path from 'node:path';
 
 import { z } from 'zod';
 
+import { cleanWorkingDirectory, snapshotWorkingDirectory } from '../helpers/cleanWorkingDirectory.js';
 import { compareStdoutAsSpaceSeparatedTokens } from '../helpers/compareStdoutAsSpaceSeparatedTokens.js';
+import { copyTestCaseFileInput } from '../helpers/copyTestCaseFileInput.js';
 import { findEntryPointFile } from '../helpers/findEntryPointFile.js';
 import { findLanguageDefinitionByPath } from '../helpers/findLanguageDefinitionByPath.js';
 import { judgeByStaticAnalysis } from '../helpers/judgeByStaticAnalysis.js';
@@ -149,7 +152,14 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
     }
   }
 
+  const cwdSnapshot = await snapshotWorkingDirectory(params.cwd);
+
   for (const testCase of testCases) {
+    // prepare test case
+    if (testCases.shared?.fileInputPath) await copyTestCaseFileInput(testCases.shared.fileInputPath, params.cwd);
+    if (testCase.fileInputPath) await copyTestCaseFileInput(testCase.fileInputPath, params.cwd);
+
+    // run
     const timeoutSeconds =
       typeof problemMarkdownFrontMatter.timeLimitMs === 'number'
         ? problemMarkdownFrontMatter.timeLimitMs / 1000
@@ -166,6 +176,7 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
 
     const outputFiles = await readOutputFiles(params.cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
 
+    // calculate decision
     let decisionCode: DecisionCode = DecisionCode.ACCEPTED;
 
     if (spawnResult.status !== 0) {
@@ -180,6 +191,20 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
       decisionCode = DecisionCode.MISSING_REQUIRED_OUTPUT_FILE_ERROR;
     } else if (!compareStdoutAsSpaceSeparatedTokens(spawnResult.stdout, testCase.output ?? '')) {
       decisionCode = DecisionCode.WRONG_ANSWER;
+    } else if (testCase.fileOutputPath) {
+      const dirents = await fs.promises.readdir(testCase.fileOutputPath, { withFileTypes: true, recursive: true });
+      for (const dirent of dirents) {
+        if (!dirent.isFile()) continue;
+        const direntRelativePath = path.relative(testCase.fileOutputPath, dirent.parentPath);
+        const expected = await fs.promises.readFile(path.join(dirent.parentPath, dirent.name));
+        try {
+          const received = await fs.promises.readFile(path.join(params.cwd, direntRelativePath, dirent.name));
+          if (received.compare(expected) !== 0) decisionCode = DecisionCode.WRONG_ANSWER;
+        } catch (error) {
+          console.error(error);
+          decisionCode = DecisionCode.WRONG_ANSWER;
+        }
+      }
     }
 
     printTestCaseResult({
@@ -193,6 +218,9 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
       memoryBytes: spawnResult.memoryBytes,
       outputFiles: outputFiles.length > 0 ? outputFiles : undefined,
     });
+
+    // clean up
+    await cleanWorkingDirectory(params.cwd, cwdSnapshot);
 
     if (decisionCode !== DecisionCode.ACCEPTED) break;
   }
