@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 
 import { z } from 'zod';
@@ -175,9 +176,6 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
 
     const outputFiles = await readOutputFiles(params.cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
 
-    // clean up
-    await cleanWorkingDirectory(params.cwd, cwdSnapshot);
-
     // calculate decision
     let decisionCode: DecisionCode = DecisionCode.ACCEPTED;
 
@@ -193,6 +191,20 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
       decisionCode = DecisionCode.MISSING_REQUIRED_OUTPUT_FILE_ERROR;
     } else if (!compareStdoutAsSpaceSeparatedTokens(spawnResult.stdout, testCase.output ?? '')) {
       decisionCode = DecisionCode.WRONG_ANSWER;
+    } else if (testCase.fileOutputPath) {
+      const dirents = await fs.promises.readdir(testCase.fileOutputPath, { withFileTypes: true, recursive: true });
+      for (const dirent of dirents) {
+        if (!dirent.isFile()) continue;
+        const direntRelativePath = path.relative(testCase.fileOutputPath, dirent.parentPath);
+        const expected = await fs.promises.readFile(path.join(dirent.parentPath, dirent.name));
+        try {
+          const received = await fs.promises.readFile(path.join(params.cwd, direntRelativePath, dirent.name));
+          if (received.compare(expected) !== 0) decisionCode = DecisionCode.WRONG_ANSWER;
+        } catch (error) {
+          console.error(error);
+          decisionCode = DecisionCode.WRONG_ANSWER;
+        }
+      }
     }
 
     printTestCaseResult({
@@ -206,6 +218,9 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
       memoryBytes: spawnResult.memoryBytes,
       outputFiles: outputFiles.length > 0 ? outputFiles : undefined,
     });
+
+    // clean up
+    await cleanWorkingDirectory(params.cwd, cwdSnapshot);
 
     if (decisionCode !== DecisionCode.ACCEPTED) break;
   }

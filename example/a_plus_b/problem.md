@@ -11,7 +11,7 @@ forbiddenTextsInCode: ['some_forbidden_name']
 整数$A,B$が与えられます。
 $A+B$の計算結果を出力してください。
 
-## 入力データの特徴
+## 制約
 
 - $0 \leq A,B \leq 10^9$
 - 入力は全て整数である。
@@ -57,5 +57,3 @@ $A+B$を出力せよ。
 ```
 5
 ```
-
-![](/assets/problems/example_course_imported_a_plus_b/01_mac.png)
