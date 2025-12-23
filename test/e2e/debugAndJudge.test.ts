@@ -110,11 +110,12 @@ const acceptedTestCaseResultsForAPlusBFile = [
   },
 ] as const satisfies readonly TestCaseResult[];
 
-test.each<[string, string, Record<string, unknown>, readonly TestCaseResult[]]>([
+test.each<[string, string, string, Record<string, unknown>, readonly TestCaseResult[]]>([
   [
     'example/a_plus_b',
     'debug.ts',
-    { cwd: 'model_answers/java', stdin: '1 1' },
+    'model_answers/java',
+    { stdin: '1 1' },
     [
       {
         testCaseId: 'debug',
@@ -128,13 +129,14 @@ test.each<[string, string, Record<string, unknown>, readonly TestCaseResult[]]>(
     ],
   ],
 
-  ['example/a_plus_b', 'judge.ts', { cwd: 'model_answers/java' }, acceptedTestCaseResultsForAPlusB],
-  ['example/a_plus_b', 'judge.ts', { cwd: 'model_answers/python' }, acceptedTestCaseResultsForAPlusB],
-  ['example/a_plus_b', 'judge.ts', { cwd: 'model_answers.test/java_rename' }, acceptedTestCaseResultsForAPlusB],
+  ['example/a_plus_b', 'judge.ts', 'model_answers/java', {}, acceptedTestCaseResultsForAPlusB],
+  ['example/a_plus_b', 'judge.ts', 'model_answers/python', {}, acceptedTestCaseResultsForAPlusB],
+  ['example/a_plus_b', 'judge.ts', 'model_answers.test/java_rename', {}, acceptedTestCaseResultsForAPlusB],
   [
     'example/a_plus_b',
     'judge.ts',
-    { cwd: 'model_answers.test/python_fpe' },
+    'model_answers.test/python_fpe',
+    {},
     [
       {
         testCaseId: '01_small_00',
@@ -154,7 +156,8 @@ test.each<[string, string, Record<string, unknown>, readonly TestCaseResult[]]>(
   [
     'example/a_plus_b',
     'judge.ts',
-    { cwd: 'model_answers.test/python_rpe' },
+    'model_answers.test/python_rpe',
+    {},
     [
       {
         testCaseId: '01_small_00',
@@ -170,7 +173,8 @@ test.each<[string, string, Record<string, unknown>, readonly TestCaseResult[]]>(
   [
     'example/a_plus_b',
     'judge.ts',
-    { cwd: 'model_answers.test/python_tle' },
+    'model_answers.test/python_tle',
+    {},
     [
       ...acceptedTestCaseResultsForAPlusB.slice(0, 2),
       {
@@ -186,7 +190,8 @@ test.each<[string, string, Record<string, unknown>, readonly TestCaseResult[]]>(
   [
     'example/a_plus_b',
     'judge.ts',
-    { cwd: 'model_answers.test/python_wa' },
+    'model_answers.test/python_wa',
+    {},
     [
       {
         testCaseId: '01_small_00',
@@ -218,11 +223,12 @@ test.each<[string, string, Record<string, unknown>, readonly TestCaseResult[]]>(
     ],
   ],
 
-  ['example/a_plus_b_file', 'judge.ts', { cwd: 'model_answers/javascript' }, acceptedTestCaseResultsForAPlusBFile],
+  ['example/a_plus_b_file', 'judge.ts', 'model_answers/javascript', {}, acceptedTestCaseResultsForAPlusBFile],
   [
     'example/a_plus_b_file',
     'judge.ts',
-    { cwd: 'model_answers.test/javascript_mrofe' },
+    'model_answers.test/javascript_mrofe',
+    {},
     [
       {
         testCaseId: '01_small_00',
@@ -237,7 +243,8 @@ test.each<[string, string, Record<string, unknown>, readonly TestCaseResult[]]>(
   [
     'example/a_plus_b_file',
     'judge.ts',
-    { cwd: 'model_answers.test/javascript_wa' },
+    'model_answers.test/javascript_wa',
+    {},
     [
       ...acceptedTestCaseResultsForAPlusBFile.slice(0, 1),
       {
@@ -250,23 +257,27 @@ test.each<[string, string, Record<string, unknown>, readonly TestCaseResult[]]>(
       },
     ],
   ],
-])('%s %s %j', { timeout: 20_000, concurrent: true }, async (cwd, scriptFilename, params, expectedTestCaseResults) => {
-  // The target files may be changed during the judging, so clone it before testing.
-  await fs.promises.mkdir('temp', { recursive: true });
-  const tempDir = await fs.promises.mkdtemp(path.join('temp', 'judge_'));
-  await fs.promises.cp(cwd, tempDir, { recursive: true });
+])(
+  '%s %s %j',
+  { timeout: 20_000, concurrent: true },
+  async (cwd, scriptFilename, argsCwd, argsParams, expectedTestCaseResults) => {
+    // The target files may be changed during the judging, so clone it before testing.
+    await fs.promises.mkdir('temp', { recursive: true });
+    const tempDir = await fs.promises.mkdtemp(path.join('temp', 'judge_'));
+    await fs.promises.cp(cwd, tempDir, { recursive: true });
 
-  const spawnResult = child_process.spawnSync('bun', [scriptFilename, JSON.stringify(params)], {
-    cwd: tempDir,
-    encoding: 'utf8',
-  });
+    const spawnResult = child_process.spawnSync('bun', [scriptFilename, argsCwd, JSON.stringify(argsParams)], {
+      cwd: tempDir,
+      encoding: 'utf8',
+    });
 
-  if (spawnResult.stderr) console.error(spawnResult.stderr);
+    if (spawnResult.stderr) console.error(spawnResult.stderr);
 
-  const testCaseResults = spawnResult.stdout
-    .split('\n')
-    .filter((line) => line.startsWith(TEST_CASE_RESULT_PREFIX))
-    .map((line) => testCaseResultSchema.parse(JSON.parse(line.slice(TEST_CASE_RESULT_PREFIX.length))));
+    const testCaseResults = spawnResult.stdout
+      .split('\n')
+      .filter((line) => line.startsWith(TEST_CASE_RESULT_PREFIX))
+      .map((line) => testCaseResultSchema.parse(JSON.parse(line.slice(TEST_CASE_RESULT_PREFIX.length))));
 
-  expect(testCaseResults).toEqual(expectedTestCaseResults);
-});
+    expect(testCaseResults).toEqual(expectedTestCaseResults);
+  }
+);

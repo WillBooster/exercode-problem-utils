@@ -24,7 +24,6 @@ const DEBUG_DEFAULT_TIMEOUT_SECONDS = 10;
 const MAX_STDOUT_LENGTH = 50_000;
 
 const judgeParamsSchema = z.object({
-  cwd: z.string(),
   language: z.union([z.string(), z.array(z.string())]).optional(),
 });
 
@@ -45,7 +44,12 @@ const debugParamsSchema = judgeParamsSchema.extend({
  *
  * Run with the required parameters:
  * ```bash
- * bun judge.ts '{ "cwd": "model_answers/java" }'
+ * bun judge.ts model_answers/java
+ * ```
+ *
+ * Run with the optional parameters:
+ * ```bash
+ * bun judge.ts model_answers/java '{ "language": "javascript" }'
  * ```
  */
 export async function stdioJudgePreset(problemDir: string): Promise<void> {
@@ -55,13 +59,13 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
   const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
 
-  const staticAnalysisTestCaseResult = await judgeByStaticAnalysis(params.cwd, problemMarkdownFrontMatter);
+  const staticAnalysisTestCaseResult = await judgeByStaticAnalysis(args.cwd, problemMarkdownFrontMatter);
   if (staticAnalysisTestCaseResult) {
     printTestCaseResult({ testCaseId: testCases[0]?.id ?? 'prebuild', ...staticAnalysisTestCaseResult });
     return;
   }
 
-  const originalMainFilePath = await findEntryPointFile(params.cwd, params.language);
+  const originalMainFilePath = await findEntryPointFile(args.cwd, params.language);
   if (!originalMainFilePath) {
     printTestCaseResult({
       testCaseId: testCases[0]?.id ?? 'prebuild',
@@ -88,8 +92,8 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
 
   if (languageDefinition.prebuild) {
     try {
-      await languageDefinition.prebuild(params.cwd);
-      prebuiltMainFilePath = await findEntryPointFile(params.cwd, params.language);
+      await languageDefinition.prebuild(args.cwd);
+      prebuiltMainFilePath = await findEntryPointFile(args.cwd, params.language);
     } catch (error) {
       console.error('prebuild error', error);
 
@@ -111,7 +115,7 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
       const buildSpawnResult = spawnSyncWithTimeout(
         buildCommand[0],
         buildCommand.slice(1),
-        { cwd: params.cwd, encoding: 'utf8', env },
+        { cwd: args.cwd, encoding: 'utf8', env },
         BUILD_TIMEOUT_SECONDS
       );
 
@@ -152,12 +156,12 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
     }
   }
 
-  const cwdSnapshot = await snapshotWorkingDirectory(params.cwd);
+  const cwdSnapshot = await snapshotWorkingDirectory(args.cwd);
 
   for (const testCase of testCases) {
     // prepare test case
-    if (testCases.shared?.fileInputPath) await copyTestCaseFileInput(testCases.shared.fileInputPath, params.cwd);
-    if (testCase.fileInputPath) await copyTestCaseFileInput(testCase.fileInputPath, params.cwd);
+    if (testCases.shared?.fileInputPath) await copyTestCaseFileInput(testCases.shared.fileInputPath, args.cwd);
+    if (testCase.fileInputPath) await copyTestCaseFileInput(testCase.fileInputPath, args.cwd);
 
     // run
     const timeoutSeconds =
@@ -170,11 +174,11 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
     const spawnResult = spawnSyncWithTimeout(
       command[0],
       command.slice(1),
-      { cwd: params.cwd, encoding: 'utf8', input: testCase.input, env },
+      { cwd: args.cwd, encoding: 'utf8', input: testCase.input, env },
       timeoutSeconds
     );
 
-    const outputFiles = await readOutputFiles(params.cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
+    const outputFiles = await readOutputFiles(args.cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
 
     // calculate decision
     let decisionCode: DecisionCode = DecisionCode.ACCEPTED;
@@ -198,7 +202,7 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
         const direntRelativePath = path.relative(testCase.fileOutputPath, dirent.parentPath);
         const expected = await fs.promises.readFile(path.join(dirent.parentPath, dirent.name));
         try {
-          const received = await fs.promises.readFile(path.join(params.cwd, direntRelativePath, dirent.name));
+          const received = await fs.promises.readFile(path.join(args.cwd, direntRelativePath, dirent.name));
           if (received.compare(expected) !== 0) decisionCode = DecisionCode.WRONG_ANSWER;
         } catch (error) {
           console.error(error);
@@ -220,7 +224,7 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
     });
 
     // clean up
-    await cleanWorkingDirectory(params.cwd, cwdSnapshot);
+    await cleanWorkingDirectory(args.cwd, cwdSnapshot);
 
     if (decisionCode !== DecisionCode.ACCEPTED) break;
   }
@@ -239,7 +243,7 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
  *
  * Run with the required parameters:
  * ```bash
- * bun debug.ts '{ "cwd": "model_answers/java", "stdin": "1 2" }'
+ * bun debug.ts model_answers/java '{ "stdin": "1 2" }'
  * ```
  */
 export async function stdioDebugPreset(problemDir: string): Promise<void> {
@@ -248,7 +252,7 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
 
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
 
-  const originalMainFilePath = await findEntryPointFile(params.cwd, params.language);
+  const originalMainFilePath = await findEntryPointFile(args.cwd, params.language);
   if (!originalMainFilePath) {
     printTestCaseResult({
       testCaseId: 'prebuild',
@@ -275,8 +279,8 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
 
   if (languageDefinition.prebuild) {
     try {
-      await languageDefinition.prebuild(params.cwd);
-      prebuiltMainFilePath = await findEntryPointFile(params.cwd, params.language);
+      await languageDefinition.prebuild(args.cwd);
+      prebuiltMainFilePath = await findEntryPointFile(args.cwd, params.language);
     } catch (error) {
       console.error('prebuild error', error);
 
@@ -298,7 +302,7 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
       const buildSpawnResult = spawnSyncWithTimeout(
         buildCommand[0],
         buildCommand.slice(1),
-        { cwd: params.cwd, encoding: 'utf8', env },
+        { cwd: args.cwd, encoding: 'utf8', env },
         BUILD_TIMEOUT_SECONDS
       );
 
@@ -350,11 +354,11 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
     const spawnResult = spawnSyncWithTimeout(
       command[0],
       command.slice(1),
-      { cwd: params.cwd, encoding: 'utf8', input: params.stdin, env },
+      { cwd: args.cwd, encoding: 'utf8', input: params.stdin, env },
       timeoutSeconds
     );
 
-    const outputFiles = await readOutputFiles(params.cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
+    const outputFiles = await readOutputFiles(args.cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
 
     let decisionCode: DecisionCode = DecisionCode.ACCEPTED;
 

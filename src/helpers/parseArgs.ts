@@ -1,12 +1,14 @@
 /**
  * Parse command line arguments in `judge.ts` or `debug.ts`.
  */
-export function parseArgs(argv: readonly string[]): { params: unknown } {
-  const paramsJson = argv[2];
-  if (!paramsJson) throw new Error('params argument required');
+export function parseArgs(argv: readonly string[]): { cwd: string; params: unknown } {
+  const cwd = argv[2];
+  if (!cwd) throw new Error('cwd argument required');
+
+  const paramsJson = argv[3];
 
   try {
-    return { params: JSON.parse(paramsJson) };
+    return { cwd, params: paramsJson ? JSON.parse(paramsJson) : {} };
   } catch (error) {
     throw new Error('bad params argument', { cause: error });
   }
