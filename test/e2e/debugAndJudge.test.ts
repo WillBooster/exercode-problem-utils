@@ -110,12 +110,16 @@ const acceptedTestCaseResultsForAPlusBFile = [
   },
 ] as const satisfies readonly TestCaseResult[];
 
-test.each<[string, string, string, Record<string, unknown>, readonly TestCaseResult[]]>([
+test.each<
+  [string, string, string, Record<string, unknown>, Record<string, string | undefined>, readonly TestCaseResult[]]
+>([
+  // stdioDebugPreset
   [
     'example/a_plus_b',
     'debug.ts',
     'model_answers/java',
     { stdin: '1 1' },
+    {},
     [
       {
         testCaseId: 'debug',
@@ -129,13 +133,15 @@ test.each<[string, string, string, Record<string, unknown>, readonly TestCaseRes
     ],
   ],
 
-  ['example/a_plus_b', 'judge.ts', 'model_answers/java', {}, acceptedTestCaseResultsForAPlusB],
-  ['example/a_plus_b', 'judge.ts', 'model_answers/python', {}, acceptedTestCaseResultsForAPlusB],
-  ['example/a_plus_b', 'judge.ts', 'model_answers.test/java_rename', {}, acceptedTestCaseResultsForAPlusB],
+  // stdioJudgePreset
+  ['example/a_plus_b', 'judge.ts', 'model_answers/java', {}, {}, acceptedTestCaseResultsForAPlusB],
+  ['example/a_plus_b', 'judge.ts', 'model_answers/python', {}, {}, acceptedTestCaseResultsForAPlusB],
+  ['example/a_plus_b', 'judge.ts', 'model_answers.test/java_rename', {}, {}, acceptedTestCaseResultsForAPlusB],
   [
     'example/a_plus_b',
     'judge.ts',
     'model_answers.test/python_fpe',
+    {},
     {},
     [
       {
@@ -158,6 +164,7 @@ test.each<[string, string, string, Record<string, unknown>, readonly TestCaseRes
     'judge.ts',
     'model_answers.test/python_rpe',
     {},
+    {},
     [
       {
         testCaseId: '01_small_00',
@@ -175,6 +182,7 @@ test.each<[string, string, string, Record<string, unknown>, readonly TestCaseRes
     'judge.ts',
     'model_answers.test/python_tle',
     {},
+    {},
     [
       ...acceptedTestCaseResultsForAPlusB.slice(0, 2),
       {
@@ -191,6 +199,7 @@ test.each<[string, string, string, Record<string, unknown>, readonly TestCaseRes
     'example/a_plus_b',
     'judge.ts',
     'model_answers.test/python_wa',
+    {},
     {},
     [
       {
@@ -223,11 +232,12 @@ test.each<[string, string, string, Record<string, unknown>, readonly TestCaseRes
     ],
   ],
 
-  ['example/a_plus_b_file', 'judge.ts', 'model_answers/javascript', {}, acceptedTestCaseResultsForAPlusBFile],
+  ['example/a_plus_b_file', 'judge.ts', 'model_answers/javascript', {}, {}, acceptedTestCaseResultsForAPlusBFile],
   [
     'example/a_plus_b_file',
     'judge.ts',
     'model_answers.test/javascript_mrofe',
+    {},
     {},
     [
       {
@@ -245,6 +255,7 @@ test.each<[string, string, string, Record<string, unknown>, readonly TestCaseRes
     'judge.ts',
     'model_answers.test/javascript_wa',
     {},
+    {},
     [
       ...acceptedTestCaseResultsForAPlusBFile.slice(0, 1),
       {
@@ -257,10 +268,68 @@ test.each<[string, string, string, Record<string, unknown>, readonly TestCaseRes
       },
     ],
   ],
+
+  // llmJudgePreset
+  [
+    'example/prompt_summary',
+    'judge.ts',
+    'model_answers/default',
+    { model: 'google/gemini-2.5-flash-lite' },
+    { GOOGLE_GENERATIVE_AI_API_KEY: process.env.GOOGLE_GENERATIVE_AI_API_KEY },
+    [
+      {
+        testCaseId: '01_small_00',
+        decisionCode: 2000,
+        stdin: expect.any(String),
+        stdout: expect.any(String),
+        timeSeconds: expect.any(Number),
+      },
+      {
+        testCaseId: '02_large_00',
+        decisionCode: 2000,
+        stdin: expect.any(String),
+        stdout: expect.any(String),
+        timeSeconds: expect.any(Number),
+      },
+    ],
+  ],
+  [
+    'example/prompt_summary',
+    'judge.ts',
+    'model_answers.test/wa',
+    { model: 'google/gemini-2.5-flash-lite' },
+    { GOOGLE_GENERATIVE_AI_API_KEY: process.env.GOOGLE_GENERATIVE_AI_API_KEY },
+    [
+      {
+        testCaseId: '01_small_00',
+        decisionCode: 1000,
+        stdin: expect.any(String),
+        stdout: expect.any(String),
+        timeSeconds: expect.any(Number),
+      },
+    ],
+  ],
+  [
+    'example/prompt_summary',
+    'judge.ts',
+    'model_answers/default',
+    { model: 'google/gemini-2.5-flash-lite' },
+    { GOOGLE_GENERATIVE_AI_API_KEY: undefined },
+    [
+      {
+        testCaseId: '01_small_00',
+        decisionCode: 1001,
+        stdin: expect.any(String),
+        stderr:
+          "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+        timeSeconds: expect.any(Number),
+      },
+    ],
+  ],
 ])(
-  '%s %s %j',
+  '%s %s %s %j',
   { timeout: 20_000, concurrent: true },
-  async (cwd, scriptFilename, argsCwd, argsParams, expectedTestCaseResults) => {
+  async (cwd, scriptFilename, argsCwd, argsParams, env, expectedTestCaseResults) => {
     // The target files may be changed during the judging, so clone it before testing.
     await fs.promises.mkdir('temp', { recursive: true });
     const tempDir = await fs.promises.mkdtemp(path.join('temp', 'judge_'));
@@ -269,6 +338,7 @@ test.each<[string, string, string, Record<string, unknown>, readonly TestCaseRes
     const spawnResult = child_process.spawnSync('bun', [scriptFilename, argsCwd, JSON.stringify(argsParams)], {
       cwd: tempDir,
       encoding: 'utf8',
+      env: { ...process.env, ...env },
     });
 
     if (spawnResult.stderr) console.error(spawnResult.stderr);
