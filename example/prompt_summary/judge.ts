@@ -5,8 +5,8 @@ await llmJudgePreset(import.meta.dirname, {
   test(context) {
     return {
       decisionCode:
-        context.result.output.length < (context.testCase.input?.length ?? 0) &&
-        context.result.output.includes(context.testCase.output ?? '')
+        context.result.output.trim().length < (context.testCase.input?.trim().length ?? 0) &&
+        context.result.output.includes(context.testCase.output?.trim() ?? '')
           ? DecisionCode.ACCEPTED
           : DecisionCode.WRONG_ANSWER,
     };

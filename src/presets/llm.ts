@@ -54,9 +54,8 @@ export async function llmJudgePreset(problemDir: string, options: LlmJudgePreset
   const prompt = await fs.promises.readFile(path.join(args.cwd, PROMPT_FILENAME), 'utf8');
 
   for (const testCase of testCases) {
+    const startTimeMilliseconds = Date.now();
     try {
-      const startTimeMilliseconds = Date.now();
-
       // requires `GOOGLE_GENERATIVE_AI_API_KEY`
       const { text } = await generateText({
         model: google(params.model.slice('google/'.length)),
@@ -65,23 +64,30 @@ export async function llmJudgePreset(problemDir: string, options: LlmJudgePreset
 
       const stopTimeMilliseconds = Date.now();
 
-      const testCaseResult = await options.test({ testCase, result: { output: text } });
-
-      printTestCaseResult({
+      const testCaseResult = {
         testCaseId: testCase.id,
         decisionCode: DecisionCode.ACCEPTED,
         stdin: testCase.input,
         stdout: text,
         timeSeconds: (stopTimeMilliseconds - startTimeMilliseconds) / 1000,
-        ...testCaseResult,
-      });
+        ...(await options.test({ testCase, result: { output: text } })),
+      };
+
+      printTestCaseResult(testCaseResult);
+
+      if (testCaseResult.decisionCode !== DecisionCode.ACCEPTED) break;
     } catch (error) {
+      const stopTimeMilliseconds = Date.now();
+
       printTestCaseResult({
         testCaseId: testCase.id,
         decisionCode: DecisionCode.RUNTIME_ERROR,
         stdin: testCase.input,
         stderr: error instanceof Error ? error.message : String(error),
+        timeSeconds: (stopTimeMilliseconds - startTimeMilliseconds) / 1000,
       });
+
+      break;
     }
   }
 }
