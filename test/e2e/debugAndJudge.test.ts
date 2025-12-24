@@ -320,7 +320,8 @@ test.each<
         testCaseId: '01_small_00',
         decisionCode: 1001,
         stdin: expect.any(String),
-        stderr: "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+        stderr:
+          "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
         timeSeconds: expect.any(Number),
       },
     ],
