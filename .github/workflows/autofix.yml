@@ -1,23 +1,9 @@
-name: autofix.ci
+name: Fix code automatically
 on:
   pull_request:
-  push:
-    branches:
-      - main
-permissions:
-  contents: read
 concurrency:
-  group: autofix-${{ github.head_ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   autofix:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          check-latest: true
-      - run: yarn install
-      - run: yarn run cleanup
-      - run: yarn run build
-      - uses: autofix-ci/action@v1
+    uses: WillBooster/reusable-workflows/.github/workflows/autofix.yml@main
