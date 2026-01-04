@@ -54,15 +54,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ai-sdk/google@npm:2.0.51":
-  version: 2.0.51
-  resolution: "@ai-sdk/google@npm:2.0.51"
+"@ai-sdk/google@npm:3.0.1":
+  version: 3.0.1
+  resolution: "@ai-sdk/google@npm:3.0.1"
   dependencies:
-    "@ai-sdk/provider": "npm:2.0.0"
-    "@ai-sdk/provider-utils": "npm:3.0.19"
+    "@ai-sdk/provider": "npm:3.0.0"
+    "@ai-sdk/provider-utils": "npm:4.0.1"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/77f2f573aea4039b0f3585422f5fcd3cde2d0219235cb43093d07ce8c47fde79c01d0d5cc118720a91b99f5caf7120fdd477a6bb7b3406c5df1b9c26bbab588a
+  checksum: 10c0/94b6cc10796e82e85048e7acddfdc854ee913b07396f5bafbe277698addc3494df9dc3958875e84be735081e4fee38196d7218731437dc21582a0c331b861ed5
   languageName: node
   linkType: hard
 
@@ -79,12 +79,34 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@ai-sdk/provider-utils@npm:4.0.1":
+  version: 4.0.1
+  resolution: "@ai-sdk/provider-utils@npm:4.0.1"
+  dependencies:
+    "@ai-sdk/provider": "npm:3.0.0"
+    "@standard-schema/spec": "npm:^1.1.0"
+    eventsource-parser: "npm:^3.0.6"
+  peerDependencies:
+    zod: ^3.25.76 || ^4.1.8
+  checksum: 10c0/f874702d8e8dcf07e1aa69087a0713528edaed6a45468758eb788dbceaef374868e5e880728e49bb15a78f6efc0893bb22b0ca0e9f73f38b9b89bcfb6084c29a
+  languageName: node
+  linkType: hard
+
 "@ai-sdk/provider@npm:2.0.0":
   version: 2.0.0
   resolution: "@ai-sdk/provider@npm:2.0.0"
   dependencies:
     json-schema: "npm:^0.4.0"
   checksum: 10c0/e50e520016c9fc0a8b5009cadd47dae2f1c81ec05c1792b9e312d7d15479f024ca8039525813a33425c884e3449019fed21043b1bfabd6a2626152ca9a388199
+  languageName: node
+  linkType: hard
+
+"@ai-sdk/provider@npm:3.0.0":
+  version: 3.0.0
+  resolution: "@ai-sdk/provider@npm:3.0.0"
+  dependencies:
+    json-schema: "npm:^0.4.0"
+  checksum: 10c0/520664b2bceb019fa398e8406d03070122d13a32efb491aa83cd156800a3eedf224985da984bccf97c9ad64e252870f92400d615858a4e2a57a442194c054031
   languageName: node
   linkType: hard
 
@@ -1720,7 +1742,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@exercode/problem-utils@workspace:."
   dependencies:
-    "@ai-sdk/google": "npm:2.0.51"
+    "@ai-sdk/google": "npm:3.0.1"
     "@tsconfig/node24": "npm:24.0.3"
     "@types/eslint": "npm:8.56.11"
     "@types/node": "npm:24.10.4"
@@ -2699,7 +2721,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@standard-schema/spec@npm:^1.0.0":
+"@standard-schema/spec@npm:^1.0.0, @standard-schema/spec@npm:^1.1.0":
   version: 1.1.0
   resolution: "@standard-schema/spec@npm:1.1.0"
   checksum: 10c0/d90f55acde4b2deb983529c87e8025fa693de1a5e8b49ecc6eb84d1fd96328add0e03d7d551442156c7432fd78165b2c26ff561b970a9a881f046abb78d6a526
