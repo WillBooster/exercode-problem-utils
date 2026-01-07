@@ -49,7 +49,7 @@
   },
   "prettier": "@willbooster/prettier-config",
   "dependencies": {
-    "@ai-sdk/google": "2.0.51",
+    "@ai-sdk/google": "3.0.2",
     "ai": "6.0.5",
     "front-matter": "4.0.2",
     "zod": "4.2.1"

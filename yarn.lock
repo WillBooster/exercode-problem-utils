@@ -54,28 +54,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ai-sdk/google@npm:2.0.51":
-  version: 2.0.51
-  resolution: "@ai-sdk/google@npm:2.0.51"
+"@ai-sdk/google@npm:3.0.2":
+  version: 3.0.2
+  resolution: "@ai-sdk/google@npm:3.0.2"
   dependencies:
-    "@ai-sdk/provider": "npm:2.0.0"
-    "@ai-sdk/provider-utils": "npm:3.0.19"
+    "@ai-sdk/provider": "npm:3.0.1"
+    "@ai-sdk/provider-utils": "npm:4.0.2"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/77f2f573aea4039b0f3585422f5fcd3cde2d0219235cb43093d07ce8c47fde79c01d0d5cc118720a91b99f5caf7120fdd477a6bb7b3406c5df1b9c26bbab588a
-  languageName: node
-  linkType: hard
-
-"@ai-sdk/provider-utils@npm:3.0.19":
-  version: 3.0.19
-  resolution: "@ai-sdk/provider-utils@npm:3.0.19"
-  dependencies:
-    "@ai-sdk/provider": "npm:2.0.0"
-    "@standard-schema/spec": "npm:^1.0.0"
-    eventsource-parser: "npm:^3.0.6"
-  peerDependencies:
-    zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/e4decb19264067fa1b1642e07d515d25d1509a1a9143f59ccc051e3ca413c9fb1d708e1052a70eaf329ca39ddf6152520cd833dbf8c95d9bf02bbeffae8ea363
+  checksum: 10c0/8c91b255872afd44ddd8c8937c4fa740eff5f20b5319115fbaa668649378b4acc80a8e2b21671a6e1d7ac86e934d445e44e36bfe94656b1dea69824a4fc75b58
   languageName: node
   linkType: hard
 
@@ -89,15 +76,6 @@ __metadata:
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
   checksum: 10c0/a2619fb2557acdd96f246ecce1aa04bb7c72eacadb371d62cbc60fc9ce76a3ca8d0fd37a43dc6184a3b835a303f46cdb24c0c73d2284e2020a06bf75789c9cb1
-  languageName: node
-  linkType: hard
-
-"@ai-sdk/provider@npm:2.0.0":
-  version: 2.0.0
-  resolution: "@ai-sdk/provider@npm:2.0.0"
-  dependencies:
-    json-schema: "npm:^0.4.0"
-  checksum: 10c0/e50e520016c9fc0a8b5009cadd47dae2f1c81ec05c1792b9e312d7d15479f024ca8039525813a33425c884e3449019fed21043b1bfabd6a2626152ca9a388199
   languageName: node
   linkType: hard
 
@@ -1742,7 +1720,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@exercode/problem-utils@workspace:."
   dependencies:
-    "@ai-sdk/google": "npm:2.0.51"
+    "@ai-sdk/google": "npm:3.0.2"
     "@tsconfig/node24": "npm:24.0.3"
     "@types/eslint": "npm:8.56.11"
     "@types/node": "npm:24.10.4"
