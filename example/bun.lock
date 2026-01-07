@@ -6,7 +6,7 @@
       "name": "example",
       "dependencies": {
         "@exercode/problem-utils": "file:..",
-        "puppeteer": "^24.34.0",
+        "puppeteer": "24.34.0",
       },
       "devDependencies": {
         "@tsconfig/node24": "24.0.3",
