@@ -198,6 +198,24 @@ test.each<
   [
     'example/a_plus_b',
     'judge.ts',
+    'model_answers.test/python_re',
+    {},
+    {},
+    [
+      {
+        testCaseId: '01_small_00',
+        decisionCode: 1001,
+        exitStatus: 1,
+        stdin: '1 1\n',
+        stderr: expect.stringContaining('ZeroDivisionError'),
+        timeSeconds: expect.any(Number),
+        memoryBytes: expect.any(Number),
+      },
+    ],
+  ],
+  [
+    'example/a_plus_b',
+    'judge.ts',
     'model_answers.test/python_wa',
     {},
     {},
