@@ -67,7 +67,9 @@ const TEST_CASES: readonly [string, (page: Page) => Promise<Omit<TestCaseResult,
 const args = parseArgs(process.argv);
 await using server = startHttpServer(args.cwd);
 
-const browser = await puppeteer.launch();
+const browser = await puppeteer.launch({
+  args: process.env.WB_DOCKER === '1' ? ['--no-sandbox', '--disable-setuid-sandbox'] : [],
+});
 const page = await browser.newPage();
 page.setDefaultTimeout(1000);
 
