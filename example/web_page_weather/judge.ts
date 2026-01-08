@@ -68,7 +68,7 @@ const args = parseArgs(process.argv);
 await using server = startHttpServer(args.cwd);
 
 const browser = await puppeteer.launch({
-  args: process.env.WB_DOCKER === '1' ? ['--no-sandbox', '--disable-setuid-sandbox'] : [],
+  args: process.env.CI || process.env.WB_DOCKER === '1' ? ['--no-sandbox', '--disable-setuid-sandbox'] : [],
 });
 const page = await browser.newPage();
 page.setDefaultTimeout(1000);
