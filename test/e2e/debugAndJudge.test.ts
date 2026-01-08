@@ -367,7 +367,11 @@ test.each<
     [
       { testCaseId: '01_h1', decisionCode: 2000 },
       { testCaseId: '02_hr', decisionCode: 2000 },
-      { testCaseId: '03_p', decisionCode: 1000, feedbackMarkdown: '`p`タグの件数が一致しません。\n4件必要ですが、3件見つかりました。' },
+      {
+        testCaseId: '03_p',
+        decisionCode: 1000,
+        feedbackMarkdown: '`p`タグの件数が一致しません。\n4件必要ですが、3件見つかりました。',
+      },
     ],
   ],
 ])(
