@@ -3,7 +3,7 @@ import http from 'node:http';
 import path from 'node:path';
 
 export interface HttpServer {
-  close(): Promise<void>;
+  [Symbol.asyncDispose](): Promise<void>;
   url: string;
   port: number | undefined;
 }
@@ -49,7 +49,7 @@ export function startHttpServer(dir: string): HttpServer {
   if (!address) throw new Error('server has been unexpectedly closed');
 
   return {
-    close: async () => {
+    [Symbol.asyncDispose]: async () => {
       server.closeAllConnections();
       await new Promise<void>((resolve) => {
         server.close(() => {
