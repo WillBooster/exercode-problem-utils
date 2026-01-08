@@ -344,6 +344,36 @@ test.each<
       },
     ],
   ],
+
+  // startHttpServer
+  [
+    'example/web_page_weather',
+    'judge.ts',
+    'model_answers/default',
+    {},
+    {},
+    [
+      { testCaseId: '01_h1', decisionCode: 2000 },
+      { testCaseId: '02_hr', decisionCode: 2000 },
+      { testCaseId: '03_p', decisionCode: 2000 },
+    ],
+  ],
+  [
+    'example/web_page_weather',
+    'judge.ts',
+    'model_answers.test/wa',
+    {},
+    {},
+    [
+      { testCaseId: '01_h1', decisionCode: 2000 },
+      { testCaseId: '02_hr', decisionCode: 2000 },
+      {
+        testCaseId: '03_p',
+        decisionCode: 1000,
+        feedbackMarkdown: '`p`タグの件数が一致しません。\n4件必要ですが、3件見つかりました。',
+      },
+    ],
+  ],
 ])(
   '%s %s %s %j',
   { timeout: 20_000, concurrent: true },
@@ -353,7 +383,7 @@ test.each<
     const tempDir = await fs.promises.mkdtemp(path.join('temp', 'judge_'));
     await fs.promises.cp(cwd, tempDir, { recursive: true });
 
-    const spawnResult = child_process.spawnSync('bun', [scriptFilename, argsCwd, JSON.stringify(argsParams)], {
+    const spawnResult = child_process.spawnSync('bun', ['run', scriptFilename, argsCwd, JSON.stringify(argsParams)], {
       cwd: tempDir,
       encoding: 'utf8',
       env: { ...process.env, ...env },
