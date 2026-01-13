@@ -1,6 +1,7 @@
 ---
 name: A + B
 timeLimitMs: 2000
+requiredSubmissionFilePaths: ['required.txt']
 requiredRegExpsInCode: ['\+']
 forbiddenRegExpsInCode: ['\bsum\s*\(']
 forbiddenTextsInCode: ['some_forbidden_name']
