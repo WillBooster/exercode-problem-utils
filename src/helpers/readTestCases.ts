@@ -8,6 +8,8 @@ export async function readTestCases(directory: string): Promise<
     shared?: { fileInputPath?: string };
   }
 > {
+  if (!fs.existsSync(directory)) return [];
+
   const idSet = new Set<string>();
   const idToInput = new Map<string, string>();
   const idToOutput = new Map<string, string>();
