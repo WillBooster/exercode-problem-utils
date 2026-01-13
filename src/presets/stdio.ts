@@ -158,6 +158,10 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
 
   const cwdSnapshot = await snapshotWorkingDirectory(args.cwd);
 
+  if (testCases.length === 0) {
+    printTestCaseResult({ testCaseId: 'default', decisionCode: DecisionCode.ACCEPTED });
+  }
+
   for (const testCase of testCases) {
     // prepare test case
     if (testCases.shared?.fileInputPath) await copyTestCaseFileInput(testCases.shared.fileInputPath, args.cwd);
