@@ -140,6 +140,21 @@ test.each<
   [
     'example/a_plus_b',
     'judge.ts',
+    'model_answers.test/python_mrsfe',
+    {},
+    {},
+    [
+      {
+        testCaseId: '01_small_00',
+        decisionCode: 1201,
+        feedbackMarkdown:
+          'ファイルが不足しています。\n次のファイルを追加してから再度提出してください。\n\n- `required.txt`\n',
+      },
+    ],
+  ],
+  [
+    'example/a_plus_b',
+    'judge.ts',
     'model_answers.test/python_fpe',
     {},
     {},

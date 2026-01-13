@@ -12,13 +12,17 @@ export async function judgeByStaticAnalysis(
   cwd: string,
   problemMarkdownFrontMatterLike: Pick<
     ProblemMarkdownFrontMatter,
-    'forbiddenRegExpsInCode' | 'forbiddenTextsInCode' | 'requiredRegExpsInCode'
+    'forbiddenRegExpsInCode' | 'forbiddenTextsInCode' | 'requiredRegExpsInCode' | 'requiredSubmissionFilePaths'
   >
 ): Promise<Pick<TestCaseResult, 'decisionCode' | 'feedbackMarkdown'> | undefined> {
+  const filePathSet = new Set<string>();
   const sourceCodeWithoutCommentFiles: { path: string; data: string }[] = [];
 
   for (const dirent of await fs.promises.readdir(cwd, { withFileTypes: true, recursive: true })) {
     if (!dirent.isFile()) continue;
+
+    const relativePath = path.relative(cwd, path.join(dirent.parentPath, dirent.name));
+    filePathSet.add(relativePath);
 
     const text = await fs.promises.readFile(path.join(dirent.parentPath, dirent.name), 'utf8');
     const isBinary = text.includes('\uFFFD');
@@ -31,6 +35,23 @@ export async function judgeByStaticAnalysis(
       path: dirent.name,
       data: languageDefinition.grammer ? removeCommentsInSourceCode(languageDefinition.grammer, text) : text,
     });
+  }
+
+  if (problemMarkdownFrontMatterLike.requiredSubmissionFilePaths) {
+    const missingFilePaths = problemMarkdownFrontMatterLike.requiredSubmissionFilePaths
+      .filter((p) => !filePathSet.has(p))
+      .toSorted();
+
+    if (missingFilePaths.length > 0) {
+      return {
+        decisionCode: DecisionCode.MISSING_REQUIRED_SUBMISSION_FILE_ERROR,
+        feedbackMarkdown: `ファイルが不足しています。
+次のファイルを追加してから再度提出してください。
+
+${missingFilePaths.map((p) => `- \`${p}\``).join('\n')}
+`,
+      };
+    }
   }
 
   const forbiddenFounds: { pattern: string; path: string; match: string }[] = [];
