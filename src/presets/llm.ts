@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { google } from '@ai-sdk/google';
+import type { ModelMessage } from 'ai';
 import { generateText } from 'ai';
 import { z } from 'zod';
 
@@ -18,6 +19,10 @@ const judgeParamsSchema = z.object({
 });
 
 interface LlmJudgePresetOptions {
+  buildPrompt?: (context: {
+    prompt: string;
+    testCase: { id: string; input?: string; output?: string };
+  }) => string | ModelMessage[];
   test: (context: {
     testCase: { id: string; input?: string; output?: string };
     result: { output: string };
@@ -59,7 +64,7 @@ export async function llmJudgePreset(problemDir: string, options: LlmJudgePreset
       // requires `GOOGLE_GENERATIVE_AI_API_KEY`
       const { text } = await generateText({
         model: google(params.model.slice('google/'.length)),
-        prompt: prompt.replaceAll('{input}', testCase.input ?? ''),
+        prompt: options.buildPrompt?.({ prompt, testCase }) ?? prompt.replaceAll('{input}', testCase.input ?? ''),
       });
 
       const stopTimeMilliseconds = Date.now();
