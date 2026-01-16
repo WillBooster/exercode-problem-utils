@@ -1,8 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { bedrock } from '@ai-sdk/amazon-bedrock';
 import { google } from '@ai-sdk/google';
-import type { ModelMessage } from 'ai';
+import { openai } from '@ai-sdk/openai';
+import { xai } from '@ai-sdk/xai';
+import type { LanguageModel, ModelMessage } from 'ai';
 import { generateText } from 'ai';
 import { z } from 'zod';
 
@@ -14,8 +17,19 @@ import type { TestCaseResult } from '../types/testCaseResult.js';
 
 const PROMPT_FILENAME = 'prompt.txt';
 
+const providerByName: Record<string, typeof bedrock | typeof google | typeof openai | typeof xai> = {
+  // requires `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`
+  bedrock,
+  // requires `GOOGLE_GENERATIVE_AI_API_KEY`
+  google,
+  // requires `OPENAI_API_KEY`
+  openai,
+  // requires `XAI_API_KEY`
+  xai,
+} as const;
+
 const judgeParamsSchema = z.object({
-  model: z.enum(['google/gemini-2.5-flash-lite']),
+  model: z.string().min(1),
 });
 
 interface LlmJudgePresetOptions {
@@ -61,9 +75,8 @@ export async function llmJudgePreset(problemDir: string, options: LlmJudgePreset
   for (const testCase of testCases) {
     const startTimeMilliseconds = Date.now();
     try {
-      // requires `GOOGLE_GENERATIVE_AI_API_KEY`
       const { text } = await generateText({
-        model: google(params.model.slice('google/'.length)),
+        model: toLanguageModel(params.model),
         prompt: options.buildPrompt?.({ prompt, testCase }) ?? prompt.replaceAll('{input}', testCase.input ?? ''),
       });
 
@@ -95,4 +108,12 @@ export async function llmJudgePreset(problemDir: string, options: LlmJudgePreset
       break;
     }
   }
+}
+
+function toLanguageModel(model: string): LanguageModel {
+  const [providerId, modelId] = model.split('/');
+  if (!providerId || !modelId) throw new Error(`bad model: ${model}`);
+  const languageModel = providerByName[providerId]?.(modelId);
+  if (!languageModel) throw new Error(`model not found: ${model}`);
+  return languageModel;
 }
