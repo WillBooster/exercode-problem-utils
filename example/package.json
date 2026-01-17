@@ -7,11 +7,11 @@
   "type": "module",
   "dependencies": {
     "@exercode/problem-utils": "file:..",
-    "puppeteer": "24.34.0"
+    "puppeteer": "24.35.0"
   },
   "devDependencies": {
     "@tsconfig/node24": "24.0.3",
-    "@types/node": "25.0.3",
+    "@types/node": "25.0.6",
     "typescript": "5.9.3"
   },
   "packageManager": "bun@1.3.1"
