@@ -1837,7 +1837,7 @@ __metadata:
     "@types/node": "npm:24.10.9"
     "@willbooster/eslint-config-ts": "npm:11.4.12"
     "@willbooster/prettier-config": "npm:10.2.4"
-    ai: "npm:6.0.40"
+    ai: "npm:6.0.41"
     build-ts: "npm:17.0.14"
     conventional-changelog-conventionalcommits: "npm:9.1.0"
     dotenv-cli: "npm:11.0.0"
@@ -3562,9 +3562,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ai@npm:6.0.40":
-  version: 6.0.40
-  resolution: "ai@npm:6.0.40"
+"ai@npm:6.0.41":
+  version: 6.0.41
+  resolution: "ai@npm:6.0.41"
   dependencies:
     "@ai-sdk/gateway": "npm:3.0.16"
     "@ai-sdk/provider": "npm:3.0.4"
@@ -3572,7 +3572,7 @@ __metadata:
     "@opentelemetry/api": "npm:1.9.0"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/9edd3fb6100a3250b5eacce430af6906555a471abbe1797013ce66dbbb08b9d122bc685d3903c506758f9a358a03305817192241372954d1bee3193edfffbe50
+  checksum: 10c0/a5a2408d74b1588327312446038886c5642d1ca61e8d0654c9a41cc19bb13bd25759f3e8fec64ad4dd2484fc89f0a4401ac7b3683599ae2283899efdba973a13
   languageName: node
   linkType: hard
 
