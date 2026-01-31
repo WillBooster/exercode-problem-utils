@@ -106,15 +106,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ai-sdk/openai@npm:3.0.18":
-  version: 3.0.18
-  resolution: "@ai-sdk/openai@npm:3.0.18"
+"@ai-sdk/openai@npm:3.0.19":
+  version: 3.0.19
+  resolution: "@ai-sdk/openai@npm:3.0.19"
   dependencies:
     "@ai-sdk/provider": "npm:3.0.5"
     "@ai-sdk/provider-utils": "npm:4.0.9"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/aff0e84cb2299496b66e93e26375b8d4f17d6083438b9f52b079c563ea0f3fba239df7446d24007f72c501b691f0f20822f987d1f989e872a7b6ea3e81ef8160
+  checksum: 10c0/a71d6db3a95ccc20be838173c12a6680985477f8ef106e380f08593ed12eac87c5210ccd1159343fe6615c8dd5db5230a5584e31bc31902b4cb848fa032ce40c
   languageName: node
   linkType: hard
 
@@ -1819,7 +1819,7 @@ __metadata:
   dependencies:
     "@ai-sdk/amazon-bedrock": "npm:4.0.30"
     "@ai-sdk/google": "npm:3.0.13"
-    "@ai-sdk/openai": "npm:3.0.18"
+    "@ai-sdk/openai": "npm:3.0.19"
     "@ai-sdk/xai": "npm:3.0.34"
     "@tsconfig/node24": "npm:24.0.4"
     "@types/eslint": "npm:8.56.11"
