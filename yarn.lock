@@ -82,15 +82,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ai-sdk/google@npm:3.0.22":
-  version: 3.0.22
-  resolution: "@ai-sdk/google@npm:3.0.22"
+"@ai-sdk/google@npm:3.0.23":
+  version: 3.0.23
+  resolution: "@ai-sdk/google@npm:3.0.23"
   dependencies:
     "@ai-sdk/provider": "npm:3.0.8"
     "@ai-sdk/provider-utils": "npm:4.0.14"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/4e6ae84bdc9cd54a908d8293b8a91f8ee734d64cdfb120fa0c32df3d2d08817c23d1608fab97297401320da5119b65e7d75acf4e349eef869376e650ca904e83
+  checksum: 10c0/617ea5165786c038f7f8768ddcbef9f925b15bd962949ea924170f9f8feb2ff06475161082f1b643b6fb4a2442823c8f777694a4664de77c886ce73050f3dec1
   languageName: node
   linkType: hard
 
@@ -1885,7 +1885,7 @@ __metadata:
   resolution: "@exercode/problem-utils@workspace:."
   dependencies:
     "@ai-sdk/amazon-bedrock": "npm:4.0.52"
-    "@ai-sdk/google": "npm:3.0.22"
+    "@ai-sdk/google": "npm:3.0.23"
     "@ai-sdk/openai": "npm:3.0.26"
     "@ai-sdk/xai": "npm:3.0.49"
     "@tsconfig/node24": "npm:24.0.4"
