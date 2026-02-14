@@ -41,11 +41,11 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ai-sdk/amazon-bedrock@npm:4.0.51":
-  version: 4.0.51
-  resolution: "@ai-sdk/amazon-bedrock@npm:4.0.51"
+"@ai-sdk/amazon-bedrock@npm:4.0.52":
+  version: 4.0.52
+  resolution: "@ai-sdk/amazon-bedrock@npm:4.0.52"
   dependencies:
-    "@ai-sdk/anthropic": "npm:3.0.38"
+    "@ai-sdk/anthropic": "npm:3.0.39"
     "@ai-sdk/provider": "npm:3.0.8"
     "@ai-sdk/provider-utils": "npm:4.0.14"
     "@smithy/eventstream-codec": "npm:^4.0.1"
@@ -53,19 +53,19 @@ __metadata:
     aws4fetch: "npm:^1.0.20"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/6926e39f0f6573b91af152b9922f5eba54efe81e764a13941548a533dbaa8f89541c105411dbd7f65338dbe5717ae4558442c9413e05773053b2e8d549b76330
+  checksum: 10c0/0b95eba57cc84c544b581d4d46325904951e310875678b5f2348a12c6321e83e56a609b574455f6dd00de5ec3ca08150caaae456f54f9b59bb060e2b26f5ca5c
   languageName: node
   linkType: hard
 
-"@ai-sdk/anthropic@npm:3.0.38":
-  version: 3.0.38
-  resolution: "@ai-sdk/anthropic@npm:3.0.38"
+"@ai-sdk/anthropic@npm:3.0.39":
+  version: 3.0.39
+  resolution: "@ai-sdk/anthropic@npm:3.0.39"
   dependencies:
     "@ai-sdk/provider": "npm:3.0.8"
     "@ai-sdk/provider-utils": "npm:4.0.14"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/ba380516fd3752d14d03ff7f138eed5f21b21beec0ef4eb44bb22d337586173b39f889c4667b5a44fc6d38b5fecd40046fba570c0925eecec6438cf7bdf3fcb9
+  checksum: 10c0/d2ed00de30bd37e5df88f4c9651732132039d6ab79bc9f3d77802d2be6bbdfec6729c4d61e3eb72b134ac3a96566301ab8efc54bb1af757ea3c528281ed266a0
   languageName: node
   linkType: hard
 
@@ -1884,7 +1884,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@exercode/problem-utils@workspace:."
   dependencies:
-    "@ai-sdk/amazon-bedrock": "npm:4.0.51"
+    "@ai-sdk/amazon-bedrock": "npm:4.0.52"
     "@ai-sdk/google": "npm:3.0.22"
     "@ai-sdk/openai": "npm:3.0.26"
     "@ai-sdk/xai": "npm:3.0.48"
