@@ -110,6 +110,27 @@ const acceptedTestCaseResultsForAPlusBFile = [
   },
 ] as const satisfies readonly TestCaseResult[];
 
+const acceptedTestCaseResultsForFileCommand = [
+  {
+    testCaseId: 'smallest',
+    decisionCode: 2000,
+    exitStatus: 0,
+    stdin: 'temp/smallest',
+    stdout: 'readme.txt\n',
+    timeSeconds: expect.any(Number),
+    memoryBytes: expect.any(Number),
+  },
+  {
+    testCaseId: 'symbols',
+    decisionCode: 2000,
+    exitStatus: 0,
+    stdin: 'temp/symbols',
+    stdout: 'short.txt\n',
+    timeSeconds: expect.any(Number),
+    memoryBytes: expect.any(Number),
+  },
+] as const satisfies readonly TestCaseResult[];
+
 test.each<
   [string, string, string, Record<string, unknown>, Record<string, string | undefined>, readonly TestCaseResult[]]
 >([
@@ -386,6 +407,33 @@ test.each<
         testCaseId: '03_p',
         decisionCode: 1000,
         feedbackMarkdown: '`p`タグの件数が一致しません。\n4件必要ですが、3件見つかりました。',
+      },
+    ],
+  ],
+  [
+    'example/file_command_min_length',
+    'judge.ts',
+    'model_answers/default',
+    {},
+    {},
+    acceptedTestCaseResultsForFileCommand,
+  ],
+  [
+    'example/file_command_min_length',
+    'judge.ts',
+    'model_answers.test/wa',
+    {},
+    {},
+    [
+      {
+        testCaseId: 'smallest',
+        decisionCode: 1000,
+        exitStatus: 0,
+        stdin: 'temp/smallest',
+        feedbackMarkdown: '期待したファイル名: `readme.txt`',
+        stdout: expect.any(String),
+        timeSeconds: expect.any(Number),
+        memoryBytes: expect.any(Number),
       },
     ],
   ],
