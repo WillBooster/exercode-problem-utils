@@ -1832,12 +1832,12 @@ __metadata:
     "@ai-sdk/xai": "npm:3.0.67"
     "@tsconfig/node24": "npm:24.0.4"
     "@types/eslint": "npm:8.56.11"
-    "@types/node": "npm:24.11.0"
+    "@types/node": "npm:24.12.0"
     "@willbooster/eslint-config-ts": "npm:11.4.12"
     "@willbooster/prettier-config": "npm:10.2.4"
     ai: "npm:6.0.116"
     build-ts: "npm:17.0.21"
-    conventional-changelog-conventionalcommits: "npm:9.2.0"
+    conventional-changelog-conventionalcommits: "npm:9.3.0"
     dotenv-cli: "npm:11.0.0"
     eslint: "npm:9.39.1"
     eslint-config-flat-gitignore: "npm:2.2.1"
@@ -1856,7 +1856,7 @@ __metadata:
     pinst: "npm:3.0.0"
     prettier: "npm:3.8.1"
     prettier-plugin-java: "npm:2.8.1"
-    puppeteer: "npm:24.37.5"
+    puppeteer: "npm:24.38.0"
     semantic-release: "npm:25.0.3"
     sort-package-json: "npm:3.6.1"
     typescript: "npm:5.9.3"
@@ -3025,12 +3025,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:24.11.0":
-  version: 24.11.0
-  resolution: "@types/node@npm:24.11.0"
+"@types/node@npm:24.12.0":
+  version: 24.12.0
+  resolution: "@types/node@npm:24.12.0"
   dependencies:
     undici-types: "npm:~7.16.0"
-  checksum: 10c0/4fb7390259e3b158d25dbecf52de8ce70fa18a4ed0949c9444bb6384517c361fa19781e6821ca8c18dc5f6af43eab72e9e159e07000e6b1286d082e8585d8c41
+  checksum: 10c0/8b31c0af5b5474f13048a4e77c57f22cd4f8fe6e58c4b6fde9456b0c13f46a5bfaf5744ff88fd089581de9f0d6e99c584e022681de7acb26a58d258c654c4843
   languageName: node
   linkType: hard
 
@@ -4404,12 +4404,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"conventional-changelog-conventionalcommits@npm:9.2.0":
-  version: 9.2.0
-  resolution: "conventional-changelog-conventionalcommits@npm:9.2.0"
+"conventional-changelog-conventionalcommits@npm:9.3.0":
+  version: 9.3.0
+  resolution: "conventional-changelog-conventionalcommits@npm:9.3.0"
   dependencies:
     compare-func: "npm:^2.0.0"
-  checksum: 10c0/1ea8f1b9a9044680c3faf9d7a963a95d65bcec45815426ebdd00f1bd2bfa26aa26c454ebaa3fb67f3dd2c1b69ad48f25f20dd7837b535210576d3e18d5e8f3a7
+  checksum: 10c0/36be9435bb1f6e97bc729a1e69471851b6621054980617dc9a82c03221de5f9c21cd2369308c364f89b2383bd596071f90c8c71efdbe7a2908f91a935685fc76
   languageName: node
   linkType: hard
 
@@ -4620,10 +4620,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"devtools-protocol@npm:0.0.1566079":
-  version: 0.0.1566079
-  resolution: "devtools-protocol@npm:0.0.1566079"
-  checksum: 10c0/a220a0a408df35efe118249d822d7b79874a1374b4eba0d59473a3d98623c7d0159f9833541086eeaa0da18f92e450b1c099cdbc6525277e804e2571cd530b8a
+"devtools-protocol@npm:0.0.1581282":
+  version: 0.0.1581282
+  resolution: "devtools-protocol@npm:0.0.1581282"
+  checksum: 10c0/8df3b3bccaa8e5ac8915c29bb6ebece350ca8781ec7689bec90dfa6a479682a1b389abd964fe7dc7610d91c96850311aa614c4414b478bee70cabd3cf154ac93
   languageName: node
   linkType: hard
 
@@ -7772,34 +7772,34 @@ __metadata:
   languageName: node
   linkType: hard
 
-"puppeteer-core@npm:24.37.5":
-  version: 24.37.5
-  resolution: "puppeteer-core@npm:24.37.5"
+"puppeteer-core@npm:24.38.0":
+  version: 24.38.0
+  resolution: "puppeteer-core@npm:24.38.0"
   dependencies:
     "@puppeteer/browsers": "npm:2.13.0"
     chromium-bidi: "npm:14.0.0"
     debug: "npm:^4.4.3"
-    devtools-protocol: "npm:0.0.1566079"
-    typed-query-selector: "npm:^2.12.0"
+    devtools-protocol: "npm:0.0.1581282"
+    typed-query-selector: "npm:^2.12.1"
     webdriver-bidi-protocol: "npm:0.4.1"
     ws: "npm:^8.19.0"
-  checksum: 10c0/6357c1d9e84f8e0f0a3214783f7af6ce52fe039ecfef6a0a122d51cf6c0c4a96d7a346ad7ff76fcba3a020bebe4cca2e1978fc8275312f1edbd5bc67a26e5d47
+  checksum: 10c0/999cf60c5a4b35750b85477a5a342a23603298c430ded378927a8c681d5020a0022d541ef0f31a53886ce111810771a211ba89904d92e78ddd1ad91313a9d14a
   languageName: node
   linkType: hard
 
-"puppeteer@npm:24.37.5":
-  version: 24.37.5
-  resolution: "puppeteer@npm:24.37.5"
+"puppeteer@npm:24.38.0":
+  version: 24.38.0
+  resolution: "puppeteer@npm:24.38.0"
   dependencies:
     "@puppeteer/browsers": "npm:2.13.0"
     chromium-bidi: "npm:14.0.0"
     cosmiconfig: "npm:^9.0.0"
-    devtools-protocol: "npm:0.0.1566079"
-    puppeteer-core: "npm:24.37.5"
-    typed-query-selector: "npm:^2.12.0"
+    devtools-protocol: "npm:0.0.1581282"
+    puppeteer-core: "npm:24.38.0"
+    typed-query-selector: "npm:^2.12.1"
   bin:
     puppeteer: lib/cjs/puppeteer/node/cli.js
-  checksum: 10c0/28f1e72ca44ba5df9a8913f987aabb929dce004f98f7a245ce9ddb33ce31bd42e385a63a5b6b9d30eefbd7b2c2bf6e89c9704771182b3fcee7dd106bf911e18c
+  checksum: 10c0/0f195e5d1fe2b9e71034b9f63cb74f48b7ede1f42714caa1935361bc93376e2d488323339314ac2b4c9622c46221122f6d411ef371e074334a9d6ba37dadccd6
   languageName: node
   linkType: hard
 
@@ -9102,7 +9102,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typed-query-selector@npm:^2.12.0":
+"typed-query-selector@npm:^2.12.1":
   version: 2.12.1
   resolution: "typed-query-selector@npm:2.12.1"
   checksum: 10c0/2c81c8560910d87f98a64e1c0b03247a7c94c3703d11f2f048553718c18da8dcab8469be76a39d2d258f0ff5a9b0bf419394d8b1c804fdf72a06181a0631d70d
