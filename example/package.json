@@ -7,7 +7,7 @@
   "type": "module",
   "dependencies": {
     "@exercode/problem-utils": "file:..",
-    "puppeteer": "24.39.1"
+    "puppeteer": "24.40.0"
   },
   "devDependencies": {
     "@tsconfig/node24": "24.0.4",
