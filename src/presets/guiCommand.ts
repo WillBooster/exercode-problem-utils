@@ -12,6 +12,7 @@ import { findLanguageDefinitionByPath } from '../helpers/findLanguageDefinitionB
 import { judgeByStaticAnalysis } from '../helpers/judgeByStaticAnalysis.js';
 import { parseArgs } from '../helpers/parseArgs.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
+import { readOutputFiles } from '../helpers/readOutputFiles.js';
 import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases as readFileTestCases } from '../helpers/readTestCases.js';
 import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
@@ -92,6 +93,7 @@ export interface GuiCommandJudgePresetOptions<TTestCase extends BaseGuiTestCase 
   test: (context: {
     testCase: TTestCase;
     runResult: GuiCommandRunResult;
+    outputFiles: NonNullable<TestCaseResult['outputFiles']>;
     context: GuiJudgeContext;
   }) => Promise<Partial<GuiJudgeCaseResult>> | Partial<GuiJudgeCaseResult>;
 }
@@ -211,7 +213,7 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
   }
 
   const cwdSnapshot = await snapshotWorkingDirectory(args.cwd);
-  const displayServer = await ensureDisplayServer();
+  const displayServer = options.runCommand ? undefined : await ensureDisplayServer();
   try {
     const sharedFileInputPath = (configuredTestCases as { shared?: { fileInputPath?: string } }).shared?.fileInputPath;
     for (const testCase of testCases) {
@@ -223,7 +225,7 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
           ? problemMarkdownFrontMatter.timeLimitMs / 1000
           : (options.runTimeoutSeconds ?? JUDGE_DEFAULT_TIMEOUT_SECONDS);
 
-      const runEnv = { ...env, DISPLAY: displayServer.display };
+      const runEnv = displayServer ? { ...env, DISPLAY: displayServer.display } : env;
       const stdin = (await options.resolveInput?.({ testCase, cwd: args.cwd, env: runEnv })) ?? testCase.input ?? '';
       const command =
         (await options.command?.({ testCase, cwd: args.cwd, env: runEnv, mainFilePath: resolvedMainFilePath })) ??
@@ -262,6 +264,7 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
         return;
       }
 
+      const outputFiles = await readOutputFiles(args.cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
       const judgeContext: GuiJudgeContext = {
         timeLimitSeconds,
         problemMarkdownFrontMatter: {
@@ -269,13 +272,14 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
           requiredOutputFilePaths: problemMarkdownFrontMatter.requiredOutputFilePaths,
         },
       };
-      const baseJudgeResult = evaluateGuiRunResult({ runResult, context: judgeContext });
+      const baseJudgeResult = evaluateGuiRunResult({ runResult, outputFiles, context: judgeContext });
       let judgeResult = baseJudgeResult;
       if (baseJudgeResult.decisionCode === DecisionCode.ACCEPTED) {
         try {
           const extendedJudgeResult = await options.test({
             testCase,
             runResult,
+            outputFiles,
             context: judgeContext,
           });
           judgeResult = {
@@ -305,14 +309,14 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
         stderr: stderr || undefined,
         timeSeconds: runResult.timeSeconds,
         feedbackMarkdown: judgeResult.feedbackMarkdown,
-        outputFiles: judgeResult.outputFiles,
+        outputFiles: judgeResult.outputFiles ?? (outputFiles.length > 0 ? outputFiles : undefined),
       });
 
       await cleanWorkingDirectory(args.cwd, cwdSnapshot);
       if (decisionCode !== DecisionCode.ACCEPTED) break;
     }
   } finally {
-    await displayServer.dispose();
+    await displayServer?.dispose();
   }
 }
 
@@ -364,6 +368,7 @@ function runDefaultPrepare(context: {
 
 function evaluateGuiRunResult(context: {
   runResult: GuiCommandRunResult;
+  outputFiles: NonNullable<TestCaseResult['outputFiles']>;
   context: GuiJudgeContext;
 }): Partial<GuiJudgeCaseResult> {
   if (context.runResult.stopReason === 'timeout') {
@@ -377,6 +382,13 @@ function evaluateGuiRunResult(context: {
     return {
       decisionCode: DecisionCode.RUNTIME_ERROR,
       stderr: context.runResult.stderr,
+    };
+  }
+
+  const requiredOutputFilesCount = context.context.problemMarkdownFrontMatter.requiredOutputFilePaths?.length ?? 0;
+  if (context.outputFiles.length < requiredOutputFilesCount) {
+    return {
+      decisionCode: DecisionCode.MISSING_REQUIRED_OUTPUT_FILE_ERROR,
     };
   }
 
@@ -477,17 +489,18 @@ async function spawnGuiProgram(context: {
 function takeScreenshots(display: string | undefined): GuiScreenshotFile[] {
   const env = display ? { ...process.env, DISPLAY: display } : process.env;
   const xwininfo = childProcess.spawnSync('xwininfo', ['-root', '-tree'], { encoding: 'utf8', env });
+  if (xwininfo.error) throw xwininfo.error;
   if (xwininfo.status !== 0 || !xwininfo.stdout) return [];
 
   const screenshots: GuiScreenshotFile[] = [];
   for (const windowId of extractTopLevelWindowIds(xwininfo.stdout)) {
     const screenshot = childProcess.spawnSync('maim', ['-i', windowId], { env });
+    if (screenshot.error) throw screenshot.error;
     if (screenshot.status !== 0 || screenshot.stdout.length === 0) continue;
 
-    const windowName = childProcess
-      .spawnSync('xdotool', ['getwindowname', windowId], { encoding: 'utf8', env })
-      .stdout.trim()
-      .replaceAll(/[\s/]/g, '_');
+    const windowNameResult = childProcess.spawnSync('xdotool', ['getwindowname', windowId], { encoding: 'utf8', env });
+    if (windowNameResult.error) throw windowNameResult.error;
+    const windowName = windowNameResult.stdout.trim().replaceAll(/[\s/]/g, '_');
 
     screenshots.push({
       path: `${windowName || 'window'}_${windowId}.png`,
@@ -516,21 +529,22 @@ function extractTopLevelWindowIds(stdout: string): string[] {
 }
 
 async function ensureDisplayServer(): Promise<{ display: string; dispose: () => Promise<void> }> {
-  if (process.env.DISPLAY) {
-    return { display: process.env.DISPLAY, dispose: () => Promise.resolve() };
-  }
-
   if (process.platform !== 'linux') {
     throw new Error('GUI screenshot capture is supported only on Linux.');
   }
 
   for (let displayNumber = 90; displayNumber < 100; displayNumber++) {
     const display = `:${displayNumber}`;
+    let spawnError: Error | undefined;
     const xvfb = childProcess.spawn('Xvfb', [display, '-screen', '0', '1280x1024x24', '-ac'], {
       stdio: 'ignore',
     });
+    xvfb.on('error', (error) => {
+      spawnError = error;
+    });
 
     await wait(300);
+    if (spawnError) throw spawnError;
     if (xvfb.exitCode !== null) continue;
 
     return {
