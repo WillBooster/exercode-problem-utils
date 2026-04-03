@@ -18,6 +18,7 @@ await guiCommandJudgePreset(import.meta.dirname, {
             stderr: '',
             status: 0,
             timeSeconds: 0.1,
+            memoryBytes: 0,
             screenshots: [{ path: mockScreenshotPath, data: 'mock-image', encoding: 'base64' }],
             stopReason: 'stable_screenshot',
           }) satisfies GuiCommandRunResult,

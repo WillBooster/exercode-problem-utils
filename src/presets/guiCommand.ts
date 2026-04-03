@@ -1,5 +1,6 @@
 import childProcess from 'node:child_process';
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { setTimeout as wait } from 'node:timers/promises';
 
@@ -17,6 +18,7 @@ import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFr
 import { readTestCases as readFileTestCases } from '../helpers/readTestCases.js';
 import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
 import { DecisionCode } from '../types/decisionCode.js';
+import { languageIdToDefinition } from '../types/language.js';
 import type { ProblemMarkdownFrontMatter } from '../types/problem.js';
 import type { TestCaseResult } from '../types/testCaseResult.js';
 
@@ -24,6 +26,7 @@ const BUILD_TIMEOUT_SECONDS = 10;
 const JUDGE_DEFAULT_TIMEOUT_SECONDS = 5;
 const SCREENSHOT_WAIT_MILLISECONDS = 300;
 const STOP_DETECTION_THRESHOLD = 5;
+const TIME_COMMAND = [os.platform() === 'darwin' ? 'gtime' : '/usr/bin/time', '--format', '%e %M'] as const;
 
 const judgeParamsSchema = z.object({
   language: z.union([z.string(), z.array(z.string())]).optional(),
@@ -47,6 +50,7 @@ export interface GuiCommandRunResult {
   stderr: string;
   status: number | undefined;
   timeSeconds: number;
+  memoryBytes: number;
   screenshots: GuiScreenshotFile[];
   stopReason: 'process_exit' | 'stable_screenshot' | 'timeout';
 }
@@ -139,12 +143,8 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
     return;
   }
 
-  const mainFilePath = await resolveMainFilePath({
-    cwd: args.cwd,
-    language: params.language,
-    configuredMainFilePath: options.mainFilePath,
-  });
-  if (!mainFilePath) {
+  const initialMainFilePath = options.mainFilePath ?? (await findEntryPointFile(args.cwd, params.language));
+  if (!initialMainFilePath) {
     printTestCaseResult({
       testCaseId: prebuildTestCaseId,
       decisionCode: DecisionCode.MISSING_REQUIRED_SUBMISSION_FILE_ERROR,
@@ -155,7 +155,7 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
     return;
   }
 
-  const languageDefinition = findLanguageDefinitionByPath(mainFilePath);
+  const languageDefinition = findLanguageDefinitionByPath(initialMainFilePath);
   if (!languageDefinition) {
     printTestCaseResult({
       testCaseId: prebuildTestCaseId,
@@ -167,14 +167,19 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
 
   const env = { ...process.env, CI: '', FORCE_COLOR: '0' };
 
-  let resolvedMainFilePath = mainFilePath;
+  let resolvedMainFilePath = await resolveMainFilePath({
+    cwd: args.cwd,
+    language: params.language,
+    configuredMainFilePath: options.mainFilePath,
+  });
   if (languageDefinition.prebuild) {
     try {
       await languageDefinition.prebuild(args.cwd);
       const prebuiltMainFilePath = await resolveMainFilePath({
         cwd: args.cwd,
-        language: params.language,
+        language: params.language ?? inferLanguageIdsByPath(initialMainFilePath),
         configuredMainFilePath: options.mainFilePath,
+        allowConfiguredPathFallback: true,
       });
       if (prebuiltMainFilePath) resolvedMainFilePath = prebuiltMainFilePath;
     } catch (error) {
@@ -185,6 +190,16 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
       });
       return;
     }
+  }
+  if (!resolvedMainFilePath) {
+    printTestCaseResult({
+      testCaseId: prebuildTestCaseId,
+      decisionCode: DecisionCode.MISSING_REQUIRED_SUBMISSION_FILE_ERROR,
+      stderr: options.mainFilePath
+        ? `required main file not found: ${options.mainFilePath}`
+        : `main file not found${params.language ? `: language: ${params.language}` : ''}`,
+    });
+    return;
   }
 
   const prepareResult =
@@ -213,10 +228,14 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
   }
 
   const cwdSnapshot = await snapshotWorkingDirectory(args.cwd);
-  const displayServer = options.runCommand ? undefined : await ensureDisplayServer();
+  let displayServer: Awaited<ReturnType<typeof ensureDisplayServer>> | undefined;
+  let currentTestCaseId = prebuildTestCaseId;
+  let currentStdin: string | undefined;
   try {
+    displayServer = options.runCommand ? undefined : await ensureDisplayServer();
     const sharedFileInputPath = (configuredTestCases as { shared?: { fileInputPath?: string } }).shared?.fileInputPath;
     for (const testCase of testCases) {
+      currentTestCaseId = testCase.id;
       if (sharedFileInputPath) await copyTestCaseFileInput(sharedFileInputPath, args.cwd);
       if (testCase.fileInputPath) await copyTestCaseFileInput(testCase.fileInputPath, args.cwd);
 
@@ -227,6 +246,7 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
 
       const runEnv = displayServer ? { ...env, DISPLAY: displayServer.display } : env;
       const stdin = (await options.resolveInput?.({ testCase, cwd: args.cwd, env: runEnv })) ?? testCase.input ?? '';
+      currentStdin = stdin;
       const command =
         (await options.command?.({ testCase, cwd: args.cwd, env: runEnv, mainFilePath: resolvedMainFilePath })) ??
         languageDefinition.command(resolvedMainFilePath);
@@ -308,6 +328,7 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
         stdout: stdout || undefined,
         stderr: stderr || undefined,
         timeSeconds: runResult.timeSeconds,
+        memoryBytes: runResult.memoryBytes,
         feedbackMarkdown: judgeResult.feedbackMarkdown,
         outputFiles: judgeResult.outputFiles ?? (outputFiles.length > 0 ? outputFiles : undefined),
       });
@@ -315,6 +336,14 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
       await cleanWorkingDirectory(args.cwd, cwdSnapshot);
       if (decisionCode !== DecisionCode.ACCEPTED) break;
     }
+  } catch (error) {
+    printTestCaseResult({
+      testCaseId: currentTestCaseId,
+      decisionCode: DecisionCode.RUNTIME_ERROR,
+      stdin: currentStdin,
+      stderr: errorToMessage(error),
+    });
+    await cleanWorkingDirectory(args.cwd, cwdSnapshot);
   } finally {
     await displayServer?.dispose();
   }
@@ -324,13 +353,22 @@ async function resolveMainFilePath(context: {
   cwd: string;
   language?: string | string[];
   configuredMainFilePath?: string;
+  allowConfiguredPathFallback?: boolean;
 }): Promise<string | undefined> {
   if (context.configuredMainFilePath) {
     const resolvedPath = path.join(context.cwd, context.configuredMainFilePath);
-    return (await pathExists(resolvedPath)) ? context.configuredMainFilePath : undefined;
+    if (await pathExists(resolvedPath)) return context.configuredMainFilePath;
+    if (!context.allowConfiguredPathFallback) return undefined;
   }
 
   return await findEntryPointFile(context.cwd, context.language);
+}
+
+function inferLanguageIdsByPath(filePath: string): string[] | undefined {
+  const languageIds = Object.entries(languageIdToDefinition)
+    .filter(([, definition]) => definition.fileExtensions.some((ext) => filePath.endsWith(ext)))
+    .map(([languageId]) => languageId);
+  return languageIds.length > 0 ? languageIds : undefined;
 }
 
 function runDefaultPrepare(context: {
@@ -385,6 +423,16 @@ function evaluateGuiRunResult(context: {
     };
   }
 
+  if (
+    context.runResult.memoryBytes >
+    (context.context.problemMarkdownFrontMatter.memoryLimitByte ?? Number.POSITIVE_INFINITY)
+  ) {
+    return {
+      decisionCode: DecisionCode.MEMORY_LIMIT_EXCEEDED,
+      stderr: context.runResult.stderr,
+    };
+  }
+
   const requiredOutputFilesCount = context.context.problemMarkdownFrontMatter.requiredOutputFilePaths?.length ?? 0;
   if (context.outputFiles.length < requiredOutputFilesCount) {
     return {
@@ -408,9 +456,11 @@ async function spawnGuiProgram(context: {
   screenshotWaitMilliseconds: number;
   stopDetectionThreshold: number;
 }): Promise<GuiCommandRunResult> {
-  const child = childProcess.spawn(context.command[0], context.command.slice(1), {
+  const wrappedCommand = ['timeout', context.timeLimitSeconds.toFixed(3), ...TIME_COMMAND, ...context.command] as const;
+  const child = childProcess.spawn(wrappedCommand[0], wrappedCommand.slice(1), {
     cwd: context.cwd,
     env: context.env,
+    detached: process.platform !== 'win32',
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
@@ -425,6 +475,7 @@ async function spawnGuiProgram(context: {
   const screenshotSignaturesHistory: string[][] = [];
   let screenshots: GuiScreenshotFile[] = [];
   const startTimeMs = Date.now();
+  let sampledMemoryBytes = 0;
 
   child.stdout.on('data', (chunk: string) => {
     stdout += chunk;
@@ -436,8 +487,20 @@ async function spawnGuiProgram(context: {
     spawnError = error;
     exitCode = 1;
   });
-  child.on('close', (code) => {
-    exitCode = code ?? undefined;
+  child.on('close', (code, signal) => {
+    if (code === 124) {
+      stopReason = 'timeout';
+      exitCode = 0;
+      return;
+    }
+    if (signal) {
+      exitCode = 1;
+      stderr = stderr
+        ? `${stderr}\nprocess terminated by signal: ${signal}`
+        : `process terminated by signal: ${signal}`;
+      return;
+    }
+    exitCode = code ?? 1;
   });
 
   if (context.stdin) child.stdin.write(context.stdin);
@@ -445,6 +508,7 @@ async function spawnGuiProgram(context: {
 
   while (exitCode === undefined) {
     await wait(context.screenshotWaitMilliseconds);
+    sampledMemoryBytes = Math.max(sampledMemoryBytes, readProcessGroupMemoryBytes(child.pid));
     const currentScreenshots = takeScreenshots(context.env.DISPLAY);
     screenshots = currentScreenshots.toSorted((a, b) => a.data.length - b.data.length);
 
@@ -473,15 +537,25 @@ async function spawnGuiProgram(context: {
     }
   }
 
+  if (stopReason !== 'process_exit' && child.exitCode === null) {
+    child.removeAllListeners('close');
+    child.removeAllListeners('error');
+  }
   await stopProcess(child);
   if (spawnError) throw spawnError;
+  const {
+    memoryBytes,
+    stderr: normalizedStderr,
+    timeSeconds,
+  } = parseTimedStderr(stderr, startTimeMs, sampledMemoryBytes);
 
   return {
     stdin: context.stdin,
     stdout: stdout.trimEnd(),
-    stderr: stderr.trimEnd(),
-    status: child.exitCode ?? exitCode,
-    timeSeconds: (Date.now() - startTimeMs) / 1000,
+    stderr: normalizedStderr,
+    status: exitCode,
+    timeSeconds,
+    memoryBytes,
     screenshots,
     stopReason,
   };
@@ -526,6 +600,21 @@ function extractTopLevelWindowIds(stdout: string): string[] {
   return windowIds;
 }
 
+function parseTimedStderr(
+  stderr: string,
+  startTimeMs: number,
+  sampledMemoryBytes: number
+): Pick<GuiCommandRunResult, 'stderr' | 'timeSeconds' | 'memoryBytes'> {
+  const match = /(?:^|\n)(\d+\.\d+) (\d+)\s*$/.exec(stderr);
+  const normalizedStderr = match ? stderr.slice(0, match.index).trimEnd() : stderr.trimEnd();
+  const parsedMemoryBytes = Number(match?.[2]) * 1024 || 0;
+  return {
+    stderr: normalizedStderr,
+    timeSeconds: Number(match?.[1]) || (Date.now() - startTimeMs) / 1000,
+    memoryBytes: Math.max(parsedMemoryBytes, sampledMemoryBytes),
+  };
+}
+
 async function ensureDisplayServer(): Promise<{ display: string; dispose: () => Promise<void> }> {
   if (process.platform !== 'linux') {
     throw new Error('GUI screenshot capture is supported only on Linux.');
@@ -562,9 +651,41 @@ async function ensureDisplayServer(): Promise<{ display: string; dispose: () => 
 
 async function stopProcess(child: childProcess.ChildProcess): Promise<void> {
   if (!child.pid) return;
-  child.kill('SIGTERM');
+  killProcessGroup(child.pid, 'SIGTERM');
   await wait(200);
-  if (child.exitCode === null) child.kill('SIGKILL');
+  if (child.exitCode === null) killProcessGroup(child.pid, 'SIGKILL');
+}
+
+function readProcessGroupMemoryBytes(processGroupId: number | undefined): number {
+  if (!processGroupId || process.platform !== 'linux') return 0;
+
+  const result = childProcess.spawnSync('ps', ['-o', 'rss=', '--no-headers', '--pgroup', String(processGroupId)], {
+    encoding: 'utf8',
+  });
+  if (result.error || result.status !== 0 || !result.stdout) return 0;
+
+  return result.stdout
+    .split('\n')
+    .map((line) => Number(line.trim()))
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .reduce((sum, value) => sum + value * 1024, 0);
+}
+
+function killProcessGroup(processGroupId: number, signal: NodeJS.Signals): void {
+  try {
+    if (process.platform !== 'win32') {
+      process.kill(-processGroupId, signal);
+      return;
+    }
+  } catch {
+    // The process group may already be gone. Fall back to the direct PID below.
+  }
+
+  try {
+    process.kill(processGroupId, signal);
+  } catch {
+    // The direct child may also already be gone.
+  }
 }
 
 async function pathExists(filePath: string): Promise<boolean> {

@@ -137,6 +137,7 @@ const acceptedTestCaseResultsForGuiPythonWindow = [
     decisionCode: 2000,
     exitStatus: 0,
     timeSeconds: expect.any(Number),
+    memoryBytes: expect.any(Number),
   },
 ] as const satisfies readonly TestCaseResult[];
 
