@@ -165,13 +165,39 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
 
   const env = { ...process.env, CI: '', FORCE_COLOR: '0' };
 
+  let resolvedMainFilePath = mainFilePath;
+  if (languageDefinition.prebuild) {
+    try {
+      await languageDefinition.prebuild(args.cwd);
+      const prebuiltMainFilePath = await resolveMainFilePath({
+        cwd: args.cwd,
+        language: params.language,
+        configuredMainFilePath: options.mainFilePath,
+      });
+      if (prebuiltMainFilePath) resolvedMainFilePath = prebuiltMainFilePath;
+    } catch (error) {
+      printTestCaseResult({
+        testCaseId: prebuildTestCaseId,
+        decisionCode: DecisionCode.BUILD_ERROR,
+        stderr: errorToMessage(error),
+      });
+      return;
+    }
+  }
+
   const prepareResult =
     (await options.prepare?.({
       cwd: args.cwd,
       env,
-      mainFilePath,
+      mainFilePath: resolvedMainFilePath,
       problemMarkdownFrontMatter,
-    })) ?? (await runDefaultPrepare({ cwd: args.cwd, env, mainFilePath, languageDefinition }));
+    })) ??
+    runDefaultPrepare({
+      cwd: args.cwd,
+      env,
+      mainFilePath: resolvedMainFilePath,
+      languageDefinition,
+    });
   if (prepareResult) {
     printTestCaseResult({
       testCaseId: prebuildTestCaseId,
@@ -200,8 +226,8 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
       const runEnv = { ...env, DISPLAY: displayServer.display };
       const stdin = (await options.resolveInput?.({ testCase, cwd: args.cwd, env: runEnv })) ?? testCase.input ?? '';
       const command =
-        (await options.command?.({ testCase, cwd: args.cwd, env: runEnv, mainFilePath })) ??
-        languageDefinition.command(mainFilePath);
+        (await options.command?.({ testCase, cwd: args.cwd, env: runEnv, mainFilePath: resolvedMainFilePath })) ??
+        languageDefinition.command(resolvedMainFilePath);
 
       let runResult: GuiCommandRunResult;
       try {
@@ -236,28 +262,39 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
         return;
       }
 
-      let judgeResult: Partial<GuiJudgeCaseResult>;
-      try {
-        judgeResult = await options.test({
-          testCase,
-          runResult,
-          context: {
-            timeLimitSeconds,
-            problemMarkdownFrontMatter: {
-              memoryLimitByte: problemMarkdownFrontMatter.memoryLimitByte,
-              requiredOutputFilePaths: problemMarkdownFrontMatter.requiredOutputFilePaths,
-            },
-          },
-        });
-      } catch (error) {
-        judgeResult = {
-          decisionCode: DecisionCode.RUNTIME_ERROR,
-          stderr: errorToMessage(error),
-        };
+      const judgeContext: GuiJudgeContext = {
+        timeLimitSeconds,
+        problemMarkdownFrontMatter: {
+          memoryLimitByte: problemMarkdownFrontMatter.memoryLimitByte,
+          requiredOutputFilePaths: problemMarkdownFrontMatter.requiredOutputFilePaths,
+        },
+      };
+      const baseJudgeResult = evaluateGuiRunResult({ runResult, context: judgeContext });
+      let judgeResult = baseJudgeResult;
+      if (baseJudgeResult.decisionCode === DecisionCode.ACCEPTED) {
+        try {
+          const extendedJudgeResult = await options.test({
+            testCase,
+            runResult,
+            context: judgeContext,
+          });
+          judgeResult = {
+            decisionCode: extendedJudgeResult.decisionCode ?? baseJudgeResult.decisionCode,
+            feedbackMarkdown: extendedJudgeResult.feedbackMarkdown,
+            stderr: extendedJudgeResult.stderr,
+            stdout: extendedJudgeResult.stdout,
+            outputFiles: extendedJudgeResult.outputFiles,
+          };
+        } catch (error) {
+          judgeResult = {
+            decisionCode: DecisionCode.RUNTIME_ERROR,
+            stderr: errorToMessage(error),
+          };
+        }
       }
 
       const decisionCode = judgeResult.decisionCode ?? DecisionCode.ACCEPTED;
-      const stdout = runResult.stdout || judgeResult.stdout;
+      const stdout = judgeResult.stdout ?? runResult.stdout;
       const stderr = judgeResult.stderr ?? runResult.stderr;
       printTestCaseResult({
         testCaseId: testCase.id,
@@ -292,23 +329,12 @@ async function resolveMainFilePath(context: {
   return await findEntryPointFile(context.cwd, context.language);
 }
 
-async function runDefaultPrepare(context: {
+function runDefaultPrepare(context: {
   cwd: string;
   env: NodeJS.ProcessEnv;
   mainFilePath: string;
   languageDefinition: NonNullable<ReturnType<typeof findLanguageDefinitionByPath>>;
-}): Promise<Partial<GuiJudgeCaseResult> | undefined> {
-  if (context.languageDefinition.prebuild) {
-    try {
-      await context.languageDefinition.prebuild(context.cwd);
-    } catch (error) {
-      return {
-        decisionCode: DecisionCode.BUILD_ERROR,
-        stderr: errorToMessage(error),
-      };
-    }
-  }
-
+}): Partial<GuiJudgeCaseResult> | undefined {
   const buildCommand = context.languageDefinition.buildCommand?.(context.mainFilePath);
   if (!buildCommand) return undefined;
 
@@ -336,6 +362,27 @@ async function runDefaultPrepare(context: {
   return undefined;
 }
 
+function evaluateGuiRunResult(context: {
+  runResult: GuiCommandRunResult;
+  context: GuiJudgeContext;
+}): Partial<GuiJudgeCaseResult> {
+  if (context.runResult.stopReason === 'timeout') {
+    return {
+      decisionCode: DecisionCode.TIME_LIMIT_EXCEEDED,
+      stderr: context.runResult.stderr,
+    };
+  }
+
+  if (context.runResult.status !== 0) {
+    return {
+      decisionCode: DecisionCode.RUNTIME_ERROR,
+      stderr: context.runResult.stderr,
+    };
+  }
+
+  return { decisionCode: DecisionCode.ACCEPTED };
+}
+
 async function readGuiTestCases<TTestCase extends BaseGuiTestCase>(problemDir: string): Promise<readonly TTestCase[]> {
   return (await readFileTestCases(path.join(problemDir, 'test_cases'))) as unknown as readonly TTestCase[];
 }
@@ -361,6 +408,7 @@ async function spawnGuiProgram(context: {
   let stdout = '';
   let stderr = '';
   let exitCode: number | undefined;
+  let spawnError: Error | undefined;
   let stopReason: GuiCommandRunResult['stopReason'] = 'process_exit';
   const screenshotsHistory: GuiScreenshotFile[][] = [];
   let screenshots: GuiScreenshotFile[] = [];
@@ -371,6 +419,10 @@ async function spawnGuiProgram(context: {
   });
   child.stderr.on('data', (chunk: string) => {
     stderr += chunk;
+  });
+  child.on('error', (error) => {
+    spawnError = error;
+    exitCode = 1;
   });
   child.on('close', (code) => {
     exitCode = code ?? undefined;
@@ -409,6 +461,7 @@ async function spawnGuiProgram(context: {
   }
 
   await stopProcess(child);
+  if (spawnError) throw spawnError;
 
   return {
     stdin: context.stdin,
