@@ -131,6 +131,15 @@ const acceptedTestCaseResultsForFileCommand = [
   },
 ] as const satisfies readonly TestCaseResult[];
 
+const acceptedTestCaseResultsForGuiPythonWindow = [
+  {
+    testCaseId: 'default',
+    decisionCode: 2000,
+    exitStatus: 0,
+    timeSeconds: expect.any(Number),
+  },
+] as const satisfies readonly TestCaseResult[];
+
 test.each<
   [string, string, string, Record<string, unknown>, Record<string, string | undefined>, readonly TestCaseResult[]]
 >([
@@ -436,6 +445,14 @@ test.each<
         memoryBytes: expect.any(Number),
       },
     ],
+  ],
+  [
+    'example/gui_python_window',
+    'judge.ts',
+    'model_answers/default',
+    {},
+    { DISPLAY: ':99', MOCK_GUI_SCREENSHOT_PATH: 'Hello_Window_1.png' },
+    acceptedTestCaseResultsForGuiPythonWindow,
   ],
 ])(
   '%s %s %s %j',
