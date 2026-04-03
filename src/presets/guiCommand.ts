@@ -422,7 +422,7 @@ async function spawnGuiProgram(context: {
   let exitCode: number | undefined;
   let spawnError: Error | undefined;
   let stopReason: GuiCommandRunResult['stopReason'] = 'process_exit';
-  const screenshotsHistory: GuiScreenshotFile[][] = [];
+  const screenshotSignaturesHistory: string[][] = [];
   let screenshots: GuiScreenshotFile[] = [];
   const startTimeMs = Date.now();
 
@@ -449,14 +449,15 @@ async function spawnGuiProgram(context: {
     screenshots = currentScreenshots.toSorted((a, b) => a.data.length - b.data.length);
 
     if (screenshots.length > 0) {
-      screenshotsHistory.unshift(screenshots);
-      screenshotsHistory.length = Math.min(screenshotsHistory.length, context.stopDetectionThreshold);
+      const screenshotSignatures = screenshots.map((file) => file.data).toSorted();
+      screenshotSignaturesHistory.unshift(screenshotSignatures);
+      screenshotSignaturesHistory.length = Math.min(screenshotSignaturesHistory.length, context.stopDetectionThreshold);
       if (
-        screenshotsHistory.length === context.stopDetectionThreshold &&
-        screenshotsHistory.every(
+        screenshotSignaturesHistory.length === context.stopDetectionThreshold &&
+        screenshotSignaturesHistory.every(
           (files) =>
-            files.length === screenshots.length &&
-            files.every((file, index) => file.data.length === screenshots[index]?.data.length)
+            files.length === screenshotSignatures.length &&
+            files.every((file, index) => file === screenshotSignatures[index])
         )
       ) {
         stopReason = 'stable_screenshot';
@@ -515,11 +516,8 @@ function takeScreenshots(display: string | undefined): GuiScreenshotFile[] {
 function extractTopLevelWindowIds(stdout: string): string[] {
   const windowIds: string[] = [];
   const lines = stdout.split('\n');
-  for (const [index, line] of lines.entries()) {
+  for (const line of lines) {
     if (line.includes('Root window id:') || line.includes('Parent window id:') || line.includes('()')) continue;
-
-    const nextLine = lines[index + 1] ?? '';
-    if (!(nextLine.includes('children:') || nextLine.includes('child:'))) continue;
 
     const match = /^\s{5}(0x[\da-f]+) /.exec(line);
     if (!match?.[1]) continue;
