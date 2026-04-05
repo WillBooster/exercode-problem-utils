@@ -24,7 +24,10 @@ import type { TestCaseResult } from '../types/testCaseResult.js';
 
 const BUILD_TIMEOUT_SECONDS = 10;
 const JUDGE_DEFAULT_TIMEOUT_SECONDS = 5;
-const SCREENSHOT_WAIT_MILLISECONDS = 300;
+const SCREENSHOT_WAIT_SECONDS = 0.3;
+const XVFB_STARTUP_WAIT_SECONDS = 0.3;
+const XVFB_SHUTDOWN_WAIT_SECONDS = 0.1;
+const PROCESS_SHUTDOWN_WAIT_SECONDS = 0.2;
 const STOP_DETECTION_THRESHOLD = 5;
 const TIME_COMMAND = [os.platform() === 'darwin' ? 'gtime' : '/usr/bin/time', '--format', '%e %M'] as const;
 
@@ -68,7 +71,7 @@ type GuiJudgeCaseResult = Pick<
 export interface GuiCommandJudgePresetOptions<TTestCase extends BaseGuiTestCase = BaseGuiTestCase> {
   mainFilePath?: string;
   runTimeoutSeconds?: number;
-  screenshotWaitMilliseconds?: number;
+  screenshotWaitSeconds?: number;
   stopDetectionThreshold?: number;
   readTestCases?: (problemDir: string) => Promise<readonly TTestCase[]>;
   prepare?: (context: {
@@ -91,7 +94,7 @@ export interface GuiCommandJudgePresetOptions<TTestCase extends BaseGuiTestCase 
     cwd: string;
     env: NodeJS.ProcessEnv;
     timeLimitSeconds: number;
-    screenshotWaitMilliseconds: number;
+    screenshotWaitSeconds: number;
     stopDetectionThreshold: number;
   }) => Promise<GuiCommandRunResult> | GuiCommandRunResult;
   test: (context: {
@@ -261,7 +264,7 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
               cwd: args.cwd,
               env: runEnv,
               timeLimitSeconds,
-              screenshotWaitMilliseconds: options.screenshotWaitMilliseconds ?? SCREENSHOT_WAIT_MILLISECONDS,
+              screenshotWaitSeconds: options.screenshotWaitSeconds ?? SCREENSHOT_WAIT_SECONDS,
               stopDetectionThreshold: options.stopDetectionThreshold ?? STOP_DETECTION_THRESHOLD,
             })
           : await spawnGuiProgram({
@@ -270,7 +273,7 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
               cwd: args.cwd,
               env: runEnv,
               timeLimitSeconds,
-              screenshotWaitMilliseconds: options.screenshotWaitMilliseconds ?? SCREENSHOT_WAIT_MILLISECONDS,
+              screenshotWaitSeconds: options.screenshotWaitSeconds ?? SCREENSHOT_WAIT_SECONDS,
               stopDetectionThreshold: options.stopDetectionThreshold ?? STOP_DETECTION_THRESHOLD,
             });
       } catch (error) {
@@ -453,7 +456,7 @@ async function spawnGuiProgram(context: {
   cwd: string;
   env: NodeJS.ProcessEnv;
   timeLimitSeconds: number;
-  screenshotWaitMilliseconds: number;
+  screenshotWaitSeconds: number;
   stopDetectionThreshold: number;
 }): Promise<GuiCommandRunResult> {
   const wrappedCommand = ['timeout', context.timeLimitSeconds.toFixed(3), ...TIME_COMMAND, ...context.command] as const;
@@ -474,7 +477,7 @@ async function spawnGuiProgram(context: {
   let stopReason: GuiCommandRunResult['stopReason'] = 'process_exit';
   const screenshotSignaturesHistory: string[][] = [];
   let screenshots: GuiScreenshotFile[] = [];
-  const startTimeMs = Date.now();
+  const startTimeSeconds = Date.now() / 1000;
   let sampledMemoryBytes = 0;
 
   child.stdout.on('data', (chunk: string) => {
@@ -507,7 +510,7 @@ async function spawnGuiProgram(context: {
   child.stdin.end();
 
   while (exitCode === undefined) {
-    await wait(context.screenshotWaitMilliseconds);
+    await wait(context.screenshotWaitSeconds * 1000);
     sampledMemoryBytes = Math.max(sampledMemoryBytes, readProcessGroupMemoryBytes(child.pid));
     const currentScreenshots = takeScreenshots(context.env.DISPLAY);
     screenshots = currentScreenshots.toSorted((a, b) => a.data.length - b.data.length);
@@ -530,7 +533,7 @@ async function spawnGuiProgram(context: {
       }
     }
 
-    if (Date.now() - startTimeMs > context.timeLimitSeconds * 1000) {
+    if (Date.now() / 1000 - startTimeSeconds > context.timeLimitSeconds) {
       stopReason = 'timeout';
       exitCode = 0;
       break;
@@ -547,7 +550,7 @@ async function spawnGuiProgram(context: {
     memoryBytes,
     stderr: normalizedStderr,
     timeSeconds,
-  } = parseTimedStderr(stderr, startTimeMs, sampledMemoryBytes);
+  } = parseTimedStderr(stderr, startTimeSeconds, sampledMemoryBytes);
 
   return {
     stdin: context.stdin,
@@ -602,7 +605,7 @@ function extractTopLevelWindowIds(stdout: string): string[] {
 
 function parseTimedStderr(
   stderr: string,
-  startTimeMs: number,
+  startTimeSeconds: number,
   sampledMemoryBytes: number
 ): Pick<GuiCommandRunResult, 'stderr' | 'timeSeconds' | 'memoryBytes'> {
   const match = /(?:^|\n)(\d+\.\d+) (\d+)\s*$/.exec(stderr);
@@ -610,7 +613,7 @@ function parseTimedStderr(
   const parsedMemoryBytes = Number(match?.[2]) * 1024 || 0;
   return {
     stderr: normalizedStderr,
-    timeSeconds: Number(match?.[1]) || (Date.now() - startTimeMs) / 1000,
+    timeSeconds: Number(match?.[1]) || Date.now() / 1000 - startTimeSeconds,
     memoryBytes: Math.max(parsedMemoryBytes, sampledMemoryBytes),
   };
 }
@@ -630,7 +633,7 @@ async function ensureDisplayServer(): Promise<{ display: string; dispose: () => 
       spawnError = error;
     });
 
-    await wait(300);
+    await wait(XVFB_STARTUP_WAIT_SECONDS * 1000);
     if (spawnError) throw spawnError;
     if (xvfb.exitCode !== null) continue;
 
@@ -639,7 +642,7 @@ async function ensureDisplayServer(): Promise<{ display: string; dispose: () => 
       dispose: async () => {
         if (!xvfb.killed) {
           xvfb.kill('SIGTERM');
-          await wait(100);
+          await wait(XVFB_SHUTDOWN_WAIT_SECONDS * 1000);
           if (xvfb.exitCode === null) xvfb.kill('SIGKILL');
         }
       },
@@ -652,7 +655,7 @@ async function ensureDisplayServer(): Promise<{ display: string; dispose: () => 
 async function stopProcess(child: childProcess.ChildProcess): Promise<void> {
   if (!child.pid) return;
   killProcessGroup(child.pid, 'SIGTERM');
-  await wait(200);
+  await wait(PROCESS_SHUTDOWN_WAIT_SECONDS * 1000);
   if (child.exitCode === null) killProcessGroup(child.pid, 'SIGKILL');
 }
 
