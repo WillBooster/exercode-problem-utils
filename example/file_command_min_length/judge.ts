@@ -60,15 +60,17 @@ await commandJudgePreset<CommandExampleTestCase>(import.meta.dirname, {
 });
 
 function tokensEqual(actual: string, expected: string): boolean {
-  const toTokens = (value: string) =>
-    value
-      .trim()
-      .split(/\s+/)
-      .filter((token) => token.length > 0);
   const actualTokens = toTokens(actual);
   const expectedTokens = toTokens(expected);
   if (actualTokens.length !== expectedTokens.length) return false;
   return actualTokens.every((token, index) => token === expectedTokens[index]);
+}
+
+function toTokens(value: string): string[] {
+  return value
+    .trim()
+    .split(/\s+/)
+    .filter((token) => token.length > 0);
 }
 
 async function writeFixtureFiles(basePath: string, files: FixtureInput): Promise<void> {
