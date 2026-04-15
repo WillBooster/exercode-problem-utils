@@ -1,8 +1,10 @@
 {
-  "extends": "@tsconfig/node24/tsconfig.json",
   "compilerOptions": {
-    "lib": ["dom"],
-    "noUncheckedIndexedAccess": true
+    "paths": {
+      "@exercode/problem-utils": ["../src/index.ts"],
+      "@exercode/problem-utils/presets/*": ["../src/presets/*.ts"]
+    }
   },
+  "extends": "../tsconfig.json",
   "include": ["**/*.ts"]
 }

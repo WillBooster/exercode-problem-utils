@@ -8,15 +8,21 @@
     "importHelpers": false,
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "noEmit": true,
     "noUncheckedIndexedAccess": true,
     "outDir": "dist",
+    "paths": {
+      "@exercode/problem-utils": ["./src/index.ts"],
+      "@exercode/problem-utils/presets/*": ["./src/presets/*.ts"]
+    },
     "resolveJsonModule": true,
+    "rootDir": ".",
     "skipLibCheck": true,
     "sourceMap": true,
     "strict": true,
-    "typeRoots": ["./node_modules/@types", "./@types"]
+    "types": ["node", "vitest/globals"]
   },
   "exclude": ["test/fixtures"],
-  "extends": "@tsconfig/node24/tsconfig.json",
+  "extends": ["@tsconfig/node-lts/tsconfig.json", "@tsconfig/node-ts/tsconfig.json", "@tsconfig/node24/tsconfig.json"],
   "include": ["scripts/**/*", "src/**/*", "test/**/*"]
 }

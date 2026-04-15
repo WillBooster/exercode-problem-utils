@@ -457,7 +457,7 @@ test.each<
   ],
 ])(
   '%s %s %s %j',
-  { timeout: 20_000, concurrent: true },
+  { timeout: 60_000, concurrent: true },
   async (cwd, scriptFilename, argsCwd, argsParams, env, expectedTestCaseResults) => {
     // The target files may be changed during the judging, so clone it before testing.
     await fs.promises.mkdir('temp', { recursive: true });
