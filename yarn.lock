@@ -41,11 +41,11 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ai-sdk/amazon-bedrock@npm:4.0.92":
-  version: 4.0.92
-  resolution: "@ai-sdk/amazon-bedrock@npm:4.0.92"
+"@ai-sdk/amazon-bedrock@npm:4.0.93":
+  version: 4.0.93
+  resolution: "@ai-sdk/amazon-bedrock@npm:4.0.93"
   dependencies:
-    "@ai-sdk/anthropic": "npm:3.0.68"
+    "@ai-sdk/anthropic": "npm:3.0.69"
     "@ai-sdk/provider": "npm:3.0.8"
     "@ai-sdk/provider-utils": "npm:4.0.23"
     "@smithy/eventstream-codec": "npm:^4.0.1"
@@ -53,19 +53,19 @@ __metadata:
     aws4fetch: "npm:^1.0.20"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/c9fa46b6bec1290b15e051332948bc86aa9b29f784d723d3511d6b6912c4008f5c4a90d2222ff6e7dbc4d657c8fe1bb58c2590c4f51088ba117807fa0869233a
+  checksum: 10c0/313023624798d06d86bd6252126620956353b80c0b493c39b1dcae715c6482e524623f623f5a93d9bcce5574a50f2441542ebe6a85da550fe9afa734391a43bc
   languageName: node
   linkType: hard
 
-"@ai-sdk/anthropic@npm:3.0.68":
-  version: 3.0.68
-  resolution: "@ai-sdk/anthropic@npm:3.0.68"
+"@ai-sdk/anthropic@npm:3.0.69":
+  version: 3.0.69
+  resolution: "@ai-sdk/anthropic@npm:3.0.69"
   dependencies:
     "@ai-sdk/provider": "npm:3.0.8"
     "@ai-sdk/provider-utils": "npm:4.0.23"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/c6ed0b0b6527ab111bf02fc71baf285aeac29b76f9995b95c99919f605425ae42bcabdc4fb9a7cde240c142efe601246a43eb153fae00a729cfb3dd4de5cc418
+  checksum: 10c0/dac50b88c6772fdbb02b3504de11d121410b379a6314a026360e4efabb9c7d39f512a5f86cce09f24ee2ed2806807f59704ffea703a67cd82c69ac4c87c2b62b
   languageName: node
   linkType: hard
 
@@ -82,15 +82,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ai-sdk/google@npm:3.0.61":
-  version: 3.0.61
-  resolution: "@ai-sdk/google@npm:3.0.61"
+"@ai-sdk/google@npm:3.0.62":
+  version: 3.0.62
+  resolution: "@ai-sdk/google@npm:3.0.62"
   dependencies:
     "@ai-sdk/provider": "npm:3.0.8"
     "@ai-sdk/provider-utils": "npm:4.0.23"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/7ccbf54ebe1a506af91a35a6f77d52d35057aaee4775223503fa10a2b45fb9e76c1fc383bd2a9c48df768415b98534ca92902717bfd01114247dbf8168195ce2
+  checksum: 10c0/30bd9da95ff6bf1b6feaefd9c4f0f65ca9ddfb31cdccbfea757558fcbc2ab9b01f08b92d7120fcf53dd77f9f9457b30eac774a988000e84285ba02398a28e54c
   languageName: node
   linkType: hard
 
@@ -1687,8 +1687,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@exercode/problem-utils@workspace:."
   dependencies:
-    "@ai-sdk/amazon-bedrock": "npm:4.0.92"
-    "@ai-sdk/google": "npm:3.0.61"
+    "@ai-sdk/amazon-bedrock": "npm:4.0.93"
+    "@ai-sdk/google": "npm:3.0.62"
     "@ai-sdk/openai": "npm:3.0.52"
     "@ai-sdk/xai": "npm:3.0.82"
     "@tsconfig/node-lts": "npm:24.0.0"
@@ -1699,7 +1699,7 @@ __metadata:
     "@willbooster/oxfmt-config": "npm:1.2.0"
     "@willbooster/oxlint-config": "npm:1.4.4"
     "@willbooster/prettier-config": "npm:10.4.0"
-    ai: "npm:6.0.156"
+    ai: "npm:6.0.158"
     build-ts: "npm:17.1.0"
     conventional-changelog-conventionalcommits: "npm:9.3.1"
     dotenv-cli: "npm:11.0.0"
@@ -3620,9 +3620,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ai@npm:6.0.156":
-  version: 6.0.156
-  resolution: "ai@npm:6.0.156"
+"ai@npm:6.0.158":
+  version: 6.0.158
+  resolution: "ai@npm:6.0.158"
   dependencies:
     "@ai-sdk/gateway": "npm:3.0.95"
     "@ai-sdk/provider": "npm:3.0.8"
@@ -3630,7 +3630,7 @@ __metadata:
     "@opentelemetry/api": "npm:1.9.0"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/f8e92c9c5446e50b6c86e2afa448dfc571afb0bc058da3525b740c775b4b61ee9bd60ebb3692ff44f0048483162b4f99a0f5a06862c15240b3e45668f0c27093
+  checksum: 10c0/d321ac297dcd8bb7d3654b9dff3332e74e9d5d86c161bb9744d633d04777fae25f2b14d0718f3b6f6836c5298c9d379fcade1c12aa1864721e96ca15f102c0f4
   languageName: node
   linkType: hard
 
