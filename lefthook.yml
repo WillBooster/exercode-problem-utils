@@ -14,6 +14,7 @@ pre-commit:
     - name: cleanup
       glob: '**/*.{astro,cjs,css,cts,gql,graphql,hbs,htm,html,java,js,json,json5,jsonc,jsx,less,md,mdx,mjs,mts,scss,svelte,toml,ts,tsx,vue,yaml,yml}'
       run: |-
+        # Lefthook expands {staged_files} as shell-escaped args, so paths with spaces stay intact.
         oxlint_files="$(printf '%s\n' {staged_files} | grep -E '(\.astro$|\.cjs$|\.cts$|\.js$|\.jsx$|\.mjs$|\.mts$|\.svelte$|\.ts$|\.tsx$|\.vue$)' || true)"
         oxfmt_files="$(printf '%s\n' {staged_files} | grep -E '(\.astro$|\.cjs$|\.css$|\.cts$|\.gql$|\.graphql$|\.hbs$|\.htm$|\.html$|\.js$|\.json$|\.json5$|\.jsonc$|\.jsx$|\.less$|\.md$|\.mdx$|\.mjs$|\.mts$|\.scss$|\.svelte$|\.toml$|\.ts$|\.tsx$|\.vue$|\.yaml$|\.yml$)' || true)"
         prettier_files="$(printf '%s\n' {staged_files} | grep -E '(\.java$)' || true)"
@@ -42,6 +43,7 @@ pre-commit:
       glob: '**/migration.sql'
       run: |-
         failed=0
+        # Lefthook expands {staged_files} as shell-escaped args, so paths with spaces stay intact.
         for file in {staged_files}; do
           if grep -q 'Warnings:' "$file"; then
             echo "Migration SQL file ($file) contains warnings! Please solve the warnings and commit again."
