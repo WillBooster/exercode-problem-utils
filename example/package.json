@@ -4,6 +4,6 @@
   "type": "module",
   "dependencies": {
     "@exercode/problem-utils": "file:..",
-    "puppeteer": "24.40.0"
+    "puppeteer": "24.41.0"
   }
 }
