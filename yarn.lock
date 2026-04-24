@@ -41,11 +41,11 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ai-sdk/amazon-bedrock@npm:4.0.93":
-  version: 4.0.93
-  resolution: "@ai-sdk/amazon-bedrock@npm:4.0.93"
+"@ai-sdk/amazon-bedrock@npm:4.0.96":
+  version: 4.0.96
+  resolution: "@ai-sdk/amazon-bedrock@npm:4.0.96"
   dependencies:
-    "@ai-sdk/anthropic": "npm:3.0.69"
+    "@ai-sdk/anthropic": "npm:3.0.71"
     "@ai-sdk/provider": "npm:3.0.8"
     "@ai-sdk/provider-utils": "npm:4.0.23"
     "@smithy/eventstream-codec": "npm:^4.0.1"
@@ -53,44 +53,44 @@ __metadata:
     aws4fetch: "npm:^1.0.20"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/313023624798d06d86bd6252126620956353b80c0b493c39b1dcae715c6482e524623f623f5a93d9bcce5574a50f2441542ebe6a85da550fe9afa734391a43bc
+  checksum: 10c0/f615cfed8106bb9e114bfc513973e39ef4ada95a48020ee924b90b7a563c90bf568545b1515afb62f160e88b45e83e68fcf15c5337cde732ea0c71d67ec6ba46
   languageName: node
   linkType: hard
 
-"@ai-sdk/anthropic@npm:3.0.69":
-  version: 3.0.69
-  resolution: "@ai-sdk/anthropic@npm:3.0.69"
+"@ai-sdk/anthropic@npm:3.0.71":
+  version: 3.0.71
+  resolution: "@ai-sdk/anthropic@npm:3.0.71"
   dependencies:
     "@ai-sdk/provider": "npm:3.0.8"
     "@ai-sdk/provider-utils": "npm:4.0.23"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/dac50b88c6772fdbb02b3504de11d121410b379a6314a026360e4efabb9c7d39f512a5f86cce09f24ee2ed2806807f59704ffea703a67cd82c69ac4c87c2b62b
+  checksum: 10c0/ec421fa49979e9a73649f6557d971dc0886ce9ca27da8f43693cafcb78c417e6719a922d40c660f19eef20a59ce361f5a83e99eb8b8e5023837885c6c304fba3
   languageName: node
   linkType: hard
 
-"@ai-sdk/gateway@npm:3.0.95":
-  version: 3.0.95
-  resolution: "@ai-sdk/gateway@npm:3.0.95"
+"@ai-sdk/gateway@npm:3.0.104":
+  version: 3.0.104
+  resolution: "@ai-sdk/gateway@npm:3.0.104"
   dependencies:
     "@ai-sdk/provider": "npm:3.0.8"
     "@ai-sdk/provider-utils": "npm:4.0.23"
-    "@vercel/oidc": "npm:3.1.0"
+    "@vercel/oidc": "npm:3.2.0"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/aaa998b6d314057e8f584b5ba25d84ee3c7e3f0508633a96a393eb8c46fa39975e359209ffbca19a36d4500fafb9e8cfebeab69234083461259e926933ae5e3e
+  checksum: 10c0/caf6f8061b8b7f35e051422a5f35f2da05fa2a103cfd98e2210bb9f8e05d08b216c4baca70e1cb7f1368853bb0e1b7359efaaafcded816577880c970635381d8
   languageName: node
   linkType: hard
 
-"@ai-sdk/google@npm:3.0.62":
-  version: 3.0.62
-  resolution: "@ai-sdk/google@npm:3.0.62"
+"@ai-sdk/google@npm:3.0.64":
+  version: 3.0.64
+  resolution: "@ai-sdk/google@npm:3.0.64"
   dependencies:
     "@ai-sdk/provider": "npm:3.0.8"
     "@ai-sdk/provider-utils": "npm:4.0.23"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/30bd9da95ff6bf1b6feaefd9c4f0f65ca9ddfb31cdccbfea757558fcbc2ab9b01f08b92d7120fcf53dd77f9f9457b30eac774a988000e84285ba02398a28e54c
+  checksum: 10c0/d85f1142021dc984fd174a6d0fdbed39e07235348db1cf423edbe3adddda2033e59939b797b7bd540bb2f40a6b6704e27f924cf18698ab17712aa961504eeec6
   languageName: node
   linkType: hard
 
@@ -106,15 +106,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ai-sdk/openai@npm:3.0.52":
-  version: 3.0.52
-  resolution: "@ai-sdk/openai@npm:3.0.52"
+"@ai-sdk/openai@npm:3.0.53":
+  version: 3.0.53
+  resolution: "@ai-sdk/openai@npm:3.0.53"
   dependencies:
     "@ai-sdk/provider": "npm:3.0.8"
     "@ai-sdk/provider-utils": "npm:4.0.23"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/27b340d35a85120ecb9f882be4df8ba7a9bc3a53799b57c19d1d0137d60fc451186306be0030d0db8664700c701eae636893d588ae60997012205f4f247bf913
+  checksum: 10c0/36b815de9916006d27432fadf4d071cfab1fc89958ebba2ca881ac63101fc378010fefec85837ffaef3e4a95fe1815399e635d9bb9ac9c0e3c8f8a46e2204b15
   languageName: node
   linkType: hard
 
@@ -140,16 +140,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ai-sdk/xai@npm:3.0.82":
-  version: 3.0.82
-  resolution: "@ai-sdk/xai@npm:3.0.82"
+"@ai-sdk/xai@npm:3.0.83":
+  version: 3.0.83
+  resolution: "@ai-sdk/xai@npm:3.0.83"
   dependencies:
     "@ai-sdk/openai-compatible": "npm:2.0.41"
     "@ai-sdk/provider": "npm:3.0.8"
     "@ai-sdk/provider-utils": "npm:4.0.23"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/685ead84761aea97d0c8c1cb3d6251635fb828c649d50a3491193919f5afdfd6bdaffa2999f04c73d8a7af60dcc24e4c85e3267676d4bb337524fdc8a7ae9b58
+  checksum: 10c0/e69d8ea04f48ff4eb6bf282c8878450f2ec7fe69ca4d662e9ed701d670fc0a5c323f13b0f40aded634e3267c62811b04c16fe4525cc837a33bc4083418596685
   languageName: node
   linkType: hard
 
@@ -1715,10 +1715,10 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@exercode/problem-utils@workspace:."
   dependencies:
-    "@ai-sdk/amazon-bedrock": "npm:4.0.93"
-    "@ai-sdk/google": "npm:3.0.62"
-    "@ai-sdk/openai": "npm:3.0.52"
-    "@ai-sdk/xai": "npm:3.0.82"
+    "@ai-sdk/amazon-bedrock": "npm:4.0.96"
+    "@ai-sdk/google": "npm:3.0.64"
+    "@ai-sdk/openai": "npm:3.0.53"
+    "@ai-sdk/xai": "npm:3.0.83"
     "@tsconfig/node-lts": "npm:24.0.0"
     "@tsconfig/node-ts": "npm:23.6.4"
     "@tsconfig/node24": "npm:24.0.4"
@@ -1727,12 +1727,12 @@ __metadata:
     "@willbooster/oxfmt-config": "npm:1.2.1"
     "@willbooster/oxlint-config": "npm:1.4.4"
     "@willbooster/prettier-config": "npm:10.4.0"
-    ai: "npm:6.0.158"
+    ai: "npm:6.0.168"
     build-ts: "npm:17.1.6"
     conventional-changelog-conventionalcommits: "npm:9.3.1"
     dotenv-cli: "npm:11.0.0"
     front-matter: "npm:4.0.2"
-    lefthook: "npm:2.1.5"
+    lefthook: "npm:2.1.6"
     oxfmt: "npm:0.45.0"
     oxlint: "npm:1.60.0"
     oxlint-tsgolint: "npm:0.21.0"
@@ -3489,10 +3489,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@vercel/oidc@npm:3.1.0":
-  version: 3.1.0
-  resolution: "@vercel/oidc@npm:3.1.0"
-  checksum: 10c0/f57278ed4b4c022c7ca85e8baa5f9bdb2623397abfa0e5dbfd75de283c8e5dc534d64dac1364b5ad8c96d00eb2d469886e6f7b640f6f195def5766950ad8ce71
+"@vercel/oidc@npm:3.2.0":
+  version: 3.2.0
+  resolution: "@vercel/oidc@npm:3.2.0"
+  checksum: 10c0/98318d3236f58c296616c8c2e1655b268c7bf58525bcd985adac7af6d900e05fc610f6f03ce2ff4bdcd3df7885a40c0ca44fdc761f122dcfe15a78c2756b0243
   languageName: node
   linkType: hard
 
@@ -3650,17 +3650,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ai@npm:6.0.158":
-  version: 6.0.158
-  resolution: "ai@npm:6.0.158"
+"ai@npm:6.0.168":
+  version: 6.0.168
+  resolution: "ai@npm:6.0.168"
   dependencies:
-    "@ai-sdk/gateway": "npm:3.0.95"
+    "@ai-sdk/gateway": "npm:3.0.104"
     "@ai-sdk/provider": "npm:3.0.8"
     "@ai-sdk/provider-utils": "npm:4.0.23"
     "@opentelemetry/api": "npm:1.9.0"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/d321ac297dcd8bb7d3654b9dff3332e74e9d5d86c161bb9744d633d04777fae25f2b14d0718f3b6f6836c5298c9d379fcade1c12aa1864721e96ca15f102c0f4
+  checksum: 10c0/600a4693885f31f1873e742533f11070aeec5a23541704c71e625d31d47bb6702f99bfda7d3d21c7170b2c831fd57696299762afab7e1682a4fad2bcd8b4abcf
   languageName: node
   linkType: hard
 
@@ -5781,90 +5781,90 @@ __metadata:
   languageName: node
   linkType: hard
 
-"lefthook-darwin-arm64@npm:2.1.5":
-  version: 2.1.5
-  resolution: "lefthook-darwin-arm64@npm:2.1.5"
+"lefthook-darwin-arm64@npm:2.1.6":
+  version: 2.1.6
+  resolution: "lefthook-darwin-arm64@npm:2.1.6"
   conditions: os=darwin & cpu=arm64
   languageName: node
   linkType: hard
 
-"lefthook-darwin-x64@npm:2.1.5":
-  version: 2.1.5
-  resolution: "lefthook-darwin-x64@npm:2.1.5"
+"lefthook-darwin-x64@npm:2.1.6":
+  version: 2.1.6
+  resolution: "lefthook-darwin-x64@npm:2.1.6"
   conditions: os=darwin & cpu=x64
   languageName: node
   linkType: hard
 
-"lefthook-freebsd-arm64@npm:2.1.5":
-  version: 2.1.5
-  resolution: "lefthook-freebsd-arm64@npm:2.1.5"
+"lefthook-freebsd-arm64@npm:2.1.6":
+  version: 2.1.6
+  resolution: "lefthook-freebsd-arm64@npm:2.1.6"
   conditions: os=freebsd & cpu=arm64
   languageName: node
   linkType: hard
 
-"lefthook-freebsd-x64@npm:2.1.5":
-  version: 2.1.5
-  resolution: "lefthook-freebsd-x64@npm:2.1.5"
+"lefthook-freebsd-x64@npm:2.1.6":
+  version: 2.1.6
+  resolution: "lefthook-freebsd-x64@npm:2.1.6"
   conditions: os=freebsd & cpu=x64
   languageName: node
   linkType: hard
 
-"lefthook-linux-arm64@npm:2.1.5":
-  version: 2.1.5
-  resolution: "lefthook-linux-arm64@npm:2.1.5"
+"lefthook-linux-arm64@npm:2.1.6":
+  version: 2.1.6
+  resolution: "lefthook-linux-arm64@npm:2.1.6"
   conditions: os=linux & cpu=arm64
   languageName: node
   linkType: hard
 
-"lefthook-linux-x64@npm:2.1.5":
-  version: 2.1.5
-  resolution: "lefthook-linux-x64@npm:2.1.5"
+"lefthook-linux-x64@npm:2.1.6":
+  version: 2.1.6
+  resolution: "lefthook-linux-x64@npm:2.1.6"
   conditions: os=linux & cpu=x64
   languageName: node
   linkType: hard
 
-"lefthook-openbsd-arm64@npm:2.1.5":
-  version: 2.1.5
-  resolution: "lefthook-openbsd-arm64@npm:2.1.5"
+"lefthook-openbsd-arm64@npm:2.1.6":
+  version: 2.1.6
+  resolution: "lefthook-openbsd-arm64@npm:2.1.6"
   conditions: os=openbsd & cpu=arm64
   languageName: node
   linkType: hard
 
-"lefthook-openbsd-x64@npm:2.1.5":
-  version: 2.1.5
-  resolution: "lefthook-openbsd-x64@npm:2.1.5"
+"lefthook-openbsd-x64@npm:2.1.6":
+  version: 2.1.6
+  resolution: "lefthook-openbsd-x64@npm:2.1.6"
   conditions: os=openbsd & cpu=x64
   languageName: node
   linkType: hard
 
-"lefthook-windows-arm64@npm:2.1.5":
-  version: 2.1.5
-  resolution: "lefthook-windows-arm64@npm:2.1.5"
+"lefthook-windows-arm64@npm:2.1.6":
+  version: 2.1.6
+  resolution: "lefthook-windows-arm64@npm:2.1.6"
   conditions: os=win32 & cpu=arm64
   languageName: node
   linkType: hard
 
-"lefthook-windows-x64@npm:2.1.5":
-  version: 2.1.5
-  resolution: "lefthook-windows-x64@npm:2.1.5"
+"lefthook-windows-x64@npm:2.1.6":
+  version: 2.1.6
+  resolution: "lefthook-windows-x64@npm:2.1.6"
   conditions: os=win32 & cpu=x64
   languageName: node
   linkType: hard
 
-"lefthook@npm:2.1.5":
-  version: 2.1.5
-  resolution: "lefthook@npm:2.1.5"
+"lefthook@npm:2.1.6":
+  version: 2.1.6
+  resolution: "lefthook@npm:2.1.6"
   dependencies:
-    lefthook-darwin-arm64: "npm:2.1.5"
-    lefthook-darwin-x64: "npm:2.1.5"
-    lefthook-freebsd-arm64: "npm:2.1.5"
-    lefthook-freebsd-x64: "npm:2.1.5"
-    lefthook-linux-arm64: "npm:2.1.5"
-    lefthook-linux-x64: "npm:2.1.5"
-    lefthook-openbsd-arm64: "npm:2.1.5"
-    lefthook-openbsd-x64: "npm:2.1.5"
-    lefthook-windows-arm64: "npm:2.1.5"
-    lefthook-windows-x64: "npm:2.1.5"
+    lefthook-darwin-arm64: "npm:2.1.6"
+    lefthook-darwin-x64: "npm:2.1.6"
+    lefthook-freebsd-arm64: "npm:2.1.6"
+    lefthook-freebsd-x64: "npm:2.1.6"
+    lefthook-linux-arm64: "npm:2.1.6"
+    lefthook-linux-x64: "npm:2.1.6"
+    lefthook-openbsd-arm64: "npm:2.1.6"
+    lefthook-openbsd-x64: "npm:2.1.6"
+    lefthook-windows-arm64: "npm:2.1.6"
+    lefthook-windows-x64: "npm:2.1.6"
   dependenciesMeta:
     lefthook-darwin-arm64:
       optional: true
@@ -5888,7 +5888,7 @@ __metadata:
       optional: true
   bin:
     lefthook: bin/index.js
-  checksum: 10c0/534c0e3b62e5032d6b61031b695aa562932e5cb147d124884fa66d12d1849a9b2843ae434fc2846b06d2f59a3e2d0d4fb0c099f2f972a93e55c331f8a50607f9
+  checksum: 10c0/3ccbe60951ebf59e35e02ca10dc8942a4455ec106f0f14a5fed2e40f000b5b57190594f3be87715d5a9a8b0cf93de33902cbd3c94688e116ffc07ad1760cfe9e
   languageName: node
   linkType: hard
 
