@@ -46,7 +46,9 @@
     "start": "build-ts run src/index.ts",
     "test": "rm -fr temp && dotenv -c test -- vitest test",
     "test/ci-setup": "yarn build && bun install --cwd example",
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "tsgo --noEmit",
+    "verify": "wb verify",
+    "verify-full": "wb verify --full"
   },
   "prettier": "@willbooster/prettier-config",
   "dependencies": {
@@ -67,6 +69,7 @@
     "@willbooster/oxfmt-config": "1.2.2",
     "@willbooster/oxlint-config": "1.4.6",
     "@willbooster/prettier-config": "10.4.0",
+    "@willbooster/wb": "13.12.9",
     "build-ts": "17.1.8",
     "conventional-changelog-conventionalcommits": "9.3.1",
     "dotenv-cli": "11.0.0",
