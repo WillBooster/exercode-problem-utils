@@ -1,10 +1,11 @@
 /**
  * Parse command line arguments in `judge.ts` or `debug.ts`.
+ *
+ * `cwd` is optional: when omitted, presets that support it may fall back to
+ * judging against model answers under `<problemDir>/model_answers/*`.
  */
-export function parseArgs(argv: readonly string[]): { cwd: string; params: unknown } {
-  const cwd = argv[2];
-  if (!cwd) throw new Error('cwd argument required');
-
+export function parseArgs(argv: readonly string[]): { cwd: string | undefined; params: unknown } {
+  const cwd = argv[2] || undefined;
   const paramsJson = argv[3];
 
   try {

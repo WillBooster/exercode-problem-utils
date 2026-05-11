@@ -65,6 +65,7 @@ const TEST_CASES: readonly [string, (page: Page) => Promise<Omit<TestCaseResult,
 ];
 
 const args = parseArgs(process.argv);
+if (!args.cwd) throw new Error('cwd argument required');
 await using server = startHttpServer(args.cwd);
 
 const browser = await puppeteer.launch({
