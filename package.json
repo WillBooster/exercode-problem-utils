@@ -67,7 +67,7 @@
     "@willbooster/oxfmt-config": "1.2.2",
     "@willbooster/oxlint-config": "1.4.6",
     "@willbooster/prettier-config": "10.4.0",
-    "@willbooster/wb": "13.12.16",
+    "@willbooster/wb": "13.12.17",
     "build-ts": "17.1.13",
     "conventional-changelog-conventionalcommits": "9.3.1",
     "dotenv-cli": "11.0.0",
