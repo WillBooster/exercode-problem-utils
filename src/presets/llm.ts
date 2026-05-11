@@ -66,6 +66,7 @@ interface LlmJudgePresetOptions {
  */
 export async function llmJudgePreset(problemDir: string, options: LlmJudgePresetOptions): Promise<void> {
   const args = parseArgs(process.argv);
+  if (!args.cwd) throw new Error('cwd argument required');
   const params = judgeParamsSchema.parse(args.params);
 
   const testCases = await readTestCases(path.join(problemDir, 'test_cases'));

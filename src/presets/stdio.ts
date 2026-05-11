@@ -54,6 +54,7 @@ const debugParamsSchema = judgeParamsSchema.extend({
  */
 export async function stdioJudgePreset(problemDir: string): Promise<void> {
   const args = parseArgs(process.argv);
+  if (!args.cwd) throw new Error('cwd argument required');
   const params = judgeParamsSchema.parse(args.params);
 
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
@@ -252,6 +253,7 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
  */
 export async function stdioDebugPreset(problemDir: string): Promise<void> {
   const args = parseArgs(process.argv);
+  if (!args.cwd) throw new Error('cwd argument required');
   const params = debugParamsSchema.parse(args.params);
 
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);

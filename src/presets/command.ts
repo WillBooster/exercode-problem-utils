@@ -12,6 +12,7 @@ import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readOutputFiles } from '../helpers/readOutputFiles.js';
 import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases as readFileTestCases } from '../helpers/readTestCases.js';
+import { printDebugCwdBanner, resolveCwds } from '../helpers/resolveCwds.js';
 import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
 import { DecisionCode } from '../types/decisionCode.js';
 import type { ProblemMarkdownFrontMatter } from '../types/problem.js';
@@ -24,6 +25,8 @@ const MAX_STDOUT_LENGTH = 50_000;
 const judgeParamsSchema = z.object({
   language: z.union([z.string(), z.array(z.string())]).optional(),
 });
+
+type JudgeParams = z.infer<typeof judgeParamsSchema>;
 
 interface BaseCommandTestCase {
   id: string;
@@ -101,6 +104,12 @@ export interface CommandJudgePresetOptions<TTestCase extends BaseCommandTestCase
  * ```bash
  * bun judge.ts model_answers/python '{ "language": "python" }'
  * ```
+ *
+ * Run without a cwd argument to judge each `<problemDir>/model_answers/*` directory
+ * for debugging. A prominent banner is printed for each run.
+ * ```bash
+ * bun judge.ts
+ * ```
  */
 export async function commandJudgePreset<TTestCase extends BaseCommandTestCase = BaseCommandTestCase>(
   problemDir: string,
@@ -109,6 +118,20 @@ export async function commandJudgePreset<TTestCase extends BaseCommandTestCase =
   const args = parseArgs(process.argv);
   const params = judgeParamsSchema.parse(args.params);
 
+  const { cwds, isDebugMode } = await resolveCwds(problemDir, args.cwd);
+
+  for (const cwd of cwds) {
+    if (isDebugMode) printDebugCwdBanner(problemDir, cwd);
+    await runCommandJudgeForCwd<TTestCase>(problemDir, cwd, params, options);
+  }
+}
+
+async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
+  problemDir: string,
+  cwd: string,
+  params: JudgeParams,
+  options: CommandJudgePresetOptions<TTestCase>
+): Promise<void> {
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
   const testCases = await (options.readTestCases ?? readCommandTestCases)(problemDir);
   const prebuildTestCaseId = testCases[0]?.id ?? 'prebuild';
@@ -118,13 +141,13 @@ export async function commandJudgePreset<TTestCase extends BaseCommandTestCase =
   };
   const runTimeoutSeconds = options.runTimeoutSeconds ?? JUDGE_DEFAULT_TIMEOUT_SECONDS;
 
-  const staticAnalysisResult = await judgeByStaticAnalysis(args.cwd, problemMarkdownFrontMatter);
+  const staticAnalysisResult = await judgeByStaticAnalysis(cwd, problemMarkdownFrontMatter);
   if (staticAnalysisResult) {
     printTestCaseResult({ testCaseId: prebuildTestCaseId, ...staticAnalysisResult });
     return;
   }
 
-  const originalMainFilePath = await findEntryPointFile(args.cwd, params.language);
+  const originalMainFilePath = await findEntryPointFile(cwd, params.language);
   if (!originalMainFilePath) {
     printTestCaseResult({
       testCaseId: prebuildTestCaseId,
@@ -150,8 +173,8 @@ export async function commandJudgePreset<TTestCase extends BaseCommandTestCase =
   let mainFilePath = originalMainFilePath;
   if (languageDefinition.prebuild) {
     try {
-      await languageDefinition.prebuild(args.cwd);
-      const prebuiltMainFilePath = await findEntryPointFile(args.cwd, params.language);
+      await languageDefinition.prebuild(cwd);
+      const prebuiltMainFilePath = await findEntryPointFile(cwd, params.language);
       if (prebuiltMainFilePath) mainFilePath = prebuiltMainFilePath;
     } catch (error) {
       printTestCaseResult({
@@ -166,7 +189,7 @@ export async function commandJudgePreset<TTestCase extends BaseCommandTestCase =
   const buildCommand = languageDefinition.buildCommand?.(mainFilePath);
   if (buildCommand) {
     const buildResult = runBuild(buildCommand, {
-      cwd: args.cwd,
+      cwd,
       env,
       testCaseId: prebuildTestCaseId,
       limits,
@@ -177,7 +200,7 @@ export async function commandJudgePreset<TTestCase extends BaseCommandTestCase =
     }
   }
 
-  const cwdSnapshot = await snapshotWorkingDirectory(args.cwd);
+  const cwdSnapshot = await snapshotWorkingDirectory(cwd);
 
   if (testCases.length === 0) {
     printTestCaseResult({ testCaseId: 'default', decisionCode: DecisionCode.ACCEPTED });
@@ -187,8 +210,8 @@ export async function commandJudgePreset<TTestCase extends BaseCommandTestCase =
   const sharedFileInputPath = (testCases as { shared?: { fileInputPath?: string } }).shared?.fileInputPath;
 
   for (const testCase of testCases) {
-    if (sharedFileInputPath) await copyTestCaseFileInput(sharedFileInputPath, args.cwd);
-    if (testCase.fileInputPath) await copyTestCaseFileInput(testCase.fileInputPath, args.cwd);
+    if (sharedFileInputPath) await copyTestCaseFileInput(sharedFileInputPath, cwd);
+    if (testCase.fileInputPath) await copyTestCaseFileInput(testCase.fileInputPath, cwd);
 
     const timeLimitSeconds =
       typeof problemMarkdownFrontMatter.timeLimitMs === 'number'
@@ -200,7 +223,7 @@ export async function commandJudgePreset<TTestCase extends BaseCommandTestCase =
     let runResult: CommandRunResult;
     try {
       if (options.resolveInput) {
-        stdin = await options.resolveInput({ testCase, cwd: args.cwd, env });
+        stdin = await options.resolveInput({ testCase, cwd, env });
       }
 
       runResult = options.runCommand
@@ -208,13 +231,13 @@ export async function commandJudgePreset<TTestCase extends BaseCommandTestCase =
             testCase,
             command,
             stdin,
-            cwd: args.cwd,
+            cwd,
             env,
             timeLimitSeconds,
           })
         : runCommand(command, {
             stdin,
-            cwd: args.cwd,
+            cwd,
             env,
             timeLimitSeconds,
           });
@@ -225,11 +248,11 @@ export async function commandJudgePreset<TTestCase extends BaseCommandTestCase =
         stdin,
         stderr: errorToMessage(error),
       });
-      await cleanWorkingDirectory(args.cwd, cwdSnapshot);
+      await cleanWorkingDirectory(cwd, cwdSnapshot);
       return;
     }
 
-    const outputFiles = await readOutputFiles(args.cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
+    const outputFiles = await readOutputFiles(cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
     const judgeContext: CommandJudgeContext = {
       timeLimitSeconds,
       outputLimitLength: limits.maxOutputLength,
@@ -270,7 +293,7 @@ export async function commandJudgePreset<TTestCase extends BaseCommandTestCase =
       outputFiles: outputFiles.length > 0 ? outputFiles : undefined,
     });
 
-    await cleanWorkingDirectory(args.cwd, cwdSnapshot);
+    await cleanWorkingDirectory(cwd, cwdSnapshot);
     if (judgeResult.decisionCode !== DecisionCode.ACCEPTED) return;
   }
 }

@@ -132,6 +132,7 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
   options: GuiCommandJudgePresetOptions<TTestCase>
 ): Promise<void> {
   const args = parseArgs(process.argv);
+  if (!args.cwd) throw new Error('cwd argument required');
   const params = judgeParamsSchema.parse(args.params);
 
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
