@@ -8,5 +8,5 @@ const BANNER_LINE = '='.repeat(72);
  */
 export function printDebugBanner(lines: readonly string[]): void {
   const body = lines.map((line) => `  ${line}`).join('\n');
-  console.error(`\n${BANNER_LINE}\n${body}\n${BANNER_LINE}`);
+  console.warn(`\n${BANNER_LINE}\n${body}\n${BANNER_LINE}`);
 }
