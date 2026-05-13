@@ -127,9 +127,7 @@ export async function commandJudgePreset<TTestCase extends BaseCommandTestCase =
 
   for (const resolvedCwd of cwds) {
     if (isDebugMode) printDebugCwdBanner(problemDir, resolvedCwd);
-    const result = await runCommandJudgeForCwd<TTestCase>(problemDir, resolvedCwd.cwd, params, options, {
-      continueAfterRejected: isDebugMode && resolvedCwd.expectedResult === 'rejected',
-    });
+    const result = await runCommandJudgeForCwd<TTestCase>(problemDir, resolvedCwd.cwd, params, options);
     if (isDebugMode && !matchesExpectedResult(resolvedCwd, result)) {
       process.exitCode = 1;
       printDebugExpectationFailureBanner(problemDir, resolvedCwd);
@@ -141,9 +139,8 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
   problemDir: string,
   cwd: string,
   params: JudgeParams,
-  options: CommandJudgePresetOptions<TTestCase>,
-  debugOptions?: { continueAfterRejected?: boolean }
-): Promise<{ allAccepted: boolean; anyAccepted: boolean }> {
+  options: CommandJudgePresetOptions<TTestCase>
+): Promise<{ allAccepted: boolean }> {
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
   const testCases = await (options.readTestCases ?? readCommandTestCases)(problemDir);
   const prebuildTestCaseId = testCases[0]?.id ?? 'prebuild';
@@ -156,7 +153,7 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
   const staticAnalysisResult = await judgeByStaticAnalysis(cwd, problemMarkdownFrontMatter);
   if (staticAnalysisResult) {
     printTestCaseResult({ testCaseId: prebuildTestCaseId, ...staticAnalysisResult });
-    return { allAccepted: false, anyAccepted: false };
+    return { allAccepted: false };
   }
 
   const originalMainFilePath = await findEntryPointFile(cwd, params.language);
@@ -166,7 +163,7 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
       decisionCode: DecisionCode.MISSING_REQUIRED_SUBMISSION_FILE_ERROR,
       stderr: `main file not found${params.language ? `: language: ${params.language}` : ''}`,
     });
-    return { allAccepted: false, anyAccepted: false };
+    return { allAccepted: false };
   }
 
   const languageDefinition = findLanguageDefinitionByPath(originalMainFilePath);
@@ -176,7 +173,7 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
       decisionCode: DecisionCode.WRONG_ANSWER,
       stderr: 'unsupported language',
     });
-    return { allAccepted: false, anyAccepted: false };
+    return { allAccepted: false };
   }
 
   // `CI` changes affects Chainlit. `FORCE_COLOR` affects Bun.
@@ -194,7 +191,7 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
         decisionCode: DecisionCode.BUILD_ERROR,
         stderr: error instanceof Error ? error.message : String(error),
       });
-      return { allAccepted: false, anyAccepted: false };
+      return { allAccepted: false };
     }
   }
 
@@ -208,7 +205,7 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
     });
     if (buildResult) {
       printTestCaseResult(buildResult);
-      return { allAccepted: false, anyAccepted: false };
+      return { allAccepted: false };
     }
   }
 
@@ -216,12 +213,11 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
 
   if (testCases.length === 0) {
     printTestCaseResult({ testCaseId: 'default', decisionCode: DecisionCode.ACCEPTED });
-    return { allAccepted: true, anyAccepted: true };
+    return { allAccepted: true };
   }
 
   const sharedFileInputPath = (testCases as { shared?: { fileInputPath?: string } }).shared?.fileInputPath;
   let allAccepted = true;
-  let anyAccepted = false;
 
   for (const testCase of testCases) {
     if (sharedFileInputPath) await copyTestCaseFileInput(sharedFileInputPath, cwd);
@@ -263,7 +259,7 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
         stderr: errorToMessage(error),
       });
       await cleanWorkingDirectory(cwd, cwdSnapshot);
-      return { allAccepted: false, anyAccepted };
+      return { allAccepted: false };
     }
 
     const outputFiles = await readOutputFiles(cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
@@ -310,18 +306,14 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
     await cleanWorkingDirectory(cwd, cwdSnapshot);
     const isAccepted = judgeResult.decisionCode === DecisionCode.ACCEPTED;
     allAccepted &&= isAccepted;
-    anyAccepted ||= isAccepted;
-    if (!isAccepted && !debugOptions?.continueAfterRejected) return { allAccepted, anyAccepted };
+    if (!isAccepted) return { allAccepted };
   }
 
-  return { allAccepted, anyAccepted };
+  return { allAccepted };
 }
 
-function matchesExpectedResult(
-  resolvedCwd: ResolvedCwd,
-  result: { allAccepted: boolean; anyAccepted: boolean }
-): boolean {
-  return resolvedCwd.expectedResult === 'accepted' ? result.allAccepted : !result.anyAccepted;
+function matchesExpectedResult(resolvedCwd: ResolvedCwd, result: { allAccepted: boolean }): boolean {
+  return result.allAccepted === (resolvedCwd.expectedResult === 'accepted');
 }
 
 function runBuild(
