@@ -310,7 +310,7 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
 }
 
 function matchesExpectedResult(resolvedCwd: ResolvedCwd, result: { allAccepted: boolean }): boolean {
-  return resolvedCwd.expectedResult === 'accepted' ? result.allAccepted : !result.allAccepted;
+  return result.allAccepted === (resolvedCwd.expectedResult === 'accepted');
 }
 
 function runBuild(
