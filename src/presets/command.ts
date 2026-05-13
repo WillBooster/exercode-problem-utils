@@ -217,7 +217,6 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
   }
 
   const sharedFileInputPath = (testCases as { shared?: { fileInputPath?: string } }).shared?.fileInputPath;
-  let allAccepted = true;
 
   for (const testCase of testCases) {
     if (sharedFileInputPath) await copyTestCaseFileInput(sharedFileInputPath, cwd);
@@ -304,12 +303,10 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
     });
 
     await cleanWorkingDirectory(cwd, cwdSnapshot);
-    const isAccepted = judgeResult.decisionCode === DecisionCode.ACCEPTED;
-    allAccepted &&= isAccepted;
-    if (!isAccepted) return { allAccepted };
+    if (judgeResult.decisionCode !== DecisionCode.ACCEPTED) return { allAccepted: false };
   }
 
-  return { allAccepted };
+  return { allAccepted: true };
 }
 
 function matchesExpectedResult(resolvedCwd: ResolvedCwd, result: { allAccepted: boolean }): boolean {
