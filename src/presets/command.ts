@@ -12,7 +12,12 @@ import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readOutputFiles } from '../helpers/readOutputFiles.js';
 import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases as readFileTestCases } from '../helpers/readTestCases.js';
-import { printDebugCwdBanner, resolveCwds } from '../helpers/resolveCwds.js';
+import {
+  printDebugCwdBanner,
+  printDebugExpectationFailureBanner,
+  resolveCwds,
+  type ResolvedCwd,
+} from '../helpers/resolveCwds.js';
 import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
 import { DecisionCode } from '../types/decisionCode.js';
 import type { ProblemMarkdownFrontMatter } from '../types/problem.js';
@@ -120,9 +125,13 @@ export async function commandJudgePreset<TTestCase extends BaseCommandTestCase =
 
   const { cwds, isDebugMode } = await resolveCwds(problemDir, args.cwd);
 
-  for (const cwd of cwds) {
-    if (isDebugMode) printDebugCwdBanner(problemDir, cwd);
-    await runCommandJudgeForCwd<TTestCase>(problemDir, cwd, params, options);
+  for (const resolvedCwd of cwds) {
+    if (isDebugMode) printDebugCwdBanner(problemDir, resolvedCwd);
+    const result = await runCommandJudgeForCwd<TTestCase>(problemDir, resolvedCwd.cwd, params, options);
+    if (isDebugMode && !matchesExpectedResult(resolvedCwd, result)) {
+      process.exitCode = 1;
+      printDebugExpectationFailureBanner(problemDir, resolvedCwd);
+    }
   }
 }
 
@@ -131,7 +140,7 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
   cwd: string,
   params: JudgeParams,
   options: CommandJudgePresetOptions<TTestCase>
-): Promise<void> {
+): Promise<{ allAccepted: boolean }> {
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
   const testCases = await (options.readTestCases ?? readCommandTestCases)(problemDir);
   const prebuildTestCaseId = testCases[0]?.id ?? 'prebuild';
@@ -144,7 +153,7 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
   const staticAnalysisResult = await judgeByStaticAnalysis(cwd, problemMarkdownFrontMatter);
   if (staticAnalysisResult) {
     printTestCaseResult({ testCaseId: prebuildTestCaseId, ...staticAnalysisResult });
-    return;
+    return { allAccepted: false };
   }
 
   const originalMainFilePath = await findEntryPointFile(cwd, params.language);
@@ -154,7 +163,7 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
       decisionCode: DecisionCode.MISSING_REQUIRED_SUBMISSION_FILE_ERROR,
       stderr: `main file not found${params.language ? `: language: ${params.language}` : ''}`,
     });
-    return;
+    return { allAccepted: false };
   }
 
   const languageDefinition = findLanguageDefinitionByPath(originalMainFilePath);
@@ -164,7 +173,7 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
       decisionCode: DecisionCode.WRONG_ANSWER,
       stderr: 'unsupported language',
     });
-    return;
+    return { allAccepted: false };
   }
 
   // `CI` changes affects Chainlit. `FORCE_COLOR` affects Bun.
@@ -182,7 +191,7 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
         decisionCode: DecisionCode.BUILD_ERROR,
         stderr: error instanceof Error ? error.message : String(error),
       });
-      return;
+      return { allAccepted: false };
     }
   }
 
@@ -196,7 +205,7 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
     });
     if (buildResult) {
       printTestCaseResult(buildResult);
-      return;
+      return { allAccepted: false };
     }
   }
 
@@ -204,7 +213,7 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
 
   if (testCases.length === 0) {
     printTestCaseResult({ testCaseId: 'default', decisionCode: DecisionCode.ACCEPTED });
-    return;
+    return { allAccepted: true };
   }
 
   const sharedFileInputPath = (testCases as { shared?: { fileInputPath?: string } }).shared?.fileInputPath;
@@ -249,7 +258,7 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
         stderr: errorToMessage(error),
       });
       await cleanWorkingDirectory(cwd, cwdSnapshot);
-      return;
+      return { allAccepted: false };
     }
 
     const outputFiles = await readOutputFiles(cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
@@ -294,8 +303,14 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
     });
 
     await cleanWorkingDirectory(cwd, cwdSnapshot);
-    if (judgeResult.decisionCode !== DecisionCode.ACCEPTED) return;
+    if (judgeResult.decisionCode !== DecisionCode.ACCEPTED) return { allAccepted: false };
   }
+
+  return { allAccepted: true };
+}
+
+function matchesExpectedResult(resolvedCwd: ResolvedCwd, result: { allAccepted: boolean }): boolean {
+  return resolvedCwd.expectedResult === 'accepted' ? result.allAccepted : !result.allAccepted;
 }
 
 function runBuild(
