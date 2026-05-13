@@ -1,6 +1,11 @@
 import path from 'node:path';
 
-import { findFailingModelAnswerDirs, findModelAnswerDirs } from './findModelAnswerDirs.js';
+import {
+  FAILING_MODEL_ANSWERS_DIRNAME,
+  MODEL_ANSWERS_DIRNAME,
+  findFailingModelAnswerDirs,
+  findModelAnswerDirs,
+} from './findModelAnswerDirs.js';
 import { printDebugBanner } from './printDebugBanner.js';
 
 export type ExpectedJudgeResult = 'accepted' | 'rejected';
@@ -28,11 +33,13 @@ export interface ResolvedCwds {
 export async function resolveCwds(problemDir: string, cwdArg: string | undefined): Promise<ResolvedCwds> {
   if (cwdArg) return { cwds: [{ cwd: cwdArg, expectedResult: 'accepted' }], isDebugMode: false };
 
-  const modelAnswerDirs = await findModelAnswerDirs(problemDir);
-  const failingModelAnswerDirs = await findFailingModelAnswerDirs(problemDir);
+  const [modelAnswerDirs, failingModelAnswerDirs] = await Promise.all([
+    findModelAnswerDirs(problemDir),
+    findFailingModelAnswerDirs(problemDir),
+  ]);
   if (modelAnswerDirs.length === 0 && failingModelAnswerDirs.length === 0) {
     throw new Error(
-      `cwd argument required (no model answer directories found in ${path.join(problemDir, 'model_answers')} or ${path.join(problemDir, 'model_answers.fails')})`
+      `cwd argument required (no model answer directories found in ${path.join(problemDir, MODEL_ANSWERS_DIRNAME)} or ${path.join(problemDir, FAILING_MODEL_ANSWERS_DIRNAME)})`
     );
   }
 

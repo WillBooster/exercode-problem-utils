@@ -1,8 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-const MODEL_ANSWERS_DIRNAME = 'model_answers';
-const FAILING_MODEL_ANSWERS_DIRNAME = 'model_answers.fails';
+export const MODEL_ANSWERS_DIRNAME = 'model_answers';
+export const FAILING_MODEL_ANSWERS_DIRNAME = 'model_answers.fails';
 
 /**
  * Find model answer directories under `<problemDir>/model_answers/`.
