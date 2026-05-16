@@ -1,7 +1,7 @@
 import { DecisionCode, parseArgs, printTestCaseResult, startHttpServer } from '@exercode/problem-utils';
 import type { TestCaseResult } from '@exercode/problem-utils';
 import assert from 'node:assert';
-import puppeteer from 'puppeteer';
+import { launch } from 'puppeteer';
 import type { Page } from 'puppeteer';
 
 const TEST_CASES: readonly [string, (page: Page) => Promise<Omit<TestCaseResult, 'testCaseId'>>][] = [
@@ -68,7 +68,7 @@ const args = parseArgs(process.argv);
 if (!args.cwd) throw new Error('cwd argument required');
 await using server = startHttpServer(args.cwd);
 
-const browser = await puppeteer.launch({
+const browser = await launch({
   args: process.env.CI || process.env.WB_DOCKER === '1' ? ['--no-sandbox', '--disable-setuid-sandbox'] : [],
 });
 const page = await browser.newPage();
