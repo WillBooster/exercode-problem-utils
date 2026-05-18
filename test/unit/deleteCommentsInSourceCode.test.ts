@@ -341,6 +341,23 @@ test('remove comments and strings preserves JavaScript template expressions afte
   ).toEqual('const value = /}/.test(input) && dangerousCall();\n');
 });
 
+test('remove comments and strings preserves JavaScript template expressions after comments containing braces', () => {
+  assert(languageIdToSourceCodeGrammar.javascript);
+
+  expect(
+    removeCommentsAndStringsInSourceCode(
+      languageIdToSourceCodeGrammar.javascript,
+      `const a = \`${'${foo // }'}
+ + dangerousCall("x")}\`;
+const b = \`${'${foo /* } */ + otherCall("x")}'}\`;
+`
+    )
+  ).toEqual(`const a = foo
+ + dangerousCall();
+const b = foo + otherCall();
+`);
+});
+
 test('remove comments and strings preserves JavaScript nested template expressions', () => {
   assert(languageIdToSourceCodeGrammar.javascript);
 
@@ -377,6 +394,21 @@ test('remove comments and strings preserves Python f-string expressions with nes
 `
     )
   ).toEqual(`result =   and dangerous_call() 
+`);
+});
+
+test('remove comments and strings does not treat identifiers ending in f as Python f-string prefixes', () => {
+  assert(languageIdToSourceCodeGrammar.python);
+
+  expect(
+    removeCommentsAndStringsInSourceCode(
+      languageIdToSourceCodeGrammar.python,
+      `value = af"{dangerous_call('x')}"
+other = a_f"{another_call('x')}"
+`
+    )
+  ).toEqual(`value = af
+other = a_f
 `);
 });
 
