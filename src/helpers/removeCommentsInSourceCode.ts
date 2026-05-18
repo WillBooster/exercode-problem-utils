@@ -1,42 +1,80 @@
 import type { LanguageDefinition } from '../types/language.js';
 
-export function removeCommentsInSourceCode(
-  grammer: NonNullable<LanguageDefinition['grammer']>,
-  sourceCode: string
+export type SourceCodeGrammar = NonNullable<LanguageDefinition['grammer']>;
+
+/** Removes comments from source code according to the provided language grammar. */
+export function removeCommentsInSourceCode(grammar: SourceCodeGrammar, sourceCode: string): string {
+  return removeCommentsAndMaybeStringsInSourceCode(grammar, sourceCode, { removeStrings: false });
+}
+
+/** Removes comments and string literal contents while preserving executable interpolation expressions. */
+export function removeCommentsAndStringsInSourceCode(grammar: SourceCodeGrammar, sourceCode: string): string {
+  return removeCommentsAndMaybeStringsInSourceCode(grammar, sourceCode, { removeStrings: true });
+}
+
+interface CommentOrStringGrammar {
+  closeRegExp: RegExp;
+  isComment: boolean;
+  openRegExp: RegExp;
+}
+
+function removeCommentsAndMaybeStringsInSourceCode(
+  grammar: SourceCodeGrammar,
+  sourceCode: string,
+  options: { removeStrings: boolean },
+  commentOrStringGrammars = compileCommentOrStringGrammars(grammar)
 ): string {
-  if (!grammer.comments?.length) return sourceCode;
+  if (!grammar.comments?.length && (!options.removeStrings || !grammar.strings?.length)) return sourceCode;
 
   const newSourceCodeSlices: string[] = [];
 
   let lastIndex = 0;
 
   while (lastIndex < sourceCode.length) {
-    let first: { match: RegExpExecArray; closeRegExp: RegExp | undefined; isComment: boolean } | undefined;
+    let first: { grammar: CommentOrStringGrammar; match: RegExpExecArray } | undefined;
 
-    for (const commentOrStringGrammer of [
-      ...grammer.comments.map((v) => ({ isComment: true, ...v })),
-      ...(grammer.strings?.map((v) => ({ isComment: false, ...v })) ?? []),
-    ]) {
-      const startRegExp = new RegExp(commentOrStringGrammer.open, 'g');
+    for (const commentOrStringGrammer of commentOrStringGrammars) {
+      const startRegExp = commentOrStringGrammer.openRegExp;
       startRegExp.lastIndex = lastIndex;
 
       const match = startRegExp.exec(sourceCode);
 
-      if (match && (!first || match.index < first.match.index)) {
-        first = { match, closeRegExp: commentOrStringGrammer.close, isComment: commentOrStringGrammer.isComment };
+      if (match && shouldPreferMatch(match, commentOrStringGrammer, first, options)) {
+        first = { grammar: commentOrStringGrammer, match };
       }
     }
 
     if (first) {
-      newSourceCodeSlices.push(sourceCode.slice(lastIndex, first.match.index));
+      let stringPrefixStartIndex = first.match.index;
+      if (!first.grammar.isComment && options.removeStrings) {
+        stringPrefixStartIndex = getPythonStringPrefixStartIndex(sourceCode, first.match.index);
+      }
+      newSourceCodeSlices.push(sourceCode.slice(lastIndex, stringPrefixStartIndex));
 
-      const closeRegExp = new RegExp(first.closeRegExp ?? /(?=\n)/g, 'g');
-      closeRegExp.lastIndex = first.match.index + first.match[0].length;
+      if (!first.grammar.isComment) {
+        lastIndex = findStringEndIndex(sourceCode, first.match.index, first.grammar);
+        const stringLiteral = sourceCode.slice(first.match.index, lastIndex);
+        if (options.removeStrings) {
+          newSourceCodeSlices.push(
+            preserveStringInterpolationExpressions(
+              grammar,
+              commentOrStringGrammars,
+              sourceCode,
+              first.match.index,
+              stringLiteral
+            )
+          );
+        } else {
+          newSourceCodeSlices.push(stringLiteral);
+        }
+      } else {
+        const closeRegExp = first.grammar.closeRegExp;
+        closeRegExp.lastIndex = first.match.index + first.match[0].length;
 
-      const match = closeRegExp.exec(sourceCode);
+        const match = closeRegExp.exec(sourceCode);
 
-      lastIndex = match ? match.index + match[0].length : sourceCode.length;
-      if (!first.isComment) newSourceCodeSlices.push(sourceCode.slice(first.match.index, lastIndex));
+        lastIndex = match ? match.index + match[0].length : sourceCode.length;
+      }
     } else {
       newSourceCodeSlices.push(sourceCode.slice(lastIndex));
       lastIndex = sourceCode.length;
@@ -44,4 +82,278 @@ export function removeCommentsInSourceCode(
   }
 
   return newSourceCodeSlices.join('');
+}
+
+function compileCommentOrStringGrammars(grammar: SourceCodeGrammar): readonly CommentOrStringGrammar[] {
+  return [
+    ...(grammar.comments?.map((v) => ({
+      closeRegExp: makeGlobalRegExp(v.close ?? /(?=\n)/g),
+      isComment: true,
+      openRegExp: makeGlobalRegExp(v.open),
+    })) ?? []),
+    ...(grammar.strings?.map((v) => ({
+      closeRegExp: makeGlobalRegExp(v.close),
+      isComment: false,
+      openRegExp: makeGlobalRegExp(v.open),
+    })) ?? []),
+  ] satisfies CommentOrStringGrammar[];
+}
+
+function shouldPreferMatch(
+  match: RegExpExecArray,
+  grammar: CommentOrStringGrammar,
+  first: { grammar: CommentOrStringGrammar; match: RegExpExecArray } | undefined,
+  options: { removeStrings: boolean }
+): boolean {
+  if (!first) return true;
+  if (match.index < first.match.index) return true;
+  if (match.index > first.match.index) return false;
+  return options.removeStrings && first.grammar.isComment && !grammar.isComment;
+}
+
+function makeGlobalRegExp(regExp: RegExp): RegExp {
+  return new RegExp(regExp, regExp.flags.includes('g') ? regExp.flags : `${regExp.flags}g`);
+}
+
+function findStringEndIndex(sourceCode: string, stringStartIndex: number, grammar: CommentOrStringGrammar): number {
+  if (sourceCode[stringStartIndex] === '`') return findJavaScriptTemplateEndIndex(sourceCode, stringStartIndex);
+  if (hasPythonFStringPrefix(sourceCode, stringStartIndex))
+    return findPythonFStringEndIndex(sourceCode, stringStartIndex);
+
+  const closeRegExp = grammar.closeRegExp;
+  closeRegExp.lastIndex = stringStartIndex + 1;
+  const match = closeRegExp.exec(sourceCode);
+  return match ? match.index + match[0].length : sourceCode.length;
+}
+
+function findJavaScriptTemplateEndIndex(sourceCode: string, stringStartIndex: number): number {
+  let index = stringStartIndex + 1;
+
+  while (index < sourceCode.length) {
+    if (sourceCode[index] === '\\') {
+      index += 2;
+      continue;
+    }
+    if (sourceCode[index] === '`') return index + 1;
+    if (sourceCode[index] === '$' && sourceCode[index + 1] === '{') {
+      index = readBalancedExpression(sourceCode, index + 2, '}', { slashStartsRegExp: true }).endIndex + 1;
+      continue;
+    }
+    index += 1;
+  }
+
+  return sourceCode.length;
+}
+
+function findPythonFStringEndIndex(sourceCode: string, stringStartIndex: number): number {
+  const quote = getStringQuote(sourceCode, stringStartIndex);
+  let index = stringStartIndex + quote.length;
+
+  while (index < sourceCode.length) {
+    if (sourceCode.startsWith(quote, index)) return index + quote.length;
+    if (sourceCode[index] === '{' && sourceCode[index + 1] === '{') {
+      index += 2;
+      continue;
+    }
+    if (sourceCode[index] === '{') {
+      index = readBalancedExpression(sourceCode, index + 1, '}', { slashStartsRegExp: false }).endIndex + 1;
+      continue;
+    }
+    index += sourceCode[index] === '\\' ? 2 : 1;
+  }
+
+  return sourceCode.length;
+}
+
+function getStringQuote(sourceCode: string, stringStartIndex: number): string {
+  const threeCharacterQuote = sourceCode.slice(stringStartIndex, stringStartIndex + 3);
+  if (threeCharacterQuote === "'''" || threeCharacterQuote === '"""') return threeCharacterQuote;
+  return sourceCode[stringStartIndex] ?? '';
+}
+
+function getPythonStringPrefixStartIndex(sourceCode: string, stringStartIndex: number): number {
+  const prefix = getPythonStringPrefix(sourceCode, stringStartIndex);
+  return prefix ? stringStartIndex - prefix.length : stringStartIndex;
+}
+
+function getPythonStringPrefix(sourceCode: string, stringStartIndex: number): string | undefined {
+  if (sourceCode[stringStartIndex] !== '"' && sourceCode[stringStartIndex] !== "'") return undefined;
+  let index = stringStartIndex - 1;
+  while (index >= 0 && /[A-Za-z]/.test(sourceCode[index] ?? '')) index -= 1;
+
+  const prefix = sourceCode.slice(index + 1, stringStartIndex);
+  if (!prefix || !/^[bfru]+$/i.test(prefix)) return undefined;
+  if (index >= 0 && /[\dA-Za-z_]/.test(sourceCode[index] ?? '')) return undefined;
+
+  return prefix;
+}
+
+function preserveStringInterpolationExpressions(
+  grammar: SourceCodeGrammar,
+  commentOrStringGrammars: readonly CommentOrStringGrammar[],
+  sourceCode: string,
+  stringStartIndex: number,
+  stringLiteral: string
+): string {
+  if (stringLiteral.startsWith('`'))
+    return preserveJavaScriptTemplateExpressions(grammar, commentOrStringGrammars, stringLiteral);
+  if (hasPythonFStringPrefix(sourceCode, stringStartIndex))
+    return preservePythonFStringExpressions(grammar, commentOrStringGrammars, stringLiteral);
+  return '';
+}
+
+function hasPythonFStringPrefix(sourceCode: string, stringStartIndex: number): boolean {
+  return getPythonStringPrefix(sourceCode, stringStartIndex)?.toLowerCase().includes('f') ?? false;
+}
+
+function preserveJavaScriptTemplateExpressions(
+  grammar: SourceCodeGrammar,
+  commentOrStringGrammars: readonly CommentOrStringGrammar[],
+  stringLiteral: string
+): string {
+  const expressions: string[] = [];
+  let index = 1;
+
+  while (index < stringLiteral.length - 1) {
+    if (stringLiteral[index] === '\\') {
+      index += 2;
+      continue;
+    }
+    if (stringLiteral[index] === '$' && stringLiteral[index + 1] === '{') {
+      const expression = readBalancedExpression(stringLiteral, index + 2, '}', { slashStartsRegExp: true });
+      expressions.push(
+        removeCommentsAndMaybeStringsInSourceCode(
+          grammar,
+          expression.content,
+          { removeStrings: true },
+          commentOrStringGrammars
+        )
+      );
+      index = expression.endIndex + 1;
+      continue;
+    }
+    index += 1;
+  }
+
+  return expressions.join('\n');
+}
+
+function preservePythonFStringExpressions(
+  grammar: SourceCodeGrammar,
+  commentOrStringGrammars: readonly CommentOrStringGrammar[],
+  stringLiteral: string
+): string {
+  const quoteLength = getStringQuote(stringLiteral, 0).length;
+  const expressions: string[] = [];
+  let index = quoteLength;
+
+  while (index < stringLiteral.length - quoteLength) {
+    if (stringLiteral[index] === '{' && stringLiteral[index + 1] === '{') {
+      index += 2;
+      continue;
+    }
+    if (stringLiteral[index] === '{') {
+      const expression = readBalancedExpression(stringLiteral, index + 1, '}', { slashStartsRegExp: false });
+      expressions.push(
+        removeCommentsAndMaybeStringsInSourceCode(
+          grammar,
+          expression.content,
+          { removeStrings: true },
+          commentOrStringGrammars
+        )
+      );
+      index = expression.endIndex + 1;
+      continue;
+    }
+    index += stringLiteral[index] === '\\' ? 2 : 1;
+  }
+
+  return expressions.join('\n');
+}
+
+function readBalancedExpression(
+  sourceCode: string,
+  startIndex: number,
+  closeChar: string,
+  options: { slashStartsRegExp: boolean }
+): { content: string; endIndex: number } {
+  let depth = 1;
+  let index = startIndex;
+
+  while (index < sourceCode.length) {
+    const char = sourceCode[index];
+    if (char === '"' || char === "'" || char === '`') {
+      index = skipQuotedSpan(sourceCode, index);
+      continue;
+    }
+    if (options.slashStartsRegExp && sourceCode[index] === '/' && sourceCode[index + 1] === '/') {
+      index = skipJavaScriptSingleLineComment(sourceCode, index);
+      continue;
+    }
+    if (options.slashStartsRegExp && sourceCode[index] === '/' && sourceCode[index + 1] === '*') {
+      index = skipJavaScriptBlockComment(sourceCode, index);
+      continue;
+    }
+    if (options.slashStartsRegExp && char === '/') {
+      index = skipJavaScriptRegExpLiteral(sourceCode, index);
+      continue;
+    }
+    if (char === '{') depth += 1;
+    if (char === closeChar) {
+      depth -= 1;
+      if (depth === 0) return { content: sourceCode.slice(startIndex, index), endIndex: index };
+    }
+    index += 1;
+  }
+
+  return { content: sourceCode.slice(startIndex), endIndex: sourceCode.length };
+}
+
+function skipQuotedSpan(sourceCode: string, startIndex: number): number {
+  const quote = getStringQuote(sourceCode, startIndex);
+  let index = startIndex + quote.length;
+
+  while (index < sourceCode.length) {
+    if (sourceCode[index] === '\\') {
+      index += 2;
+      continue;
+    }
+    if (sourceCode.startsWith(quote, index)) return index + quote.length;
+    index += 1;
+  }
+
+  return index;
+}
+
+function skipJavaScriptRegExpLiteral(sourceCode: string, startIndex: number): number {
+  let index = startIndex + 1;
+  let inCharacterClass = false;
+
+  while (index < sourceCode.length) {
+    if (sourceCode[index] === '\\') {
+      index += 2;
+      continue;
+    }
+    if (sourceCode[index] === '[') inCharacterClass = true;
+    if (sourceCode[index] === ']') inCharacterClass = false;
+    if (sourceCode[index] === '/' && !inCharacterClass) {
+      index += 1;
+      while (/[A-Za-z]/.test(sourceCode[index] ?? '')) index += 1;
+      return index;
+    }
+    if (sourceCode[index] === '\n') return startIndex + 1;
+    index += 1;
+  }
+
+  return startIndex + 1;
+}
+
+function skipJavaScriptSingleLineComment(sourceCode: string, startIndex: number): number {
+  const newLineIndex = sourceCode.indexOf('\n', startIndex + 2);
+  return newLineIndex === -1 ? sourceCode.length : newLineIndex;
+}
+
+function skipJavaScriptBlockComment(sourceCode: string, startIndex: number): number {
+  const endIndex = sourceCode.indexOf('*/', startIndex + 2);
+  return endIndex === -1 ? sourceCode.length : endIndex + 2;
 }

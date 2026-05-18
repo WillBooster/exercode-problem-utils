@@ -1,7 +1,10 @@
 import { assert, expect, test } from 'vitest';
 
-import { removeCommentsInSourceCode } from '../../src/helpers/removeCommentsInSourceCode.js';
-import { languageIdToDefinition } from '../../src/types/language.js';
+import {
+  removeCommentsAndStringsInSourceCode,
+  removeCommentsInSourceCode,
+} from '../../src/helpers/removeCommentsInSourceCode.js';
+import { languageIdToSourceCodeGrammar } from '../../src/helpers/sourceCodeGrammars.js';
 
 test.each<[string, string, string]>([
   [
@@ -238,7 +241,205 @@ header {
 `,
   ],
 ])('%s', (language, sourceCode, expected) => {
-  const languageDefinition = languageIdToDefinition[language];
-  assert(languageDefinition?.grammer);
-  expect(removeCommentsInSourceCode(languageDefinition.grammer, sourceCode)).toEqual(expected);
+  const grammar = languageIdToSourceCodeGrammar[language];
+  assert(grammar);
+  expect(removeCommentsInSourceCode(grammar, sourceCode)).toEqual(expected);
+});
+
+test.each<[string, string, string]>([
+  [
+    'java',
+    `public class Main {
+  public static void main(String[] args) {
+    // System.out.println("spoof");
+    System.out.println("// Not a comment");
+    String str = "/* Also not a comment */";
+    char c = '#';
+  }
+}
+`,
+    `public class Main {
+  public static void main(String[] args) {
+    System.out.println();
+    String str = ;
+    char c = ;
+  }
+}
+`,
+  ],
+  [
+    'python',
+    `# ChatOpenAI(model="gpt-4o-mini")
+api_name = "ChatOpenAI"
+query = '兵十に栗を渡したのはだれ？'
+prompt = """
+This string mentions similarity_search and as_retriever.
+"""
+retriever = db.as_retriever(search_kwargs={"k": 3})
+documents = retriever.invoke(query)
+`,
+    [
+      '',
+      'api_name = ',
+      'query = ',
+      'prompt =',
+      'retriever = db.as_retriever(search_kwargs={: 3})',
+      'documents = retriever.invoke(query)',
+      '',
+    ].join('\n'),
+  ],
+  [
+    'javascript',
+    `// fetch("spoof")
+const text = "fetch('/api')";
+const template = \`callMe()\`;
+fetch("/api/data");
+`,
+    `
+const text = ;
+const template = ;
+fetch();
+`,
+  ],
+  [
+    'html',
+    `<div data-value="<!-- not a comment -->">x</div>
+<!-- <script>spoof()</script> -->
+<span title='hello'>body</span>
+`,
+    `<div data-value=>x</div>
+<span title=>body</span>
+`,
+  ],
+])('remove comments and strings: %s', (language, sourceCode, expected) => {
+  const grammar = languageIdToSourceCodeGrammar[language];
+  assert(grammar);
+  expect(removeCommentsAndStringsInSourceCode(grammar, sourceCode)).toEqual(expected);
+});
+
+test('remove comments and strings preserves JavaScript template literal expressions', () => {
+  const sourceCode = `// fetch("spoof")
+const result = \`${'${fetch("/api") /* comment */}'}\`;
+`;
+
+  assert(languageIdToSourceCodeGrammar.javascript);
+  expect(removeCommentsAndStringsInSourceCode(languageIdToSourceCodeGrammar.javascript, sourceCode)).toEqual(
+    `
+const result = fetch();
+`
+  );
+});
+
+test('remove comments and strings preserves JavaScript template expressions after regex literals', () => {
+  assert(languageIdToSourceCodeGrammar.javascript);
+
+  expect(
+    removeCommentsAndStringsInSourceCode(
+      languageIdToSourceCodeGrammar.javascript,
+      'const value = `${/}/.test(input) && dangerousCall("x")}`;\n'
+    )
+  ).toEqual('const value = /}/.test(input) && dangerousCall();\n');
+});
+
+test('remove comments and strings preserves JavaScript template expressions after comments containing braces', () => {
+  assert(languageIdToSourceCodeGrammar.javascript);
+
+  expect(
+    removeCommentsAndStringsInSourceCode(
+      languageIdToSourceCodeGrammar.javascript,
+      `const a = \`${'${foo // }'}
+ + dangerousCall("x")}\`;
+const b = \`${'${foo /* } */ + otherCall("x")}'}\`;
+`
+    )
+  ).toEqual(`const a = foo
+ + dangerousCall();
+const b = foo + otherCall();
+`);
+});
+
+test('remove comments and strings preserves JavaScript nested template expressions', () => {
+  assert(languageIdToSourceCodeGrammar.javascript);
+
+  expect(
+    removeCommentsAndStringsInSourceCode(
+      languageIdToSourceCodeGrammar.javascript,
+      'const value = `outer ${`inner` && dangerousCall("x")}`;\n'
+    )
+  ).toEqual('const value =  && dangerousCall();\n');
+});
+
+test('remove comments and strings preserves Python f-string expressions', () => {
+  const sourceCode = `# dangerous_call("spoof")
+result = f"{dangerous_call('x') # comment
+}"
+`;
+
+  assert(languageIdToSourceCodeGrammar.python);
+  expect(removeCommentsAndStringsInSourceCode(languageIdToSourceCodeGrammar.python, sourceCode)).toEqual(
+    `
+result = dangerous_call()
+
+`
+  );
+});
+
+test('remove comments and strings preserves Python f-string expressions with nested triple-quoted strings', () => {
+  assert(languageIdToSourceCodeGrammar.python);
+
+  expect(
+    removeCommentsAndStringsInSourceCode(
+      languageIdToSourceCodeGrammar.python,
+      `result = f"Hello { f'''w'o}rld''' and dangerous_call('x') }"
+`
+    )
+  ).toEqual(`result =   and dangerous_call() 
+`);
+});
+
+test('remove comments and strings does not treat identifiers ending in f as Python f-string prefixes', () => {
+  assert(languageIdToSourceCodeGrammar.python);
+
+  expect(
+    removeCommentsAndStringsInSourceCode(
+      languageIdToSourceCodeGrammar.python,
+      `value = af"{dangerous_call('x')}"
+other = a_f"{another_call('x')}"
+`
+    )
+  ).toEqual(`value = af
+other = a_f
+`);
+});
+
+test('remove comments and strings preserves Python triple-quoted f-string expressions', () => {
+  assert(languageIdToSourceCodeGrammar.python);
+
+  expect(
+    removeCommentsAndStringsInSourceCode(
+      languageIdToSourceCodeGrammar.python,
+      `result = f"""{dangerous_call('x')}"""
+other = f'''{another_call("y")}'''
+`
+    )
+  ).toEqual(`result = dangerous_call()
+other = another_call()
+`);
+});
+
+test('comment grammars preserve existing regex flags while adding global matching', () => {
+  const grammar = {
+    comments: [{ open: /comment/i, close: /end/i }],
+    strings: [],
+  };
+
+  expect(removeCommentsInSourceCode(grammar, 'x COMMENT remove END y')).toEqual('x  y');
+});
+
+test('root exports expose source-code stripping helpers and grammars', async () => {
+  const exports = await import('../../src/index.js');
+  expect(exports.removeCommentsInSourceCode).toBe(removeCommentsInSourceCode);
+  expect(exports.removeCommentsAndStringsInSourceCode).toBe(removeCommentsAndStringsInSourceCode);
+  expect(exports.languageIdToSourceCodeGrammar.python).toBe(languageIdToSourceCodeGrammar.python);
+  expect('languageIdToDefinition' in exports).toBe(false);
 });
