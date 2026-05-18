@@ -2,12 +2,20 @@ import type { LanguageDefinition } from '../types/language.js';
 
 export type SourceCodeGrammar = NonNullable<LanguageDefinition['grammer']>;
 
+/** Removes comments from source code according to the provided language grammar. */
 export function removeCommentsInSourceCode(grammar: SourceCodeGrammar, sourceCode: string): string {
   return removeCommentsAndMaybeStringsInSourceCode(grammar, sourceCode, { removeStrings: false });
 }
 
+/** Removes comments and string literal contents while preserving executable interpolation expressions. */
 export function removeCommentsAndStringsInSourceCode(grammar: SourceCodeGrammar, sourceCode: string): string {
   return removeCommentsAndMaybeStringsInSourceCode(grammar, sourceCode, { removeStrings: true });
+}
+
+interface CommentOrStringGrammar {
+  closeRegExp: RegExp;
+  isComment: boolean;
+  openRegExp: RegExp;
 }
 
 function removeCommentsAndMaybeStringsInSourceCode(
@@ -19,40 +27,48 @@ function removeCommentsAndMaybeStringsInSourceCode(
 
   const newSourceCodeSlices: string[] = [];
   const commentOrStringGrammars = [
-    ...(grammar.comments?.map((v) => ({ isComment: true, ...v })) ?? []),
-    ...(grammar.strings?.map((v) => ({ isComment: false, ...v })) ?? []),
-  ];
+    ...(grammar.comments?.map((v) => ({
+      closeRegExp: makeGlobalRegExp(v.close ?? /(?=\n)/g),
+      isComment: true,
+      openRegExp: makeGlobalRegExp(v.open),
+    })) ?? []),
+    ...(grammar.strings?.map((v) => ({
+      closeRegExp: makeGlobalRegExp(v.close),
+      isComment: false,
+      openRegExp: makeGlobalRegExp(v.open),
+    })) ?? []),
+  ] satisfies CommentOrStringGrammar[];
 
   let lastIndex = 0;
 
   while (lastIndex < sourceCode.length) {
-    let first: { match: RegExpExecArray; closeRegExp: RegExp | undefined; isComment: boolean } | undefined;
+    let first: { grammar: CommentOrStringGrammar; match: RegExpExecArray } | undefined;
 
     for (const commentOrStringGrammer of commentOrStringGrammars) {
-      const startRegExp = makeGlobalRegExp(commentOrStringGrammer.open);
+      const startRegExp = commentOrStringGrammer.openRegExp;
       startRegExp.lastIndex = lastIndex;
 
       const match = startRegExp.exec(sourceCode);
 
-      if (match && (!first || match.index < first.match.index)) {
-        first = { match, closeRegExp: commentOrStringGrammer.close, isComment: commentOrStringGrammer.isComment };
+      if (match && shouldPreferMatch(match, commentOrStringGrammer, first, options)) {
+        first = { grammar: commentOrStringGrammer, match };
       }
     }
 
     if (first) {
       let stringPrefixStartIndex = first.match.index;
-      if (!first.isComment && options.removeStrings) {
+      if (!first.grammar.isComment && options.removeStrings) {
         stringPrefixStartIndex = getPythonStringPrefixStartIndex(sourceCode, first.match.index);
       }
       newSourceCodeSlices.push(sourceCode.slice(lastIndex, stringPrefixStartIndex));
 
-      const closeRegExp = makeGlobalRegExp(first.closeRegExp ?? /(?=\n)/g);
+      const closeRegExp = first.grammar.closeRegExp;
       closeRegExp.lastIndex = first.match.index + first.match[0].length;
 
       const match = closeRegExp.exec(sourceCode);
 
       lastIndex = match ? match.index + match[0].length : sourceCode.length;
-      if (!first.isComment) {
+      if (!first.grammar.isComment) {
         const stringLiteral = sourceCode.slice(first.match.index, lastIndex);
         if (options.removeStrings) {
           newSourceCodeSlices.push(
@@ -69,6 +85,18 @@ function removeCommentsAndMaybeStringsInSourceCode(
   }
 
   return newSourceCodeSlices.join('');
+}
+
+function shouldPreferMatch(
+  match: RegExpExecArray,
+  grammar: CommentOrStringGrammar,
+  first: { grammar: CommentOrStringGrammar; match: RegExpExecArray } | undefined,
+  options: { removeStrings: boolean }
+): boolean {
+  if (!first) return true;
+  if (match.index < first.match.index) return true;
+  if (match.index > first.match.index) return false;
+  return options.removeStrings && first.grammar.isComment && !grammar.isComment;
 }
 
 function makeGlobalRegExp(regExp: RegExp): RegExp {

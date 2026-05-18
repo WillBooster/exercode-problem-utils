@@ -345,6 +345,21 @@ result = dangerous_call()
   );
 });
 
+test('remove comments and strings preserves Python triple-quoted f-string expressions', () => {
+  assert(languageIdToSourceCodeGrammar.python);
+
+  expect(
+    removeCommentsAndStringsInSourceCode(
+      languageIdToSourceCodeGrammar.python,
+      `result = f"""{dangerous_call('x')}"""
+other = f'''{another_call("y")}'''
+`
+    )
+  ).toEqual(`result = dangerous_call()
+other = another_call()
+`);
+});
+
 test('comment grammars preserve existing regex flags while adding global matching', () => {
   const grammar = {
     comments: [{ open: /comment/i, close: /end/i }],
