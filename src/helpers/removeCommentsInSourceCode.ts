@@ -4,7 +4,22 @@ export function removeCommentsInSourceCode(
   grammer: NonNullable<LanguageDefinition['grammer']>,
   sourceCode: string
 ): string {
-  if (!grammer.comments?.length) return sourceCode;
+  return removeCommentsAndMaybeStringsInSourceCode(grammer, sourceCode, { removeStrings: false });
+}
+
+export function removeCommentsAndStringsInSourceCode(
+  grammer: NonNullable<LanguageDefinition['grammer']>,
+  sourceCode: string
+): string {
+  return removeCommentsAndMaybeStringsInSourceCode(grammer, sourceCode, { removeStrings: true });
+}
+
+function removeCommentsAndMaybeStringsInSourceCode(
+  grammer: NonNullable<LanguageDefinition['grammer']>,
+  sourceCode: string,
+  options: { removeStrings: boolean }
+): string {
+  if (!grammer.comments?.length && (!options.removeStrings || !grammer.strings?.length)) return sourceCode;
 
   const newSourceCodeSlices: string[] = [];
 
@@ -14,7 +29,7 @@ export function removeCommentsInSourceCode(
     let first: { match: RegExpExecArray; closeRegExp: RegExp | undefined; isComment: boolean } | undefined;
 
     for (const commentOrStringGrammer of [
-      ...grammer.comments.map((v) => ({ isComment: true, ...v })),
+      ...(grammer.comments?.map((v) => ({ isComment: true, ...v })) ?? []),
       ...(grammer.strings?.map((v) => ({ isComment: false, ...v })) ?? []),
     ]) {
       const startRegExp = new RegExp(commentOrStringGrammer.open, 'g');
@@ -36,7 +51,8 @@ export function removeCommentsInSourceCode(
       const match = closeRegExp.exec(sourceCode);
 
       lastIndex = match ? match.index + match[0].length : sourceCode.length;
-      if (!first.isComment) newSourceCodeSlices.push(sourceCode.slice(first.match.index, lastIndex));
+      if (!first.isComment && !options.removeStrings)
+        newSourceCodeSlices.push(sourceCode.slice(first.match.index, lastIndex));
     } else {
       newSourceCodeSlices.push(sourceCode.slice(lastIndex));
       lastIndex = sourceCode.length;

@@ -1,6 +1,9 @@
 import { assert, expect, test } from 'vitest';
 
-import { removeCommentsInSourceCode } from '../../src/helpers/removeCommentsInSourceCode.js';
+import {
+  removeCommentsAndStringsInSourceCode,
+  removeCommentsInSourceCode,
+} from '../../src/helpers/removeCommentsInSourceCode.js';
 import { languageIdToDefinition } from '../../src/types/language.js';
 
 test.each<[string, string, string]>([
@@ -241,4 +244,82 @@ header {
   const languageDefinition = languageIdToDefinition[language];
   assert(languageDefinition?.grammer);
   expect(removeCommentsInSourceCode(languageDefinition.grammer, sourceCode)).toEqual(expected);
+});
+
+test.each<[string, string, string]>([
+  [
+    'java',
+    `public class Main {
+  public static void main(String[] args) {
+    // System.out.println("spoof");
+    System.out.println("// Not a comment");
+    String str = "/* Also not a comment */";
+    char c = '#';
+  }
+}
+`,
+    `public class Main {
+  public static void main(String[] args) {
+    System.out.println();
+    String str = ;
+    char c = ;
+  }
+}
+`,
+  ],
+  [
+    'python',
+    `# ChatOpenAI(model="gpt-4o-mini")
+api_name = "ChatOpenAI"
+query = '兵十に栗を渡したのはだれ？'
+prompt = """
+This string mentions similarity_search and as_retriever.
+"""
+retriever = db.as_retriever(search_kwargs={"k": 3})
+documents = retriever.invoke(query)
+`,
+    [
+      '',
+      'api_name = ',
+      'query = ',
+      'prompt =',
+      'retriever = db.as_retriever(search_kwargs={: 3})',
+      'documents = retriever.invoke(query)',
+      '',
+    ].join('\n'),
+  ],
+  [
+    'javascript',
+    `// fetch("spoof")
+const text = "fetch('/api')";
+const template = \`callMe()\`;
+fetch("/api/data");
+`,
+    `
+const text = ;
+const template = ;
+fetch();
+`,
+  ],
+  [
+    'html',
+    `<div data-value="<!-- not a comment -->">x</div>
+<!-- <script>spoof()</script> -->
+<span title='hello'>body</span>
+`,
+    `<div data-value=>x</div>
+<span title=>body</span>
+`,
+  ],
+])('remove comments and strings: %s', (language, sourceCode, expected) => {
+  const languageDefinition = languageIdToDefinition[language];
+  assert(languageDefinition?.grammer);
+  expect(removeCommentsAndStringsInSourceCode(languageDefinition.grammer, sourceCode)).toEqual(expected);
+});
+
+test('root exports expose source-code stripping helpers and language definitions', async () => {
+  const exports = await import('../../src/index.js');
+  expect(exports.removeCommentsInSourceCode).toBe(removeCommentsInSourceCode);
+  expect(exports.removeCommentsAndStringsInSourceCode).toBe(removeCommentsAndStringsInSourceCode);
+  expect(exports.languageIdToDefinition.python).toBe(languageIdToDefinition.python);
 });
