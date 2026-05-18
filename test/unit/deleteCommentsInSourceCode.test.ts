@@ -330,6 +330,28 @@ const result = fetch();
   );
 });
 
+test('remove comments and strings preserves JavaScript template expressions after regex literals', () => {
+  assert(languageIdToSourceCodeGrammar.javascript);
+
+  expect(
+    removeCommentsAndStringsInSourceCode(
+      languageIdToSourceCodeGrammar.javascript,
+      'const value = `${/}/.test(input) && dangerousCall("x")}`;\n'
+    )
+  ).toEqual('const value = /}/.test(input) && dangerousCall();\n');
+});
+
+test('remove comments and strings preserves JavaScript nested template expressions', () => {
+  assert(languageIdToSourceCodeGrammar.javascript);
+
+  expect(
+    removeCommentsAndStringsInSourceCode(
+      languageIdToSourceCodeGrammar.javascript,
+      'const value = `outer ${`inner` && dangerousCall("x")}`;\n'
+    )
+  ).toEqual('const value =  && dangerousCall();\n');
+});
+
 test('remove comments and strings preserves Python f-string expressions', () => {
   const sourceCode = `# dangerous_call("spoof")
 result = f"{dangerous_call('x') # comment
@@ -343,6 +365,19 @@ result = dangerous_call()
 
 `
   );
+});
+
+test('remove comments and strings preserves Python f-string expressions with nested triple-quoted strings', () => {
+  assert(languageIdToSourceCodeGrammar.python);
+
+  expect(
+    removeCommentsAndStringsInSourceCode(
+      languageIdToSourceCodeGrammar.python,
+      `result = f"Hello { f'''w'o}rld''' and dangerous_call('x') }"
+`
+    )
+  ).toEqual(`result =   and dangerous_call() 
+`);
 });
 
 test('remove comments and strings preserves Python triple-quoted f-string expressions', () => {

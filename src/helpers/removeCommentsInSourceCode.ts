@@ -62,13 +62,8 @@ function removeCommentsAndMaybeStringsInSourceCode(
       }
       newSourceCodeSlices.push(sourceCode.slice(lastIndex, stringPrefixStartIndex));
 
-      const closeRegExp = first.grammar.closeRegExp;
-      closeRegExp.lastIndex = first.match.index + first.match[0].length;
-
-      const match = closeRegExp.exec(sourceCode);
-
-      lastIndex = match ? match.index + match[0].length : sourceCode.length;
       if (!first.grammar.isComment) {
+        lastIndex = findStringEndIndex(sourceCode, first.match.index, first.grammar);
         const stringLiteral = sourceCode.slice(first.match.index, lastIndex);
         if (options.removeStrings) {
           newSourceCodeSlices.push(
@@ -77,6 +72,13 @@ function removeCommentsAndMaybeStringsInSourceCode(
         } else {
           newSourceCodeSlices.push(stringLiteral);
         }
+      } else {
+        const closeRegExp = first.grammar.closeRegExp;
+        closeRegExp.lastIndex = first.match.index + first.match[0].length;
+
+        const match = closeRegExp.exec(sourceCode);
+
+        lastIndex = match ? match.index + match[0].length : sourceCode.length;
       }
     } else {
       newSourceCodeSlices.push(sourceCode.slice(lastIndex));
@@ -101,6 +103,62 @@ function shouldPreferMatch(
 
 function makeGlobalRegExp(regExp: RegExp): RegExp {
   return new RegExp(regExp, regExp.flags.includes('g') ? regExp.flags : `${regExp.flags}g`);
+}
+
+function findStringEndIndex(sourceCode: string, stringStartIndex: number, grammar: CommentOrStringGrammar): number {
+  if (sourceCode[stringStartIndex] === '`') return findJavaScriptTemplateEndIndex(sourceCode, stringStartIndex);
+  if (hasPythonFStringPrefix(sourceCode, stringStartIndex))
+    return findPythonFStringEndIndex(sourceCode, stringStartIndex);
+
+  const closeRegExp = grammar.closeRegExp;
+  closeRegExp.lastIndex = stringStartIndex + 1;
+  const match = closeRegExp.exec(sourceCode);
+  return match ? match.index + match[0].length : sourceCode.length;
+}
+
+function findJavaScriptTemplateEndIndex(sourceCode: string, stringStartIndex: number): number {
+  let index = stringStartIndex + 1;
+
+  while (index < sourceCode.length) {
+    if (sourceCode[index] === '\\') {
+      index += 2;
+      continue;
+    }
+    if (sourceCode[index] === '`') return index + 1;
+    if (sourceCode[index] === '$' && sourceCode[index + 1] === '{') {
+      index = readBalancedExpression(sourceCode, index + 2, '}', { slashStartsRegExp: true }).endIndex + 1;
+      continue;
+    }
+    index += 1;
+  }
+
+  return sourceCode.length;
+}
+
+function findPythonFStringEndIndex(sourceCode: string, stringStartIndex: number): number {
+  const quote = getStringQuote(sourceCode, stringStartIndex);
+  let index = stringStartIndex + quote.length;
+
+  while (index < sourceCode.length) {
+    if (sourceCode.startsWith(quote, index)) return index + quote.length;
+    if (sourceCode[index] === '{' && sourceCode[index + 1] === '{') {
+      index += 2;
+      continue;
+    }
+    if (sourceCode[index] === '{') {
+      index = readBalancedExpression(sourceCode, index + 1, '}', { slashStartsRegExp: false }).endIndex + 1;
+      continue;
+    }
+    index += sourceCode[index] === '\\' ? 2 : 1;
+  }
+
+  return sourceCode.length;
+}
+
+function getStringQuote(sourceCode: string, stringStartIndex: number): string {
+  const threeCharacterQuote = sourceCode.slice(stringStartIndex, stringStartIndex + 3);
+  if (threeCharacterQuote === "'''" || threeCharacterQuote === '"""') return threeCharacterQuote;
+  return sourceCode[stringStartIndex] ?? '';
 }
 
 function getPythonStringPrefixStartIndex(sourceCode: string, stringStartIndex: number): number {
@@ -147,7 +205,7 @@ function preserveJavaScriptTemplateExpressions(grammar: SourceCodeGrammar, strin
       continue;
     }
     if (stringLiteral[index] === '$' && stringLiteral[index + 1] === '{') {
-      const expression = readBalancedExpression(stringLiteral, index + 2, '}');
+      const expression = readBalancedExpression(stringLiteral, index + 2, '}', { slashStartsRegExp: true });
       expressions.push(removeCommentsAndStringsInSourceCode(grammar, expression.content));
       index = expression.endIndex + 1;
       continue;
@@ -159,7 +217,7 @@ function preserveJavaScriptTemplateExpressions(grammar: SourceCodeGrammar, strin
 }
 
 function preservePythonFStringExpressions(grammar: SourceCodeGrammar, stringLiteral: string): string {
-  const quoteLength = stringLiteral.startsWith("'''") || stringLiteral.startsWith('"""') ? 3 : 1;
+  const quoteLength = getStringQuote(stringLiteral, 0).length;
   const expressions: string[] = [];
   let index = quoteLength;
 
@@ -169,7 +227,7 @@ function preservePythonFStringExpressions(grammar: SourceCodeGrammar, stringLite
       continue;
     }
     if (stringLiteral[index] === '{') {
-      const expression = readBalancedExpression(stringLiteral, index + 1, '}');
+      const expression = readBalancedExpression(stringLiteral, index + 1, '}', { slashStartsRegExp: false });
       expressions.push(removeCommentsAndStringsInSourceCode(grammar, expression.content));
       index = expression.endIndex + 1;
       continue;
@@ -183,7 +241,8 @@ function preservePythonFStringExpressions(grammar: SourceCodeGrammar, stringLite
 function readBalancedExpression(
   sourceCode: string,
   startIndex: number,
-  closeChar: string
+  closeChar: string,
+  options: { slashStartsRegExp: boolean }
 ): { content: string; endIndex: number } {
   let depth = 1;
   let index = startIndex;
@@ -192,6 +251,10 @@ function readBalancedExpression(
     const char = sourceCode[index];
     if (char === '"' || char === "'" || char === '`') {
       index = skipQuotedSpan(sourceCode, index);
+      continue;
+    }
+    if (options.slashStartsRegExp && char === '/') {
+      index = skipJavaScriptRegExpLiteral(sourceCode, index);
       continue;
     }
     if (char === '{') depth += 1;
@@ -206,17 +269,40 @@ function readBalancedExpression(
 }
 
 function skipQuotedSpan(sourceCode: string, startIndex: number): number {
-  const quote = sourceCode[startIndex];
-  let index = startIndex + 1;
+  const quote = getStringQuote(sourceCode, startIndex);
+  let index = startIndex + quote.length;
 
   while (index < sourceCode.length) {
     if (sourceCode[index] === '\\') {
       index += 2;
       continue;
     }
-    if (sourceCode[index] === quote) return index + 1;
+    if (sourceCode.startsWith(quote, index)) return index + quote.length;
     index += 1;
   }
 
   return index;
+}
+
+function skipJavaScriptRegExpLiteral(sourceCode: string, startIndex: number): number {
+  let index = startIndex + 1;
+  let inCharacterClass = false;
+
+  while (index < sourceCode.length) {
+    if (sourceCode[index] === '\\') {
+      index += 2;
+      continue;
+    }
+    if (sourceCode[index] === '[') inCharacterClass = true;
+    if (sourceCode[index] === ']') inCharacterClass = false;
+    if (sourceCode[index] === '/' && !inCharacterClass) {
+      index += 1;
+      while (/[A-Za-z]/.test(sourceCode[index] ?? '')) index += 1;
+      return index;
+    }
+    if (sourceCode[index] === '\n') return startIndex + 1;
+    index += 1;
+  }
+
+  return startIndex + 1;
 }
