@@ -12,6 +12,9 @@ export interface PackageManagerCommandRunResult {
   status: number | undefined;
   timeSeconds: number;
   memoryBytes: number;
+  timedOut: boolean;
+  signal: NodeJS.Signals | undefined;
+  outputLimitExceeded: boolean;
 }
 
 export interface RunCommandInTemporaryPackageManagerProjectOptions {
@@ -22,6 +25,7 @@ export interface RunCommandInTemporaryPackageManagerProjectOptions {
   stdin?: string;
   env?: NodeJS.ProcessEnv;
   timeLimitSeconds: number;
+  outputLimitBytes?: number;
   tempDirPrefix?: string;
   projectFilePaths?: readonly string[];
 }
@@ -48,6 +52,9 @@ const packageManagerProjectFilePaths = {
   yarn: ['package.json', 'yarn.lock', '.yarnrc.yml', '.yarn'],
 } as const satisfies Record<PackageManager, readonly string[]>;
 
+const defaultOutputLimitBytes = 50 * 1024 * 1024;
+const killGracePeriodMilliseconds = 1000;
+
 /**
  * Copies a submission directory to a temporary directory, overlays package
  * manager project files from the problem directory, runs a command, and then
@@ -57,7 +64,6 @@ export async function runCommandInTemporaryPackageManagerProject(
   options: RunCommandInTemporaryPackageManagerProjectOptions
 ): Promise<PackageManagerCommandRunResult> {
   const runDir = await fs.mkdtemp(path.join(os.tmpdir(), options.tempDirPrefix ?? 'exercode-'));
-  const startedAt = Date.now();
   try {
     await fs.cp(options.cwd, runDir, { recursive: true });
     await copyPackageManagerProjectFiles({
@@ -68,20 +74,26 @@ export async function runCommandInTemporaryPackageManagerProject(
     });
 
     const command = typeof options.command === 'function' ? options.command({ runDir }) : options.command;
+    const startedAt = Date.now();
     const result = await spawnWithInput(command, {
       cwd: runDir,
       env: options.env ?? process.env,
+      outputLimitBytes: options.outputLimitBytes ?? defaultOutputLimitBytes,
       stdin: options.stdin ?? '',
       timeLimitSeconds: options.timeLimitSeconds,
     });
+    const elapsedTimeSeconds = (Date.now() - startedAt) / 1000;
 
     return {
       stdin: options.stdin ?? '',
       stdout: result.stdout,
       stderr: result.stderr,
-      status: result.status,
-      timeSeconds: Math.min((Date.now() - startedAt) / 1000, options.timeLimitSeconds),
+      status: result.timedOut || result.outputLimitExceeded ? 0 : result.status,
+      timeSeconds: result.timedOut ? options.timeLimitSeconds + 1e-3 : elapsedTimeSeconds,
       memoryBytes: 0,
+      timedOut: result.timedOut,
+      signal: result.signal,
+      outputLimitExceeded: result.outputLimitExceeded,
     };
   } finally {
     await fs.rm(runDir, { force: true, recursive: true });
@@ -114,10 +126,18 @@ async function spawnWithInput(
   context: {
     cwd: string;
     env: NodeJS.ProcessEnv;
+    outputLimitBytes: number;
     stdin: string;
     timeLimitSeconds: number;
   }
-): Promise<{ stdout: string; stderr: string; status: number | undefined }> {
+): Promise<{
+  stdout: string;
+  stderr: string;
+  status: number | undefined;
+  timedOut: boolean;
+  signal: NodeJS.Signals | undefined;
+  outputLimitExceeded: boolean;
+}> {
   const subprocess = childProcess.spawn(command[0], command.slice(1), {
     cwd: context.cwd,
     env: context.env,
@@ -126,21 +146,69 @@ async function spawnWithInput(
 
   const stdoutChunks: Buffer[] = [];
   const stderrChunks: Buffer[] = [];
-  subprocess.stdout.on('data', (chunk: Buffer) => stdoutChunks.push(chunk));
-  subprocess.stderr.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
+  let outputBytes = 0;
+  let timedOut = false;
+  let outputLimitExceeded = false;
 
-  const timeout = setTimeout(() => subprocess.kill(), context.timeLimitSeconds * 1000);
-  subprocess.stdin.end(context.stdin);
+  const appendOutputChunk = (chunks: Buffer[], chunk: Buffer): void => {
+    if (outputBytes >= context.outputLimitBytes) return;
 
-  const status = await new Promise<number | undefined>((resolve, reject) => {
-    subprocess.on('error', reject);
-    subprocess.on('close', (code) => resolve(code ?? undefined));
+    const remainingBytes = context.outputLimitBytes - outputBytes;
+    const appendedChunk = chunk.byteLength > remainingBytes ? chunk.subarray(0, remainingBytes) : chunk;
+    chunks.push(appendedChunk);
+    outputBytes += appendedChunk.byteLength;
+
+    if (chunk.byteLength > remainingBytes || outputBytes >= context.outputLimitBytes) {
+      outputLimitExceeded = true;
+      subprocess.kill('SIGKILL');
+    }
+  };
+
+  subprocess.stdout.on('data', (chunk: Buffer) => appendOutputChunk(stdoutChunks, chunk));
+  subprocess.stderr.on('data', (chunk: Buffer) => appendOutputChunk(stderrChunks, chunk));
+
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    subprocess.kill('SIGTERM');
+  }, context.timeLimitSeconds * 1000);
+  const killTimeout = setTimeout(
+    () => {
+      if (timedOut) subprocess.kill('SIGKILL');
+    },
+    context.timeLimitSeconds * 1000 + killGracePeriodMilliseconds
+  );
+  killTimeout.unref();
+
+  const { status, signal } = await new Promise<{ status: number | undefined; signal: NodeJS.Signals | undefined }>(
+    (resolve, reject) => {
+      let settled = false;
+      const rejectOnce = (error: Error): void => {
+        if (settled) return;
+        settled = true;
+        reject(error);
+      };
+      subprocess.on('error', rejectOnce);
+      subprocess.stdin.on('error', (error: NodeJS.ErrnoException) => {
+        if (error.code !== 'EPIPE') rejectOnce(error);
+      });
+      subprocess.on('close', (code, closeSignal) => {
+        if (settled) return;
+        settled = true;
+        resolve({ status: code ?? undefined, signal: closeSignal ?? undefined });
+      });
+      subprocess.stdin.end(context.stdin);
+    }
+  ).finally(() => {
+    clearTimeout(timeout);
+    clearTimeout(killTimeout);
   });
-  clearTimeout(timeout);
 
   return {
     stdout: Buffer.concat(stdoutChunks).toString(),
     stderr: Buffer.concat(stderrChunks).toString(),
     status,
+    timedOut,
+    signal,
+    outputLimitExceeded,
   };
 }
