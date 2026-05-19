@@ -54,7 +54,8 @@ const packageManagerProjectFilePaths = {
 
 const defaultOutputLimitBytes = 50 * 1024 * 1024;
 const killGracePeriodMilliseconds = 1000;
-const timeCommand = [os.platform() === 'darwin' ? 'gtime' : '/usr/bin/time', '--format', '%e %M'] as const;
+const timeResultHeadroomBytes = 128;
+const timeCommand = resolveTimeCommand();
 
 /**
  * Copies a submission directory to a temporary directory, overlays package
@@ -141,8 +142,8 @@ async function spawnWithInput(
   signal: NodeJS.Signals | undefined;
   outputLimitExceeded: boolean;
 }> {
-  const timedCommand = [...timeCommand, ...command] as const;
-  const subprocess = childProcess.spawn(timedCommand[0], timedCommand.slice(1), {
+  const spawnedCommand = timeCommand === undefined ? command : ([...timeCommand, ...command] as const);
+  const subprocess = childProcess.spawn(spawnedCommand[0], spawnedCommand.slice(1), {
     cwd: context.cwd,
     detached: process.platform !== 'win32',
     env: context.env,
@@ -158,12 +159,16 @@ async function spawnWithInput(
   const appendOutputChunk = (chunks: Buffer[], chunk: Buffer): void => {
     if (outputBytes >= context.outputLimitBytes) return;
 
-    const remainingBytes = context.outputLimitBytes - outputBytes;
+    const outputLimitBytes =
+      timeCommand !== undefined && chunks === stderrChunks
+        ? Math.max(0, context.outputLimitBytes - timeResultHeadroomBytes)
+        : context.outputLimitBytes;
+    const remainingBytes = outputLimitBytes - outputBytes;
     const appendedChunk = chunk.byteLength > remainingBytes ? chunk.subarray(0, remainingBytes) : chunk;
     chunks.push(appendedChunk);
     outputBytes += appendedChunk.byteLength;
 
-    if (chunk.byteLength > remainingBytes || outputBytes >= context.outputLimitBytes) {
+    if (chunk.byteLength > remainingBytes || outputBytes >= outputLimitBytes) {
       outputLimitExceeded = true;
       killSubprocessGroup(subprocess, 'SIGKILL');
     }
@@ -208,7 +213,9 @@ async function spawnWithInput(
     clearTimeout(killTimeout);
   });
 
-  const { stderr, timeSeconds, memoryBytes } = extractTimeResult(Buffer.concat(stderrChunks).toString());
+  const rawStderr = Buffer.concat(stderrChunks).toString();
+  const { stderr, timeSeconds, memoryBytes } =
+    timeCommand === undefined ? { stderr: rawStderr, timeSeconds: 0, memoryBytes: 0 } : extractTimeResult(rawStderr);
 
   return {
     stdout: Buffer.concat(stdoutChunks).toString(),
@@ -220,6 +227,14 @@ async function spawnWithInput(
     signal,
     outputLimitExceeded,
   };
+}
+
+function resolveTimeCommand(): readonly [string, ...string[]] | undefined {
+  const command = os.platform() === 'darwin' ? 'gtime' : '/usr/bin/time';
+  const result = childProcess.spawnSync(command, ['--version'], { stdio: 'ignore' });
+  if (result.error || result.status !== 0) return undefined;
+
+  return [command, '--format', '%e %M'];
 }
 
 function killSubprocessGroup(subprocess: childProcess.ChildProcess, signal: NodeJS.Signals): void {
@@ -239,11 +254,11 @@ function killSubprocessGroup(subprocess: childProcess.ChildProcess, signal: Node
 }
 
 function extractTimeResult(stderr: string): { stderr: string; timeSeconds: number; memoryBytes: number } {
-  const match = /(?:^|\n)(\d+\.\d+) (\d+)\s*$/.exec(stderr);
+  const match = /(\d+\.\d+) (\d+)\s*$/.exec(stderr);
   if (!match) return { stderr, timeSeconds: 0, memoryBytes: 0 };
 
   return {
-    stderr: stderr.slice(0, match.index),
+    stderr: stderr.slice(0, match.index).replace(/\n$/, ''),
     timeSeconds: Number(match[1]),
     memoryBytes: Number(match[2]) * 1024,
   };
