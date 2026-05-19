@@ -158,15 +158,15 @@ async function spawnWithInput(
   let outputLimitExceeded = false;
 
   const appendOutputChunk = (chunks: Buffer[], chunk: Buffer): void => {
-    if (outputBytes >= context.outputLimitBytes) return;
-
-    const remainingBytes = Math.max(0, context.outputLimitBytes - outputBytes);
-    if (remainingBytes === 0) {
-      outputLimitExceeded = true;
-      killSubprocessGroup(subprocess, 'SIGKILL');
+    if (outputBytes >= context.outputLimitBytes) {
+      if (chunk.byteLength > 0) {
+        outputLimitExceeded = true;
+        killSubprocessGroup(subprocess, 'SIGKILL');
+      }
       return;
     }
 
+    const remainingBytes = context.outputLimitBytes - outputBytes;
     const appendedChunk = chunk.byteLength > remainingBytes ? chunk.subarray(0, remainingBytes) : chunk;
     chunks.push(appendedChunk);
     outputBytes += appendedChunk.byteLength;
