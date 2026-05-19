@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-export type PackageManager = 'bun' | 'npm' | 'pnpm' | 'uv' | 'yarn';
+export type PackageManager = 'bun' | 'cargo' | 'go' | 'gradle' | 'maven' | 'npm' | 'pnpm' | 'ruby' | 'uv' | 'yarn';
 
 export interface PackageManagerCommandRunResult {
   stdin: string;
@@ -28,8 +28,22 @@ export interface RunCommandInTemporaryPackageManagerProjectOptions {
 
 const packageManagerProjectFilePaths = {
   bun: ['package.json', 'bun.lock', 'bun.lockb'],
+  cargo: ['Cargo.toml', 'Cargo.lock'],
+  go: ['go.mod', 'go.sum'],
+  gradle: [
+    'build.gradle',
+    'build.gradle.kts',
+    'settings.gradle',
+    'settings.gradle.kts',
+    'gradle.properties',
+    'gradle',
+    'gradlew',
+    'gradlew.bat',
+  ],
+  maven: ['pom.xml', '.mvn', 'mvnw', 'mvnw.cmd'],
   npm: ['package.json', 'package-lock.json'],
   pnpm: ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml'],
+  ruby: ['Gemfile', 'Gemfile.lock', '.ruby-version'],
   uv: ['pyproject.toml', 'uv.lock'],
   yarn: ['package.json', 'yarn.lock', '.yarnrc.yml', '.yarn'],
 } as const satisfies Record<PackageManager, readonly string[]>;
