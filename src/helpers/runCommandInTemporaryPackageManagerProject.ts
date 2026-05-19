@@ -171,7 +171,7 @@ async function spawnWithInput(
     chunks.push(appendedChunk);
     outputBytes += appendedChunk.byteLength;
 
-    if (chunk.byteLength > remainingBytes || outputBytes >= context.outputLimitBytes) {
+    if (chunk.byteLength > remainingBytes) {
       outputLimitExceeded = true;
       killSubprocessGroup(subprocess, 'SIGKILL');
     }
@@ -195,18 +195,27 @@ async function spawnWithInput(
   const { status, signal } = await new Promise<{ status: number | undefined; signal: NodeJS.Signals | undefined }>(
     (resolve, reject) => {
       let settled = false;
-      const rejectOnce = (error: Error): void => {
+      let pendingError: Error | undefined;
+      const failAfterClose = (error: Error): void => {
         if (settled) return;
-        settled = true;
-        reject(error);
+        pendingError = error;
+        killSubprocessGroup(subprocess, 'SIGKILL');
+        if (subprocess.pid === undefined) {
+          settled = true;
+          reject(error);
+        }
       };
-      subprocess.on('error', rejectOnce);
+      subprocess.on('error', failAfterClose);
       subprocess.stdin.on('error', (error: NodeJS.ErrnoException) => {
-        if (error.code !== 'EPIPE') rejectOnce(error);
+        if (error.code !== 'EPIPE') failAfterClose(error);
       });
       subprocess.on('close', (code, closeSignal) => {
         if (settled) return;
         settled = true;
+        if (pendingError) {
+          reject(pendingError);
+          return;
+        }
         resolve({ status: code ?? undefined, signal: closeSignal ?? undefined });
       });
       subprocess.stdin.end(context.stdin);
@@ -266,8 +275,8 @@ async function readTimeResult(timeOutputPath: string): Promise<{ timeSeconds: nu
     return { timeSeconds: 0, memoryBytes: 0 };
   }
 
-  const match = /(\d+\.\d+) (\d+)\s*$/.exec(content);
+  const match = /(\d+(?:[.,]\d+)?) (\d+)\s*$/.exec(content);
   if (!match) return { timeSeconds: 0, memoryBytes: 0 };
 
-  return { timeSeconds: Number(match[1]), memoryBytes: Number(match[2]) * 1024 };
+  return { timeSeconds: Number(match[1]!.replace(',', '.')), memoryBytes: Number(match[2]) * 1024 };
 }
