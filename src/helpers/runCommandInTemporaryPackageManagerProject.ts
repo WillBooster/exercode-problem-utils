@@ -77,7 +77,7 @@ export async function runCommandInTemporaryPackageManagerProject(
     const startedAt = Date.now();
     const result = await spawnWithInput(command, {
       cwd: runDir,
-      env: options.env ?? process.env,
+      env: options.env ? { ...process.env, ...options.env } : process.env,
       outputLimitBytes: options.outputLimitBytes ?? defaultOutputLimitBytes,
       stdin: options.stdin ?? '',
       timeLimitSeconds: options.timeLimitSeconds,
