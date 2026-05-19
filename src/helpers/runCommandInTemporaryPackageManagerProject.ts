@@ -54,6 +54,7 @@ const packageManagerProjectFilePaths = {
 
 const defaultOutputLimitBytes = 50 * 1024 * 1024;
 const killGracePeriodMilliseconds = 1000;
+const timeCommand = [os.platform() === 'darwin' ? 'gtime' : '/usr/bin/time', '--format', '%e %M'] as const;
 
 /**
  * Copies a submission directory to a temporary directory, overlays package
@@ -89,8 +90,8 @@ export async function runCommandInTemporaryPackageManagerProject(
       stdout: result.stdout,
       stderr: result.stderr,
       status: result.timedOut || result.outputLimitExceeded ? 0 : result.status,
-      timeSeconds: result.timedOut ? options.timeLimitSeconds + 1e-3 : elapsedTimeSeconds,
-      memoryBytes: 0,
+      timeSeconds: result.timedOut ? options.timeLimitSeconds + 1e-3 : result.timeSeconds || elapsedTimeSeconds,
+      memoryBytes: result.memoryBytes,
       timedOut: result.timedOut,
       signal: result.signal,
       outputLimitExceeded: result.outputLimitExceeded,
@@ -134,12 +135,16 @@ async function spawnWithInput(
   stdout: string;
   stderr: string;
   status: number | undefined;
+  timeSeconds: number;
+  memoryBytes: number;
   timedOut: boolean;
   signal: NodeJS.Signals | undefined;
   outputLimitExceeded: boolean;
 }> {
-  const subprocess = childProcess.spawn(command[0], command.slice(1), {
+  const timedCommand = [...timeCommand, ...command] as const;
+  const subprocess = childProcess.spawn(timedCommand[0], timedCommand.slice(1), {
     cwd: context.cwd,
+    detached: process.platform !== 'win32',
     env: context.env,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
@@ -160,7 +165,7 @@ async function spawnWithInput(
 
     if (chunk.byteLength > remainingBytes || outputBytes >= context.outputLimitBytes) {
       outputLimitExceeded = true;
-      subprocess.kill('SIGKILL');
+      killSubprocessGroup(subprocess, 'SIGKILL');
     }
   };
 
@@ -169,11 +174,11 @@ async function spawnWithInput(
 
   const timeout = setTimeout(() => {
     timedOut = true;
-    subprocess.kill('SIGTERM');
+    killSubprocessGroup(subprocess, 'SIGTERM');
   }, context.timeLimitSeconds * 1000);
   const killTimeout = setTimeout(
     () => {
-      if (timedOut) subprocess.kill('SIGKILL');
+      if (timedOut) killSubprocessGroup(subprocess, 'SIGKILL');
     },
     context.timeLimitSeconds * 1000 + killGracePeriodMilliseconds
   );
@@ -203,12 +208,43 @@ async function spawnWithInput(
     clearTimeout(killTimeout);
   });
 
+  const { stderr, timeSeconds, memoryBytes } = extractTimeResult(Buffer.concat(stderrChunks).toString());
+
   return {
     stdout: Buffer.concat(stdoutChunks).toString(),
-    stderr: Buffer.concat(stderrChunks).toString(),
+    stderr,
     status,
+    timeSeconds,
+    memoryBytes,
     timedOut,
     signal,
     outputLimitExceeded,
+  };
+}
+
+function killSubprocessGroup(subprocess: childProcess.ChildProcess, signal: NodeJS.Signals): void {
+  if (subprocess.pid === undefined) return;
+
+  try {
+    if (process.platform === 'win32') {
+      subprocess.kill(signal);
+      return;
+    }
+    process.kill(-subprocess.pid, signal);
+  } catch (error) {
+    const code =
+      typeof error === 'object' && error !== null && 'code' in error ? (error as { code: unknown }).code : undefined;
+    if (code !== 'ESRCH' && code !== 'EPERM') throw error;
+  }
+}
+
+function extractTimeResult(stderr: string): { stderr: string; timeSeconds: number; memoryBytes: number } {
+  const match = /(?:^|\n)(\d+\.\d+) (\d+)\s*$/.exec(stderr);
+  if (!match) return { stderr, timeSeconds: 0, memoryBytes: 0 };
+
+  return {
+    stderr: stderr.slice(0, match.index),
+    timeSeconds: Number(match[1]),
+    memoryBytes: Number(match[2]) * 1024,
   };
 }
