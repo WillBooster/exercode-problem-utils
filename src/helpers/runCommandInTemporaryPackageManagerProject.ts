@@ -54,7 +54,6 @@ const packageManagerProjectFilePaths = {
 
 const defaultOutputLimitBytes = 50 * 1024 * 1024;
 const killGracePeriodMilliseconds = 1000;
-const timeResultHeadroomBytes = 128;
 const timeCommand = resolveTimeCommand();
 
 /**
@@ -142,7 +141,9 @@ async function spawnWithInput(
   signal: NodeJS.Signals | undefined;
   outputLimitExceeded: boolean;
 }> {
-  const spawnedCommand = timeCommand === undefined ? command : ([...timeCommand, ...command] as const);
+  const timeOutputPath = timeCommand === undefined ? undefined : path.join(context.cwd, '.exercode-time-result');
+  const spawnedCommand =
+    timeCommand === undefined ? command : ([...timeCommand, `--output=${timeOutputPath}`, ...command] as const);
   const subprocess = childProcess.spawn(spawnedCommand[0], spawnedCommand.slice(1), {
     cwd: context.cwd,
     detached: process.platform !== 'win32',
@@ -159,16 +160,18 @@ async function spawnWithInput(
   const appendOutputChunk = (chunks: Buffer[], chunk: Buffer): void => {
     if (outputBytes >= context.outputLimitBytes) return;
 
-    const outputLimitBytes =
-      timeCommand !== undefined && chunks === stderrChunks
-        ? Math.max(0, context.outputLimitBytes - timeResultHeadroomBytes)
-        : context.outputLimitBytes;
-    const remainingBytes = outputLimitBytes - outputBytes;
+    const remainingBytes = Math.max(0, context.outputLimitBytes - outputBytes);
+    if (remainingBytes === 0) {
+      outputLimitExceeded = true;
+      killSubprocessGroup(subprocess, 'SIGKILL');
+      return;
+    }
+
     const appendedChunk = chunk.byteLength > remainingBytes ? chunk.subarray(0, remainingBytes) : chunk;
     chunks.push(appendedChunk);
     outputBytes += appendedChunk.byteLength;
 
-    if (chunk.byteLength > remainingBytes || outputBytes >= outputLimitBytes) {
+    if (chunk.byteLength > remainingBytes || outputBytes >= context.outputLimitBytes) {
       outputLimitExceeded = true;
       killSubprocessGroup(subprocess, 'SIGKILL');
     }
@@ -213,13 +216,12 @@ async function spawnWithInput(
     clearTimeout(killTimeout);
   });
 
-  const rawStderr = Buffer.concat(stderrChunks).toString();
-  const { stderr, timeSeconds, memoryBytes } =
-    timeCommand === undefined ? { stderr: rawStderr, timeSeconds: 0, memoryBytes: 0 } : extractTimeResult(rawStderr);
+  const { timeSeconds, memoryBytes } =
+    timeOutputPath === undefined ? { timeSeconds: 0, memoryBytes: 0 } : await readTimeResult(timeOutputPath);
 
   return {
     stdout: Buffer.concat(stdoutChunks).toString(),
-    stderr,
+    stderr: Buffer.concat(stderrChunks).toString(),
     status,
     timeSeconds,
     memoryBytes,
@@ -253,13 +255,19 @@ function killSubprocessGroup(subprocess: childProcess.ChildProcess, signal: Node
   }
 }
 
-function extractTimeResult(stderr: string): { stderr: string; timeSeconds: number; memoryBytes: number } {
-  const match = /(\d+\.\d+) (\d+)\s*$/.exec(stderr);
-  if (!match) return { stderr, timeSeconds: 0, memoryBytes: 0 };
+async function readTimeResult(timeOutputPath: string): Promise<{ timeSeconds: number; memoryBytes: number }> {
+  let content: string;
+  try {
+    content = await fs.readFile(timeOutputPath, 'utf8');
+  } catch (error) {
+    const code =
+      typeof error === 'object' && error !== null && 'code' in error ? (error as { code: unknown }).code : undefined;
+    if (code !== 'ENOENT') throw error;
+    return { timeSeconds: 0, memoryBytes: 0 };
+  }
 
-  return {
-    stderr: stderr.slice(0, match.index).replace(/\n$/, ''),
-    timeSeconds: Number(match[1]),
-    memoryBytes: Number(match[2]) * 1024,
-  };
+  const match = /(\d+\.\d+) (\d+)\s*$/.exec(content);
+  if (!match) return { timeSeconds: 0, memoryBytes: 0 };
+
+  return { timeSeconds: Number(match[1]), memoryBytes: Number(match[2]) * 1024 };
 }
