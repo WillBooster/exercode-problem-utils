@@ -48,6 +48,7 @@ export interface CommandRunResult {
   status: number | undefined;
   timeSeconds: number;
   memoryBytes: number;
+  outputLimitExceeded?: boolean;
 }
 
 interface CommandJudgeContext {
@@ -439,6 +440,7 @@ function evaluateByLimits(context: {
   }
 
   if (
+    context.runResult.outputLimitExceeded ||
     context.runResult.stdout.length > context.context.outputLimitLength ||
     context.runResult.stderr.length > context.context.outputLimitLength
   ) {
