@@ -62,7 +62,10 @@ export interface CommandJudgeLimits {
   maxOutputLength: number;
 }
 
-export interface CommandJudgePresetOptions<TTestCase extends BaseCommandTestCase = BaseCommandTestCase> {
+export interface CommandJudgePresetOptions<
+  TTestCase extends BaseCommandTestCase = BaseCommandTestCase,
+  TRunResult extends CommandRunResult = CommandRunResult,
+> {
   limits?: CommandJudgeLimits;
   runTimeoutSeconds?: number;
   readTestCases?: (problemDir: string) => Promise<readonly TTestCase[]>;
@@ -74,10 +77,10 @@ export interface CommandJudgePresetOptions<TTestCase extends BaseCommandTestCase
     cwd: string;
     env: NodeJS.ProcessEnv;
     timeLimitSeconds: number;
-  }) => Promise<CommandRunResult> | CommandRunResult;
+  }) => Promise<TRunResult> | TRunResult;
   test?: (context: {
     testCase: TTestCase;
-    runResult: CommandRunResult;
+    runResult: TRunResult;
     outputFiles: NonNullable<TestCaseResult['outputFiles']>;
     context: CommandJudgeContext;
   }) => Promise<Partial<CommandJudgeCaseResult>> | Partial<CommandJudgeCaseResult> | undefined;
@@ -117,10 +120,10 @@ export interface CommandJudgePresetOptions<TTestCase extends BaseCommandTestCase
  * bun judge.ts
  * ```
  */
-export async function commandJudgePreset<TTestCase extends BaseCommandTestCase = BaseCommandTestCase>(
-  problemDir: string,
-  options: CommandJudgePresetOptions<TTestCase>
-): Promise<void> {
+export async function commandJudgePreset<
+  TTestCase extends BaseCommandTestCase = BaseCommandTestCase,
+  TRunResult extends CommandRunResult = CommandRunResult,
+>(problemDir: string, options: CommandJudgePresetOptions<TTestCase, TRunResult>): Promise<void> {
   const args = parseArgs(process.argv);
   const params = judgeParamsSchema.parse(args.params);
 
@@ -128,7 +131,7 @@ export async function commandJudgePreset<TTestCase extends BaseCommandTestCase =
 
   for (const resolvedCwd of cwds) {
     if (isDebugMode) printDebugCwdBanner(problemDir, resolvedCwd);
-    const result = await runCommandJudgeForCwd<TTestCase>(problemDir, resolvedCwd.cwd, params, options);
+    const result = await runCommandJudgeForCwd<TTestCase, TRunResult>(problemDir, resolvedCwd.cwd, params, options);
     if (isDebugMode && !matchesExpectedResult(resolvedCwd, result)) {
       process.exitCode = 1;
       printDebugExpectationFailureBanner(problemDir, resolvedCwd);
@@ -136,11 +139,14 @@ export async function commandJudgePreset<TTestCase extends BaseCommandTestCase =
   }
 }
 
-async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
+async function runCommandJudgeForCwd<
+  TTestCase extends BaseCommandTestCase,
+  TRunResult extends CommandRunResult = CommandRunResult,
+>(
   problemDir: string,
   cwd: string,
   params: JudgeParams,
-  options: CommandJudgePresetOptions<TTestCase>
+  options: CommandJudgePresetOptions<TTestCase, TRunResult>
 ): Promise<{ allAccepted: boolean }> {
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
   const testCases = await (options.readTestCases ?? readCommandTestCases)(problemDir);
@@ -230,7 +236,7 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
 
     const command = languageDefinition.command(mainFilePath);
     let stdin = testCase.input ?? '';
-    let runResult: CommandRunResult;
+    let runResult: TRunResult;
     try {
       if (options.resolveInput) {
         stdin = await options.resolveInput({ testCase, cwd, env });
@@ -245,12 +251,12 @@ async function runCommandJudgeForCwd<TTestCase extends BaseCommandTestCase>(
             env,
             timeLimitSeconds,
           })
-        : runCommand(command, {
+        : (runCommand(command, {
             stdin,
             cwd,
             env,
             timeLimitSeconds,
-          });
+          }) as TRunResult);
     } catch (error) {
       printTestCaseResult({
         testCaseId: testCase.id,
