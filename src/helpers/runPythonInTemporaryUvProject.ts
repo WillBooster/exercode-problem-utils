@@ -21,17 +21,10 @@ const defaultPythonArgs = ['main.py'] as const;
 export function runPythonInTemporaryUvProject(
   options: RunPythonInTemporaryUvProjectOptions
 ): Promise<PackageManagerCommandRunResult> {
+  const { pythonArgs = defaultPythonArgs, uvArgs = [], ...restOptions } = options;
   return runCommandInTemporaryPackageManagerProject({
-    ...options,
+    ...restOptions,
     packageManager: 'uv',
-    command: [
-      'uv',
-      'run',
-      '--quiet',
-      '--no-progress',
-      ...(options.uvArgs ?? []),
-      'python',
-      ...(options.pythonArgs ?? defaultPythonArgs),
-    ] as const,
+    command: ['uv', 'run', '--quiet', '--no-progress', ...uvArgs, 'python', ...pythonArgs] as const,
   });
 }
