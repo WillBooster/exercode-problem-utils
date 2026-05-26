@@ -24,10 +24,14 @@ export function runPythonInTemporaryUvProject(
   return runCommandInTemporaryPackageManagerProject({
     ...options,
     packageManager: 'uv',
-    command: ['uv', 'run', '--quiet', '--no-progress', ...(options.uvArgs ?? []), 'python', ...pythonArgs(options)],
+    command: [
+      'uv',
+      'run',
+      '--quiet',
+      '--no-progress',
+      ...(options.uvArgs ?? []),
+      'python',
+      ...(options.pythonArgs ?? defaultPythonArgs),
+    ] as const,
   });
-}
-
-function pythonArgs(options: RunPythonInTemporaryUvProjectOptions): readonly [string, ...string[]] {
-  return options.pythonArgs ?? defaultPythonArgs;
 }
