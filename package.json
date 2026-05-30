@@ -65,7 +65,7 @@
     "@types/node": "24.12.3",
     "@typescript/native-preview": "7.0.0-dev.20260517.1",
     "@willbooster/oxfmt-config": "1.2.2",
-    "@willbooster/oxlint-config": "1.4.6",
+    "@willbooster/oxlint-config": "1.4.7",
     "@willbooster/prettier-config": "10.4.0",
     "@willbooster/wb": "13.20.0",
     "build-ts": "17.1.15",
