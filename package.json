@@ -70,7 +70,6 @@
     "@willbooster/wb": "13.19.2",
     "build-ts": "17.1.15",
     "conventional-changelog-conventionalcommits": "9.3.1",
-    "dotenv-cli": "11.0.0",
     "lefthook": "2.1.6",
     "oxfmt": "0.50.0",
     "oxlint": "1.65.0",
