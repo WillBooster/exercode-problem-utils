@@ -67,7 +67,7 @@
     "@willbooster/oxfmt-config": "1.2.2",
     "@willbooster/oxlint-config": "1.4.7",
     "@willbooster/prettier-config": "10.4.0",
-    "@willbooster/wb": "13.21.2",
+    "@willbooster/wb": "13.22.1",
     "build-ts": "17.1.18",
     "conventional-changelog-conventionalcommits": "9.3.1",
     "lefthook": "2.1.8",
@@ -81,7 +81,7 @@
     "sort-package-json": "3.6.1",
     "vitest": "4.1.7"
   },
-  "packageManager": "yarn@4.15.0",
+  "packageManager": "yarn@4.16.0",
   "engines": {
     "node": ">=24"
   },
