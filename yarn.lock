@@ -1698,7 +1698,7 @@ __metadata:
     "@willbooster/oxfmt-config": "npm:1.2.2"
     "@willbooster/oxlint-config": "npm:1.4.6"
     "@willbooster/prettier-config": "npm:10.4.0"
-    "@willbooster/wb": "npm:13.19.2"
+    "@willbooster/wb": "npm:13.21.2"
     ai: "npm:6.0.184"
     build-ts: "npm:17.1.15"
     conventional-changelog-conventionalcommits: "npm:9.3.1"
@@ -3622,9 +3622,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@willbooster/wb@npm:13.19.2":
-  version: 13.19.2
-  resolution: "@willbooster/wb@npm:13.19.2"
+"@willbooster/wb@npm:13.21.2":
+  version: 13.21.2
+  resolution: "@willbooster/wb@npm:13.21.2"
   dependencies:
     chalk: "npm:5.6.2"
     dotenv: "npm:17.4.2"
@@ -3636,7 +3636,7 @@ __metadata:
     yargs: "npm:18.0.0"
   bin:
     wb: bin/index.js
-  checksum: 10c0/8c7524a0ab9aa072c1d9489bd6a3b2c3bb22509bdee32a7b8b1ff4fbee75faee0317cc7b8ff1a63f70ae4d1ea55bbd9fb1c48b480a57f06e7c4bffa40f9af312
+  checksum: 10c0/4028da20f877f1de33d1eb3dd09f4fa6f6de6f157b0f749ec0db1276248467e925b80a02117152d7cc920867416d6bb0df418f8692a358e9a6f48357662f9e0f
   languageName: node
   linkType: hard
 
