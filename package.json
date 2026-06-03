@@ -42,7 +42,7 @@
     "prepare": "lefthook install || true",
     "prettify": "prettier --cache --no-error-on-unmatched-pattern --write \"**/{.*/,}*.{java}\" \"!**/test{-,/}fixtures/**\" || true",
     "start": "build-ts run src/index.ts",
-    "test": "rm -fr temp && WB_ENV=test wb dotenv -- vitest test",
+    "test": "rm -fr temp && WB_ENV=test wb dotenv -- yarn vitest test",
     "test/ci-setup": "yarn build && bun install --cwd example",
     "typecheck": "wb typecheck",
     "verify": "wb verify",
