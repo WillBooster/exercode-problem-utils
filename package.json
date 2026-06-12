@@ -50,11 +50,11 @@
   },
   "prettier": "@willbooster/prettier-config",
   "dependencies": {
-    "@ai-sdk/amazon-bedrock": "4.0.111",
+    "@ai-sdk/amazon-bedrock": "4.0.113",
     "@ai-sdk/google": "3.0.80",
-    "@ai-sdk/openai": "3.0.67",
+    "@ai-sdk/openai": "3.0.68",
     "@ai-sdk/xai": "3.0.93",
-    "ai": "6.0.193",
+    "ai": "6.0.197",
     "front-matter": "4.0.2",
     "zod": "4.4.3"
   },
@@ -63,7 +63,7 @@
     "@tsconfig/node-ts": "23.6.4",
     "@tsconfig/node24": "24.0.4",
     "@types/node": "24.12.3",
-    "@typescript/native-preview": "7.0.0-dev.20260527.2",
+    "@typescript/native-preview": "7.0.0-dev.20260607.1",
     "@willbooster/oxfmt-config": "1.2.2",
     "@willbooster/oxlint-config": "1.4.8",
     "@willbooster/prettier-config": "10.4.0",
