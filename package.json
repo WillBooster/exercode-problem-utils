@@ -67,12 +67,12 @@
     "@willbooster/oxfmt-config": "1.2.2",
     "@willbooster/oxlint-config": "1.4.8",
     "@willbooster/prettier-config": "10.4.0",
-    "@willbooster/wb": "13.22.13",
+    "@willbooster/wb": "13.22.16",
     "build-ts": "17.1.24",
     "conventional-changelog-conventionalcommits": "9.3.1",
     "lefthook": "2.1.9",
-    "oxfmt": "0.54.0",
-    "oxlint": "1.69.0",
+    "oxfmt": "0.55.0",
+    "oxlint": "1.70.0",
     "oxlint-tsgolint": "0.23.0",
     "prettier": "3.8.3",
     "prettier-plugin-java": "2.9.7",
@@ -81,7 +81,7 @@
     "sort-package-json": "4.0.0",
     "vitest": "4.1.8"
   },
-  "packageManager": "yarn@4.16.0",
+  "packageManager": "yarn@4.17.0",
   "engines": {
     "node": ">=24"
   },
