@@ -2,12 +2,14 @@ import path from 'node:path';
 
 import { z } from 'zod';
 
+import { checkProblemDirIsolation } from '../helpers/checkProblemDirIsolation.js';
 import { cleanWorkingDirectory, snapshotWorkingDirectory } from '../helpers/cleanWorkingDirectory.js';
 import { copyTestCaseFileInput } from '../helpers/copyTestCaseFileInput.js';
 import { findEntryPointFile } from '../helpers/findEntryPointFile.js';
 import { findLanguageDefinitionByPath } from '../helpers/findLanguageDefinitionByPath.js';
 import { judgeByStaticAnalysis } from '../helpers/judgeByStaticAnalysis.js';
 import { parseArgs } from '../helpers/parseArgs.js';
+import { printDebugBanner } from '../helpers/printDebugBanner.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readOutputFiles } from '../helpers/readOutputFiles.js';
 import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
@@ -128,6 +130,23 @@ export async function commandJudgePreset<
   const params = judgeParamsSchema.parse(args.params);
 
   const { cwds, isDebugMode } = await resolveCwds(problemDir, args.cwd);
+
+  if (isDebugMode) {
+    const acceptedCwd = cwds.find((cwd) => cwd.expectedResult === 'accepted');
+    if (acceptedCwd) {
+      const isolationCheckResult = await checkProblemDirIsolation(problemDir, acceptedCwd, params);
+      if (!isolationCheckResult.passed) {
+        process.exitCode = 1;
+        return;
+      }
+    } else {
+      printDebugBanner([
+        '[DEBUG MODE] isolated problem directory check skipped',
+        '',
+        'No accepted model answer is available for checking that the copied judge still accepts a valid submission.',
+      ]);
+    }
+  }
 
   for (const resolvedCwd of cwds) {
     if (isDebugMode) printDebugCwdBanner(problemDir, resolvedCwd);
