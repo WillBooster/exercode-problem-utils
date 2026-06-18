@@ -41,17 +41,15 @@ export async function checkProblemDirIsolation(
       ]);
       return { passed: true };
     }
+    const env = createIsolationEnv(problemDir);
+    const execArgv = process.execArgv.filter((arg) => !arg.startsWith('--inspect'));
     const paramsJson = JSON.stringify(params);
-    const spawnResult = child_process.spawnSync(
-      process.execPath,
-      [...process.execArgv, scriptPath, copiedCwd, paramsJson],
-      {
-        cwd: copiedProblemDir,
-        encoding: 'utf8',
-        env: process.env,
-        timeout: ISOLATION_CHECK_TIMEOUT_MS,
-      }
-    );
+    const spawnResult = child_process.spawnSync(process.execPath, [...execArgv, scriptPath, copiedCwd, paramsJson], {
+      cwd: copiedProblemDir,
+      encoding: 'utf8',
+      env,
+      timeout: ISOLATION_CHECK_TIMEOUT_MS,
+    });
     const stdout = spawnResult.stdout ?? '';
     const stderr = spawnResult.stderr ?? '';
 
@@ -101,11 +99,34 @@ export async function checkProblemDirIsolation(
   }
 }
 
+function createIsolationEnv(problemDir: string): NodeJS.ProcessEnv {
+  const nodeModulesPaths = findAncestorNodeModulesPaths(problemDir);
+  if (nodeModulesPaths.length === 0) return process.env;
+
+  return {
+    ...process.env,
+    NODE_PATH: [...nodeModulesPaths, ...(process.env.NODE_PATH ? [process.env.NODE_PATH] : [])].join(path.delimiter),
+  };
+}
+
+function findAncestorNodeModulesPaths(problemDir: string): string[] {
+  const nodeModulesPaths: string[] = [];
+  let currentDir = path.resolve(problemDir);
+  while (true) {
+    const nodeModulesPath = path.join(currentDir, 'node_modules');
+    if (fs.existsSync(nodeModulesPath)) nodeModulesPaths.push(nodeModulesPath);
+
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) return nodeModulesPaths;
+    currentDir = parentDir;
+  }
+}
+
 function getInvokedScriptPath(problemDir: string): string {
   const scriptPath = process.argv[1];
-  if (!scriptPath) return './judge.ts';
+  if (!scriptPath) return `.${path.sep}judge.ts`;
   const relativeScriptPath = path.relative(problemDir, path.resolve(scriptPath));
-  return relativeScriptPath.startsWith('.') ? relativeScriptPath : `./${relativeScriptPath}`;
+  return relativeScriptPath.startsWith('.') ? relativeScriptPath : `.${path.sep}${relativeScriptPath}`;
 }
 
 function isAcceptedJudgeOutput(stdout: string): boolean {
