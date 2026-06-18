@@ -27,7 +27,10 @@ export async function checkProblemDirIsolation(
   try {
     tempRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'problem-utils-isolation_'));
     const copiedProblemDir = path.join(tempRoot, path.basename(problemDir));
-    await fs.promises.cp(problemDir, copiedProblemDir, { recursive: true });
+    await fs.promises.cp(problemDir, copiedProblemDir, {
+      recursive: true,
+      filter: (src) => path.basename(src) !== 'node_modules',
+    });
     await symlinkAncestorNodeModules(tempRoot, problemDir);
 
     const relativeCwd = path.relative(problemDir, resolvedCwd.cwd);
@@ -130,6 +133,7 @@ function getInvokedScriptPath(problemDir: string): string {
   const scriptPath = process.argv[1];
   if (!scriptPath) return `.${path.sep}judge.ts`;
   const relativeScriptPath = path.relative(problemDir, path.resolve(scriptPath));
+  if (path.isAbsolute(relativeScriptPath)) return relativeScriptPath;
   return relativeScriptPath.startsWith('.') ? relativeScriptPath : `.${path.sep}${relativeScriptPath}`;
 }
 
