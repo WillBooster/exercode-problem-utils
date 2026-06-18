@@ -48,7 +48,7 @@ export async function checkProblemDirIsolation(
       return { passed: true };
     }
     const execArgv = process.execArgv.filter(isIsolationExecArg);
-    const paramsJson = JSON.stringify(params);
+    const paramsJson = JSON.stringify(isJudgeParamsObject(params) ? params : {});
     const spawnResult = child_process.spawnSync(process.execPath, [...execArgv, scriptPath, copiedCwd, paramsJson], {
       cwd: copiedProblemDir,
       encoding: 'utf8',
@@ -111,6 +111,10 @@ function isCopiedProblemPath(src: string): boolean {
 
 function isIsolationExecArg(arg: string): boolean {
   return !arg.startsWith('--inspect') && !arg.startsWith('--watch') && !arg.startsWith('--hot');
+}
+
+function isJudgeParamsObject(params: unknown): params is object {
+  return params !== undefined && params !== null && typeof params === 'object' && !Array.isArray(params);
 }
 
 async function symlinkAllAncestorNodeModules(tempRoot: string, problemDir: string): Promise<void> {
