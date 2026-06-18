@@ -27,12 +27,13 @@ export async function checkProblemDirIsolation(
   try {
     tempRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'problem-utils-isolation_'));
     const absoluteProblemDir = path.resolve(problemDir);
-    const copiedProblemDir = path.join(tempRoot, path.basename(absoluteProblemDir));
+    const copiedProblemDir = path.join(tempRoot, toTempRelativePath(absoluteProblemDir));
+    await fs.promises.mkdir(path.dirname(copiedProblemDir), { recursive: true });
     await fs.promises.cp(absoluteProblemDir, copiedProblemDir, {
       recursive: true,
       filter: isCopiedProblemPath,
     });
-    await symlinkAncestorNodeModules(tempRoot, absoluteProblemDir);
+    await symlinkAllAncestorNodeModules(tempRoot, absoluteProblemDir);
 
     const relativeCwd = path.relative(absoluteProblemDir, path.resolve(resolvedCwd.cwd));
     const copiedCwd = path.join(copiedProblemDir, relativeCwd);
@@ -112,31 +113,32 @@ function isIsolationExecArg(arg: string): boolean {
   return !arg.startsWith('--inspect') && !arg.startsWith('--watch') && !arg.startsWith('--hot');
 }
 
-async function symlinkAncestorNodeModules(tempRoot: string, problemDir: string): Promise<void> {
-  const ancestorNodeModulesPath = findAncestorNodeModulesPath(problemDir);
-  if (!ancestorNodeModulesPath) return;
-
-  try {
-    await fs.promises.symlink(
-      ancestorNodeModulesPath,
-      path.join(tempRoot, 'node_modules'),
-      process.platform === 'win32' ? 'junction' : 'dir'
-    );
-  } catch {
-    // Package resolution is best-effort; the isolation check still reports a clear spawn failure if imports break.
-  }
-}
-
-function findAncestorNodeModulesPath(problemDir: string): string | undefined {
+async function symlinkAllAncestorNodeModules(tempRoot: string, problemDir: string): Promise<void> {
   let currentDir = path.resolve(problemDir);
   while (true) {
     const nodeModulesPath = path.join(currentDir, 'node_modules');
-    if (fs.existsSync(nodeModulesPath)) return nodeModulesPath;
+    if (fs.existsSync(nodeModulesPath)) {
+      const targetSymlinkPath = path.join(tempRoot, toTempRelativePath(currentDir), 'node_modules');
+      try {
+        await fs.promises.mkdir(path.dirname(targetSymlinkPath), { recursive: true });
+        await fs.promises.symlink(
+          nodeModulesPath,
+          targetSymlinkPath,
+          process.platform === 'win32' ? 'junction' : 'dir'
+        );
+      } catch {
+        // Package resolution is best-effort; the isolation check still reports a clear spawn failure if imports break.
+      }
+    }
 
     const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir) return undefined;
+    if (parentDir === currentDir) break;
     currentDir = parentDir;
   }
+}
+
+function toTempRelativePath(absolutePath: string): string {
+  return absolutePath.replace(/^([a-zA-Z]):/, '$1');
 }
 
 function getInvokedScriptPath(problemDir: string): string {
