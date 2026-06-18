@@ -57,7 +57,7 @@ export async function checkProblemDirIsolation(
       '',
       `Copied problem dir : ${copiedProblemDir}`,
       `Checked cwd        : ${relativeCwd}`,
-      `Exit status        : ${spawnResult.status ?? 'signal'}`,
+      `Exit status        : ${spawnResult.status ?? spawnResult.signal ?? 'unknown'}`,
       `Spawn error        : ${spawnResult.error?.message ?? '<none>'}`,
       '',
       'stdout:',
@@ -75,13 +75,21 @@ export async function checkProblemDirIsolation(
     ]);
     return { passed: false };
   } finally {
-    if (tempRoot) await fs.promises.rm(tempRoot, { recursive: true, force: true });
+    if (tempRoot) {
+      try {
+        await fs.promises.rm(tempRoot, { recursive: true, force: true });
+      } catch {
+        // Cleanup errors should not mask the primary isolation check result.
+      }
+    }
   }
 }
 
 function getInvokedScriptPath(problemDir: string): string {
   const scriptPath = process.argv[1];
-  return scriptPath ? path.relative(problemDir, path.resolve(scriptPath)) : 'judge.ts';
+  if (!scriptPath) return './judge.ts';
+  const relativeScriptPath = path.relative(problemDir, path.resolve(scriptPath));
+  return relativeScriptPath.startsWith('.') ? relativeScriptPath : `./${relativeScriptPath}`;
 }
 
 function isAcceptedJudgeOutput(stdout: string): boolean {
