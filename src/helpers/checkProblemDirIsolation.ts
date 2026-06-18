@@ -26,16 +26,17 @@ export async function checkProblemDirIsolation(
   let tempRoot: string | undefined;
   try {
     tempRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'problem-utils-isolation_'));
-    const copiedProblemDir = path.join(tempRoot, path.basename(problemDir));
-    await fs.promises.cp(problemDir, copiedProblemDir, {
+    const absoluteProblemDir = path.resolve(problemDir);
+    const copiedProblemDir = path.join(tempRoot, path.basename(absoluteProblemDir));
+    await fs.promises.cp(absoluteProblemDir, copiedProblemDir, {
       recursive: true,
       filter: isCopiedProblemPath,
     });
-    await symlinkAncestorNodeModules(tempRoot, problemDir);
+    await symlinkAncestorNodeModules(tempRoot, absoluteProblemDir);
 
-    const relativeCwd = path.relative(problemDir, resolvedCwd.cwd);
+    const relativeCwd = path.relative(absoluteProblemDir, path.resolve(resolvedCwd.cwd));
     const copiedCwd = path.join(copiedProblemDir, relativeCwd);
-    const scriptPath = getInvokedScriptPath(problemDir);
+    const scriptPath = getInvokedScriptPath(absoluteProblemDir);
     if (scriptPath.startsWith('..') || path.isAbsolute(scriptPath)) {
       printDebugBanner([
         '[DEBUG MODE] isolated problem directory check skipped',
