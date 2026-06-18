@@ -41,13 +41,17 @@ export async function checkProblemDirIsolation(
       ]);
       return { passed: true };
     }
-    const paramsJson = JSON.stringify(params) ?? '{}';
-    const spawnResult = child_process.spawnSync('bun', ['run', scriptPath, copiedCwd, paramsJson], {
-      cwd: copiedProblemDir,
-      encoding: 'utf8',
-      env: process.env,
-      timeout: ISOLATION_CHECK_TIMEOUT_MS,
-    });
+    const paramsJson = JSON.stringify(params);
+    const spawnResult = child_process.spawnSync(
+      process.execPath,
+      [...process.execArgv, scriptPath, copiedCwd, paramsJson],
+      {
+        cwd: copiedProblemDir,
+        encoding: 'utf8',
+        env: process.env,
+        timeout: ISOLATION_CHECK_TIMEOUT_MS,
+      }
+    );
     const stdout = spawnResult.stdout ?? '';
     const stderr = spawnResult.stderr ?? '';
 
