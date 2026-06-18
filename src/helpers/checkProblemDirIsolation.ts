@@ -29,7 +29,7 @@ export async function checkProblemDirIsolation(
     const copiedProblemDir = path.join(tempRoot, path.basename(problemDir));
     await fs.promises.cp(problemDir, copiedProblemDir, {
       recursive: true,
-      filter: (src) => path.basename(src) !== 'node_modules',
+      filter: isCopiedProblemPath,
     });
     await symlinkAncestorNodeModules(tempRoot, problemDir);
 
@@ -45,7 +45,7 @@ export async function checkProblemDirIsolation(
       ]);
       return { passed: true };
     }
-    const execArgv = process.execArgv.filter((arg) => !arg.startsWith('--inspect'));
+    const execArgv = process.execArgv.filter(isIsolationExecArg);
     const paramsJson = JSON.stringify(params);
     const spawnResult = child_process.spawnSync(process.execPath, [...execArgv, scriptPath, copiedCwd, paramsJson], {
       cwd: copiedProblemDir,
@@ -100,6 +100,15 @@ export async function checkProblemDirIsolation(
       }
     }
   }
+}
+
+function isCopiedProblemPath(src: string): boolean {
+  const name = path.basename(src);
+  return name !== 'node_modules' && name !== '.git';
+}
+
+function isIsolationExecArg(arg: string): boolean {
+  return !arg.startsWith('--inspect') && !arg.startsWith('--watch') && !arg.startsWith('--hot');
 }
 
 async function symlinkAncestorNodeModules(tempRoot: string, problemDir: string): Promise<void> {
