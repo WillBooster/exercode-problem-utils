@@ -120,7 +120,6 @@ async function symlinkAllAncestorNodeModules(tempRoot: string, problemDir: strin
     if (fs.existsSync(nodeModulesPath)) {
       const targetSymlinkPath = path.join(tempRoot, toTempRelativePath(currentDir), 'node_modules');
       try {
-        await fs.promises.mkdir(path.dirname(targetSymlinkPath), { recursive: true });
         await fs.promises.symlink(
           nodeModulesPath,
           targetSymlinkPath,
