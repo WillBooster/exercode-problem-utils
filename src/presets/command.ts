@@ -135,7 +135,10 @@ export async function commandJudgePreset<
     const acceptedCwd = cwds.find((cwd) => cwd.expectedResult === 'accepted');
     if (acceptedCwd) {
       const isolationCheckResult = await checkProblemDirIsolation(problemDir, acceptedCwd, params);
-      if (!isolationCheckResult.passed) process.exitCode = 1;
+      if (!isolationCheckResult.passed) {
+        process.exitCode = 1;
+        return;
+      }
     } else {
       printDebugBanner([
         '[DEBUG MODE] isolated problem directory check skipped',
