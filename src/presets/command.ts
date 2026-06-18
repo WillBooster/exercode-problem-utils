@@ -2,6 +2,7 @@ import path from 'node:path';
 
 import { z } from 'zod';
 
+import { checkProblemDirIsolation } from '../helpers/checkProblemDirIsolation.js';
 import { cleanWorkingDirectory, snapshotWorkingDirectory } from '../helpers/cleanWorkingDirectory.js';
 import { copyTestCaseFileInput } from '../helpers/copyTestCaseFileInput.js';
 import { findEntryPointFile } from '../helpers/findEntryPointFile.js';
@@ -128,6 +129,11 @@ export async function commandJudgePreset<
   const params = judgeParamsSchema.parse(args.params);
 
   const { cwds, isDebugMode } = await resolveCwds(problemDir, args.cwd);
+
+  if (isDebugMode) {
+    const isolationCheckResult = await checkProblemDirIsolation(problemDir, cwds[0]!, params);
+    if (!isolationCheckResult.passed) process.exitCode = 1;
+  }
 
   for (const resolvedCwd of cwds) {
     if (isDebugMode) printDebugCwdBanner(problemDir, resolvedCwd);
