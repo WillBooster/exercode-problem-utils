@@ -29,7 +29,8 @@ export async function checkProblemDirIsolation(
     const relativeCwd = path.relative(problemDir, resolvedCwd.cwd);
     const copiedCwd = path.join(copiedProblemDir, relativeCwd);
     const scriptName = getInvokedScriptName();
-    const spawnResult = child_process.spawnSync('bun', ['run', scriptName, copiedCwd, JSON.stringify(params)], {
+    const paramsJson = JSON.stringify(params) ?? '{}';
+    const spawnResult = child_process.spawnSync('bun', ['run', scriptName, copiedCwd, paramsJson], {
       cwd: copiedProblemDir,
       encoding: 'utf8',
       env: process.env,
