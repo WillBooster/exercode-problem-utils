@@ -1,7 +1,5 @@
 # 作問ガイド
 
-根拠: `gen-em` 系の作問方針、`WillBoosterLab/judge` の教材実例、`exercode-sakamoto-smartse-courses` の実運用。
-
 ## 鉄則
 
 - 入力に対して出力が一意、または `judge.ts` で決定的に正誤判定できる問題だけ作る。
@@ -40,8 +38,10 @@
 問題文と judge の両方で縛る。
 
 - 問題文: 「`Agent` と `run` を `@openai/agents` から import する」「`sandboxMode` を `read-only` にする」など。
-- frontmatter: 単純な必須/禁止なら `requiredRegExpsInCode` / `forbiddenRegExpsInCode`。
-- `judge.ts`: コメントや文字列での抜け道を避けたい場合は、提出ソースからコメント/文字列を除去して検査する。
+- frontmatter: 単純な禁止なら `forbiddenRegExpsInCode` / `forbiddenTextsInCode` を使う。
+- `requiredRegExpsInCode` だけで「構文を使った」とみなさない。文字列リテラルに対象語を置く抜け道が残るため。
+- `judge.ts`: 構文/API の使用を必須にする場合は、提出ソースからコメント/文字列を除去して検査する。
+- `model_answers.fails/`: 対象構文/API を使わずに正しい出力を出す解答を置き、実際に棄却されることを確認する。
 
 失敗時は `feedbackMarkdown` で満たしていない要件を箇条書きにすると学習者が直しやすい。
 
@@ -60,7 +60,7 @@
 
 - 正解は最低1つ。コースの対象言語に合わせる。
 - 失敗解答は、誤答の種類ごとに `model_answers.fails/<id>/` を用意する。
-- SMART-SE の TypeScript 問題では `typescript_no_sdk`, `typescript_missing_agent`, `typescript_local_tool` のように、落としたい理由が分かる名前にする。
+- 失敗解答の ID は、落としたい理由が分かる名前にする。
 
 ## 採点方式の選び方
 

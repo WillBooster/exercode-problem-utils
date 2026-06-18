@@ -1,7 +1,5 @@
 # 問題ファイル仕様
 
-根拠: `@exercode/problem-utils` の `src/types/`・`src/helpers/`・`src/presets/`、および `WillBoosterLab/judge` の `problemFileSchema` / `readProblem`。
-
 ## 問題ファイル
 
 - `problem.md`: 汎用例、`@exercode/problem-utils/example`、judge 側の多くの教材で使用。
@@ -96,16 +94,13 @@ judge サーバの `readTestCases`:
 
 ## DecisionCode
 
-主な値:
+作問時によく使う値:
 
 | 値 | 名前 |
 | --- | --- |
 | 1000 | `WRONG_ANSWER` |
 | 1001 | `RUNTIME_ERROR` |
 | 1002 | `TIME_LIMIT_EXCEEDED` |
-| 1003 | `MEMORY_LIMIT_EXCEEDED` |
-| 1004 | `OUTPUT_SIZE_LIMIT_EXCEEDED` |
-| 1005 | `PRESENTATION_ERROR` |
 | 1006 | `FORBIDDEN_PATTERNS_IN_CODE_ERROR` |
 | 1007 | `REQUIRED_PATTERNS_IN_CODE_ERROR` |
 | 1100 | `BUILD_ERROR` |
