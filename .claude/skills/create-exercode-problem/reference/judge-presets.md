@@ -1,14 +1,10 @@
 # judge.ts と採点プリセット
 
-## judge.ts の役割
+プリセット API は変わる可能性がある。作業時は必ず現在の `src/presets/*.ts` または installed package の `dist/presets/*.d.ts` を確認する。
 
-`judge.ts` は採点スクリプト。提出物（cwd）を実行し、各テストケースの結果を
-`TEST_CASE_RESULT {...}` という1行 JSON として標準出力に書き出す（この形式が Exercode の採点結果として読まれる）。
+## 標準入出力: `stdioJudgePreset`
 
-採点ロジックを毎回ゼロから書く必要はない。典型的な採点方式は `@exercode/problem-utils/presets/*`
-に**プリセット**として用意されており、`judge.ts` はプリセットを呼ぶだけで済むことが多い。
-
-最も単純な標準入出力の問題なら、これだけ：
+単純な入力→出力問題の既定。
 
 ```ts
 import { stdioJudgePreset } from '@exercode/problem-utils/presets/stdio';
@@ -16,36 +12,69 @@ import { stdioJudgePreset } from '@exercode/problem-utils/presets/stdio';
 await stdioJudgePreset(import.meta.dirname);
 ```
 
-## プリセットは「常に実装を確認する」
+検証:
 
-**利用可能なプリセットや各プリセットの引数・オプションは随時追加・変更される。**
-このスキルに API を転記すると古くなるため、ここには詳細仕様を書かない。
-実際に使うときは、必ず次を確認して**現在の正確な API** を把握すること：
+```bash
+bun judge.ts model_answers/python '{"language":"python"}'
+```
 
-- パッケージのエクスポート: `@exercode/problem-utils/presets/*`
-  - このリポジトリで作業している場合は `src/presets/*.ts`（実装そのもの）。
-  - パッケージを利用する側では、`node_modules/@exercode/problem-utils/dist/presets/*` の型定義（`*.d.ts`）。
-- 各プリセットのオプション型（`...PresetOptions`）と、それを使う `judge.ts` の書き方。
+挙動:
 
-## 採点方式の選び方（方針）
+- `test_cases/<id>.in` を stdin として実行し、`<id>.out` と比較する。
+- 出力は空白区切りトークン比較。
+- 浮動小数点は絶対/相対誤差 `1e-6`。
+- `requiredOutputFilePaths` がある場合は出力ファイル存在も見る。
 
-具体的なプリセット名は実装で確認する前提で、**問題の性質 → 採点方式**の対応の目安：
+## 独自判定: `commandJudgePreset`
 
-- 標準入力に対する標準出力で正誤が決まる … 標準入出力ベースの採点（最頻・最も低コスト）。
-- ファイルを読み書きする … ファイル入出力ベースの採点（`requiredOutputFilePaths` と併用）。
-- 入力を動的生成する／外部コマンドを実行する／独自の比較をしたい … コマンド実行ベースの採点。
-- LLM へのプロンプト（`prompt.txt`）を採点する … LLM ベースの採点（出力は非決定的なので緩い基準で判定）。
-- GUI（デスクトップウィンドウ）をスクリーンショットで判定する … GUI ベースの採点。
-- Web ページ（HTML/CSS/JS）の DOM を判定する／上記に当てはまらない … プリセットを使わず、エクスポートされたヘルパ（`parseArgs`, `printTestCaseResult`, `startHttpServer`, `DecisionCode` など）で **judge.ts を自作**する。
+次の場合の既定:
 
-迷ったら標準入出力ベースを選ぶ。Node.js 互換で書けるものをわざわざ Web/GUI 方式にしない。
+- JSON など構造化出力を厳密に比較する。
+- 提出コードの import、関数呼び出し、モデル名などを静的検査する。
+- 入力ファイルを動的生成する。
+- `runCommandInTemporaryPackageManagerProject` で `package.json` など問題内ファイルを一時プロジェクトへ持ち込みたい。
+- `model_answers.fails/` をまとめて検証したい。
 
-判定結果は `DecisionCode`（`reference/problem-spec.md` の一覧）で返し、必要なら学習者向けの
-`feedbackMarkdown` を添える。実際の問題ごとの構成例は、このリポジトリの `example/` 配下が参考になる。
+最小形:
 
-## judge を書く／選ぶときの共通注意（方式によらない）
+```ts
+import { DecisionCode } from '@exercode/problem-utils';
+import { commandJudgePreset } from '@exercode/problem-utils/presets/command';
 
-- 結果は必ずプリセット経由または `printTestCaseResult` で `TEST_CASE_RESULT` 行として出す（デバッグ用の余計な標準出力を混ぜない）。
-- 採点ロジックは決定的に。乱数や時刻に依存させない。
-- 時間・メモリ・出力サイズの上限チェックは多くのプリセットが内部で行う。自作するときは少なくとも終了コードと実行時間を見る。
-- `feedbackMarkdown` で「不足している要素」「期待値」などを返すと学習効果が高い。
+await commandJudgePreset(import.meta.dirname, {
+  readTestCases: async () => [{ id: 'test_1', input: '1 2', expected: '3' }],
+  test: ({ runResult, testCase }) =>
+    runResult.stdout.trim() === testCase.expected
+      ? { decisionCode: DecisionCode.ACCEPTED }
+      : { decisionCode: DecisionCode.WRONG_ANSWER },
+});
+```
+
+検証:
+
+```bash
+bun judge.ts
+```
+
+cwd を省くと `model_answers/*` と `model_answers.fails/*` を列挙し、正解は受理、失敗解答は棄却されることを確認する。デバッグモードでは、問題ディレクトリだけを一時ディレクトリにコピーして judge が動くかも確認する。
+
+## LLM prompt: `llmJudgePreset`
+
+提出物に `prompt.txt` を要求し、各 test case input を `{input}` に差し込んで LLM 出力を判定する。`requiredEnvironmentVariables` に必要な API key を書き、実装時は現在の `llmJudgePreset` の型を確認する。
+
+検証時は model を params JSON で渡す:
+
+```bash
+bun judge.ts model_answers/default '{"model":"openai/gpt-5.4-nano"}'
+```
+
+## judge を自作するとき
+
+プリセットで足りない場合は `parseArgs`, `printTestCaseResult`, `DecisionCode`, `startHttpServer` などのヘルパを使う。結果は必ず `printTestCaseResult` かプリセット経由で `TEST_CASE_RESULT {...}` として出す。
+
+自作時の注意:
+
+- 採点は決定的にする。時刻や乱数に依存させない。
+- 余計な標準出力を混ぜない。学習者向け情報は `feedbackMarkdown` に入れる。
+- 問題ディレクトリ外の相対 import をしない。補助ファイルは問題内に同梱する。
+- source inspection ではコメント/文字列を除去してから見るか、誤検知しない正規表現にする。
