@@ -21,16 +21,17 @@ export async function checkProblemDirIsolation(
   resolvedCwd: ResolvedCwd,
   params: unknown
 ): Promise<ProblemDirIsolationCheckResult> {
-  const tempRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'problem-utils-isolation_'));
-  const copiedProblemDir = path.join(tempRoot, path.basename(problemDir));
+  let tempRoot: string | undefined;
   try {
+    tempRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'problem-utils-isolation_'));
+    const copiedProblemDir = path.join(tempRoot, path.basename(problemDir));
     await fs.promises.cp(problemDir, copiedProblemDir, { recursive: true });
 
     const relativeCwd = path.relative(problemDir, resolvedCwd.cwd);
     const copiedCwd = path.join(copiedProblemDir, relativeCwd);
-    const scriptName = getInvokedScriptName();
+    const scriptPath = getInvokedScriptPath(problemDir);
     const paramsJson = JSON.stringify(params) ?? '{}';
-    const spawnResult = child_process.spawnSync('bun', ['run', scriptName, copiedCwd, paramsJson], {
+    const spawnResult = child_process.spawnSync('bun', ['run', scriptPath, copiedCwd, paramsJson], {
       cwd: copiedProblemDir,
       encoding: 'utf8',
       env: process.env,
@@ -66,18 +67,25 @@ export async function checkProblemDirIsolation(
       stderr.trimEnd() || '<empty>',
     ]);
     return { passed: false };
+  } catch (error) {
+    printDebugBanner([
+      '[DEBUG MODE] isolated problem directory check failed due to an unexpected error',
+      '',
+      error instanceof Error ? error.message : String(error),
+    ]);
+    return { passed: false };
   } finally {
-    await fs.promises.rm(tempRoot, { recursive: true, force: true });
+    if (tempRoot) await fs.promises.rm(tempRoot, { recursive: true, force: true });
   }
 }
 
-function getInvokedScriptName(): string {
+function getInvokedScriptPath(problemDir: string): string {
   const scriptPath = process.argv[1];
-  return scriptPath ? path.basename(scriptPath) : 'judge.ts';
+  return scriptPath ? path.relative(problemDir, path.resolve(scriptPath)) : 'judge.ts';
 }
 
 function isAcceptedJudgeOutput(stdout: string): boolean {
-  const resultLines = stdout.split('\n').filter((line) => line.startsWith(TEST_CASE_RESULT_PREFIX));
+  const resultLines = stdout.split(/\r?\n/).filter((line) => line.startsWith(TEST_CASE_RESULT_PREFIX));
   if (resultLines.length === 0) return false;
 
   return resultLines.every((line) => {
