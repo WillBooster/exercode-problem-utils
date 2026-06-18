@@ -9,6 +9,8 @@ import { TEST_CASE_RESULT_PREFIX, testCaseResultSchema } from '../types/testCase
 import { printDebugBanner } from './printDebugBanner.js';
 import type { ResolvedCwd } from './resolveCwds.js';
 
+const ISOLATION_CHECK_TIMEOUT_MS = 30_000;
+
 export interface ProblemDirIsolationCheckResult {
   passed: boolean;
 }
@@ -30,11 +32,21 @@ export async function checkProblemDirIsolation(
     const relativeCwd = path.relative(problemDir, resolvedCwd.cwd);
     const copiedCwd = path.join(copiedProblemDir, relativeCwd);
     const scriptPath = getInvokedScriptPath(problemDir);
+    if (scriptPath.startsWith('..') || path.isAbsolute(scriptPath)) {
+      printDebugBanner([
+        '[DEBUG MODE] isolated problem directory check skipped',
+        '',
+        'The invoked judge script is located outside the problem directory.',
+        `Script path: ${scriptPath}`,
+      ]);
+      return { passed: true };
+    }
     const paramsJson = JSON.stringify(params) ?? '{}';
     const spawnResult = child_process.spawnSync('bun', ['run', scriptPath, copiedCwd, paramsJson], {
       cwd: copiedProblemDir,
       encoding: 'utf8',
       env: process.env,
+      timeout: ISOLATION_CHECK_TIMEOUT_MS,
     });
     const stdout = spawnResult.stdout ?? '';
     const stderr = spawnResult.stderr ?? '';
