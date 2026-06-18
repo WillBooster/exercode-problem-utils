@@ -34,8 +34,10 @@ export async function checkProblemDirIsolation(
       encoding: 'utf8',
       env: process.env,
     });
+    const stdout = spawnResult.stdout ?? '';
+    const stderr = spawnResult.stderr ?? '';
 
-    if (spawnResult.status === 0 && isAcceptedJudgeOutput(spawnResult.stdout)) {
+    if (spawnResult.status === 0 && isAcceptedJudgeOutput(stdout)) {
       printDebugBanner([
         '[DEBUG MODE] isolated problem directory check passed',
         '',
@@ -54,12 +56,13 @@ export async function checkProblemDirIsolation(
       `Copied problem dir : ${copiedProblemDir}`,
       `Checked cwd        : ${relativeCwd}`,
       `Exit status        : ${spawnResult.status ?? 'signal'}`,
+      `Spawn error        : ${spawnResult.error?.message ?? '<none>'}`,
       '',
       'stdout:',
-      spawnResult.stdout.trimEnd() || '<empty>',
+      stdout.trimEnd() || '<empty>',
       '',
       'stderr:',
-      spawnResult.stderr.trimEnd() || '<empty>',
+      stderr.trimEnd() || '<empty>',
     ]);
     return { passed: false };
   } finally {
