@@ -28,6 +28,7 @@ export async function checkProblemDirIsolation(
     tempRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'problem-utils-isolation_'));
     const copiedProblemDir = path.join(tempRoot, path.basename(problemDir));
     await fs.promises.cp(problemDir, copiedProblemDir, { recursive: true });
+    await symlinkAncestorNodeModules(tempRoot, problemDir);
 
     const relativeCwd = path.relative(problemDir, resolvedCwd.cwd);
     const copiedCwd = path.join(copiedProblemDir, relativeCwd);
@@ -41,13 +42,12 @@ export async function checkProblemDirIsolation(
       ]);
       return { passed: true };
     }
-    const env = createIsolationEnv(problemDir);
     const execArgv = process.execArgv.filter((arg) => !arg.startsWith('--inspect'));
     const paramsJson = JSON.stringify(params);
     const spawnResult = child_process.spawnSync(process.execPath, [...execArgv, scriptPath, copiedCwd, paramsJson], {
       cwd: copiedProblemDir,
       encoding: 'utf8',
-      env,
+      env: process.env,
       timeout: ISOLATION_CHECK_TIMEOUT_MS,
     });
     const stdout = spawnResult.stdout ?? '';
@@ -99,25 +99,29 @@ export async function checkProblemDirIsolation(
   }
 }
 
-function createIsolationEnv(problemDir: string): NodeJS.ProcessEnv {
-  const nodeModulesPaths = findAncestorNodeModulesPaths(problemDir);
-  if (nodeModulesPaths.length === 0) return process.env;
+async function symlinkAncestorNodeModules(tempRoot: string, problemDir: string): Promise<void> {
+  const ancestorNodeModulesPath = findAncestorNodeModulesPath(problemDir);
+  if (!ancestorNodeModulesPath) return;
 
-  return {
-    ...process.env,
-    NODE_PATH: [...nodeModulesPaths, ...(process.env.NODE_PATH ? [process.env.NODE_PATH] : [])].join(path.delimiter),
-  };
+  try {
+    await fs.promises.symlink(
+      ancestorNodeModulesPath,
+      path.join(tempRoot, 'node_modules'),
+      process.platform === 'win32' ? 'junction' : 'dir'
+    );
+  } catch {
+    // Package resolution is best-effort; the isolation check still reports a clear spawn failure if imports break.
+  }
 }
 
-function findAncestorNodeModulesPaths(problemDir: string): string[] {
-  const nodeModulesPaths: string[] = [];
+function findAncestorNodeModulesPath(problemDir: string): string | undefined {
   let currentDir = path.resolve(problemDir);
   while (true) {
     const nodeModulesPath = path.join(currentDir, 'node_modules');
-    if (fs.existsSync(nodeModulesPath)) nodeModulesPaths.push(nodeModulesPath);
+    if (fs.existsSync(nodeModulesPath)) return nodeModulesPath;
 
     const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir) return nodeModulesPaths;
+    if (parentDir === currentDir) return undefined;
     currentDir = parentDir;
   }
 }
