@@ -3,6 +3,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { DecisionCode } from '../types/decisionCode.js';
+import { TEST_CASE_RESULT_PREFIX, testCaseResultSchema } from '../types/testCaseResult.js';
+
 import { printDebugBanner } from './printDebugBanner.js';
 import type { ResolvedCwd } from './resolveCwds.js';
 
@@ -32,7 +35,7 @@ export async function checkProblemDirIsolation(
       env: process.env,
     });
 
-    if (spawnResult.status === 0) {
+    if (spawnResult.status === 0 && isAcceptedJudgeOutput(spawnResult.stdout)) {
       printDebugBanner([
         '[DEBUG MODE] isolated problem directory check passed',
         '',
@@ -45,7 +48,7 @@ export async function checkProblemDirIsolation(
     printDebugBanner([
       '[DEBUG MODE] isolated problem directory check failed',
       '',
-      'The judge did not run after copying only the problem directory to a temporary location.',
+      'The judge did not complete successfully after copying only the problem directory to a temporary location.',
       'Make sure judge.ts imports only files included in the problem directory.',
       '',
       `Copied problem dir : ${copiedProblemDir}`,
@@ -67,4 +70,18 @@ export async function checkProblemDirIsolation(
 function getInvokedScriptName(): string {
   const scriptPath = process.argv[1];
   return scriptPath ? path.basename(scriptPath) : 'judge.ts';
+}
+
+function isAcceptedJudgeOutput(stdout: string): boolean {
+  const resultLines = stdout.split('\n').filter((line) => line.startsWith(TEST_CASE_RESULT_PREFIX));
+  if (resultLines.length === 0) return false;
+
+  return resultLines.every((line) => {
+    try {
+      const parsedResult = testCaseResultSchema.safeParse(JSON.parse(line.slice(TEST_CASE_RESULT_PREFIX.length)));
+      return parsedResult.success && parsedResult.data.decisionCode === DecisionCode.ACCEPTED;
+    } catch {
+      return false;
+    }
+  });
 }
