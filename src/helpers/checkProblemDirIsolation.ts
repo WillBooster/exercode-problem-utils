@@ -137,7 +137,8 @@ async function symlinkAllAncestorNodeModules(tempRoot: string, problemDir: strin
 }
 
 function toTempRelativePath(absolutePath: string): string {
-  return absolutePath.replace(/^([a-zA-Z]):/, '$1');
+  const { root } = path.parse(absolutePath);
+  return path.relative(root, absolutePath);
 }
 
 function getInvokedScriptPath(problemDir: string): string {
