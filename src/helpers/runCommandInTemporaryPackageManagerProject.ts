@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 export type PackageManager = 'bun' | 'cargo' | 'go' | 'gradle' | 'maven' | 'npm' | 'pnpm' | 'ruby' | 'uv' | 'yarn';
+type PackageManagerInstallCommand = readonly [string, ...string[]];
 
 export interface PackageManagerCommandRunResult {
   stdin: string;
@@ -40,6 +41,8 @@ const packageManagerProjectFilePaths = {
     'settings.gradle',
     'settings.gradle.kts',
     'gradle.properties',
+    'gradle.lockfile',
+    'buildscript-gradle.lockfile',
     'gradle',
     'gradlew',
     'gradlew.bat',
@@ -49,15 +52,21 @@ const packageManagerProjectFilePaths = {
   pnpm: ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml'],
   ruby: ['Gemfile', 'Gemfile.lock', '.ruby-version'],
   uv: ['pyproject.toml', 'uv.lock'],
-  yarn: ['package.json', 'yarn.lock', '.yarnrc.yml', '.yarn'],
+  yarn: ['package.json', 'yarn.lock', '.yarnrc', '.yarnrc.yml', '.yarn'],
 } as const satisfies Record<PackageManager, readonly string[]>;
 
-const packageManagerInstallCommands: Partial<Record<PackageManager, readonly [string, ...string[]]>> = {
-  bun: ['bun', 'install', '--silent'],
-  npm: ['npm', 'install', '--silent'],
-  pnpm: ['pnpm', 'install', '--silent'],
-  yarn: ['yarn', 'install', '--silent'],
-};
+const packageManagerInstallCommandResolvers = {
+  bun: resolveBunInstallCommand,
+  cargo: resolveCargoInstallCommand,
+  go: resolveGoInstallCommand,
+  gradle: resolveGradleInstallCommand,
+  maven: resolveMavenInstallCommand,
+  npm: resolveNpmInstallCommand,
+  pnpm: resolvePnpmInstallCommand,
+  ruby: resolveRubyInstallCommand,
+  uv: resolveUvInstallCommand,
+  yarn: resolveYarnInstallCommand,
+} as const satisfies Record<PackageManager, (runDir: string) => Promise<PackageManagerInstallCommand | undefined>>;
 
 const defaultOutputLimitBytes = 50 * 1024 * 1024;
 const killGracePeriodMilliseconds = 1000;
@@ -82,7 +91,7 @@ export async function runCommandInTemporaryPackageManagerProject(
     });
 
     const env = options.env ? { ...process.env, ...options.env } : process.env;
-    const installCommand = resolveInstallCommand(options.packageManager);
+    const installCommand = await resolveInstallCommand(options.packageManager, runDir);
     const command = typeof options.command === 'function' ? options.command({ runDir }) : options.command;
     const startedAt = Date.now();
     const outputLimitBytes = options.outputLimitBytes ?? defaultOutputLimitBytes;
@@ -167,12 +176,141 @@ function toPackageManagerCommandRunResult(context: {
   };
 }
 
-function resolveInstallCommand(packageManager: PackageManager): readonly [string, ...string[]] | undefined {
-  return packageManagerInstallCommands[packageManager];
+function resolveInstallCommand(
+  packageManager: PackageManager,
+  runDir: string
+): Promise<PackageManagerInstallCommand | undefined> {
+  return packageManagerInstallCommandResolvers[packageManager](runDir);
 }
 
 function isFailedSpawnResult(result: Awaited<ReturnType<typeof spawnWithInput>>): boolean {
   return result.status !== 0 || result.timedOut || result.outputLimitExceeded;
+}
+
+async function resolveBunInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
+  if (!(await pathExists(path.join(runDir, 'package.json')))) return undefined;
+  // Bun supports --silent and it keeps successful preparation output out of judge output buffers.
+  return (await hasAnyPath(runDir, ['bun.lock', 'bun.lockb']))
+    ? ['bun', 'install', '--frozen-lockfile', '--silent']
+    : ['bun', 'install', '--silent'];
+}
+
+async function resolveCargoInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
+  if (!(await pathExists(path.join(runDir, 'Cargo.toml')))) return undefined;
+  return (await pathExists(path.join(runDir, 'Cargo.lock'))) ? ['cargo', 'fetch', '--locked'] : ['cargo', 'fetch'];
+}
+
+async function resolveGoInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
+  if (!(await pathExists(path.join(runDir, 'go.mod')))) return undefined;
+  return ['go', 'mod', 'download'];
+}
+
+async function resolveGradleInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
+  if (
+    !(await hasAnyPath(runDir, [
+      'build.gradle',
+      'build.gradle.kts',
+      'settings.gradle',
+      'settings.gradle.kts',
+      'gradlew',
+      'gradlew.bat',
+    ]))
+  )
+    return undefined;
+  const args = ['--no-daemon', '--quiet', 'dependencies'] as const;
+  if (process.platform === 'win32') {
+    return (await pathExists(path.join(runDir, 'gradlew.bat')))
+      ? ['cmd.exe', '/c', 'gradlew.bat', ...args]
+      : ['gradle', ...args];
+  }
+  return (await pathExists(path.join(runDir, 'gradlew'))) ? ['sh', './gradlew', ...args] : ['gradle', ...args];
+}
+
+async function resolveMavenInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
+  if (!(await pathExists(path.join(runDir, 'pom.xml')))) return undefined;
+  const args = ['-q', 'dependency:go-offline'] as const;
+  if (process.platform === 'win32') {
+    return (await pathExists(path.join(runDir, 'mvnw.cmd')))
+      ? ['cmd.exe', '/c', 'mvnw.cmd', ...args]
+      : ['mvn', ...args];
+  }
+  return (await pathExists(path.join(runDir, 'mvnw'))) ? ['sh', './mvnw', ...args] : ['mvn', ...args];
+}
+
+async function resolveNpmInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
+  if (!(await pathExists(path.join(runDir, 'package.json')))) return undefined;
+  return (await pathExists(path.join(runDir, 'package-lock.json')))
+    ? ['npm', 'ci', '--silent']
+    : ['npm', 'install', '--silent'];
+}
+
+async function resolvePnpmInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
+  if (!(await pathExists(path.join(runDir, 'package.json')))) return undefined;
+  return (await pathExists(path.join(runDir, 'pnpm-lock.yaml')))
+    ? ['pnpm', 'install', '--frozen-lockfile', '--silent']
+    : ['pnpm', 'install', '--silent'];
+}
+
+async function resolveRubyInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
+  if (!(await pathExists(path.join(runDir, 'Gemfile')))) return undefined;
+  return (await pathExists(path.join(runDir, 'Gemfile.lock')))
+    ? ['bundle', 'install', '--frozen', '--quiet']
+    : ['bundle', 'install', '--quiet'];
+}
+
+async function resolveUvInstallCommand(): Promise<undefined> {
+  return undefined;
+}
+
+async function resolveYarnInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
+  if (!(await pathExists(path.join(runDir, 'package.json')))) return undefined;
+  const isBerry = await isYarnBerryProject(runDir);
+  const hasLockfile = await pathExists(path.join(runDir, 'yarn.lock'));
+  if (isBerry) return hasLockfile ? ['yarn', 'install', '--immutable'] : ['yarn', 'install'];
+  return hasLockfile ? ['yarn', 'install', '--frozen-lockfile', '--silent'] : ['yarn', 'install', '--silent'];
+}
+
+async function isYarnBerryProject(runDir: string): Promise<boolean> {
+  if (await pathExists(path.join(runDir, '.yarnrc.yml'))) return true;
+
+  const packageJson = await readJson(path.join(runDir, 'package.json'));
+  const packageManager = typeof packageJson.packageManager === 'string' ? packageJson.packageManager : undefined;
+  const yarnMajorVersion = /^yarn@(\d+)/.exec(packageManager ?? '')?.[1];
+  return yarnMajorVersion !== undefined && Number(yarnMajorVersion) >= 2;
+}
+
+async function hasAnyPath(directoryPath: string, relativePaths: readonly string[]): Promise<boolean> {
+  for (const relativePath of relativePaths) {
+    if (await pathExists(path.join(directoryPath, relativePath))) return true;
+  }
+  return false;
+}
+
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch (error) {
+    const code =
+      typeof error === 'object' && error !== null && 'code' in error ? (error as { code: unknown }).code : undefined;
+    if (code !== 'ENOENT') throw error;
+    return false;
+  }
+}
+
+async function readJson(filePath: string): Promise<Record<string, unknown>> {
+  try {
+    const parsed = JSON.parse(await fs.readFile(filePath, 'utf8')) as unknown;
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch (error) {
+    if (error instanceof SyntaxError) return {};
+    const code =
+      typeof error === 'object' && error !== null && 'code' in error ? (error as { code: unknown }).code : undefined;
+    if (code === 'ENOENT') return {};
+    throw error;
+  }
 }
 
 export async function copyPackageManagerProjectFiles(options: {
