@@ -300,7 +300,15 @@ async function pathExists(filePath: string): Promise<boolean> {
 }
 
 async function readJson(filePath: string): Promise<Record<string, unknown>> {
-  return JSON.parse(await fs.readFile(filePath, 'utf8')) as Record<string, unknown>;
+  try {
+    return JSON.parse(await fs.readFile(filePath, 'utf8')) as Record<string, unknown>;
+  } catch (error) {
+    if (error instanceof SyntaxError) return {};
+    const code =
+      typeof error === 'object' && error !== null && 'code' in error ? (error as { code: unknown }).code : undefined;
+    if (code === 'ENOENT') return {};
+    throw error;
+  }
 }
 
 export async function copyPackageManagerProjectFiles(options: {
