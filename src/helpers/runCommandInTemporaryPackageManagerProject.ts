@@ -139,7 +139,7 @@ export async function runCommandInTemporaryPackageManagerProject(
         options,
         result: {
           ...result,
-          timeSeconds: elapsedTimeSeconds,
+          timeSeconds: installResult.timeSeconds + result.timeSeconds,
           memoryBytes: Math.max(installResult.memoryBytes, result.memoryBytes),
         },
       });
