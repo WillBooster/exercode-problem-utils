@@ -212,6 +212,7 @@ async function resolveGradleInstallCommand(runDir: string): Promise<PackageManag
       'settings.gradle',
       'settings.gradle.kts',
       'gradlew',
+      'gradlew.bat',
     ]))
   )
     return undefined;
