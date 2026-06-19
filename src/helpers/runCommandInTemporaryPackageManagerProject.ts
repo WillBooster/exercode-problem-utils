@@ -69,8 +69,8 @@ const timeCommand = resolveTimeCommand();
 
 /**
  * Copies a submission directory to a temporary directory, overlays package
- * manager project files from the problem directory, optionally installs
- * dependencies, runs a command, and then removes the temporary directory.
+ * manager project files from the problem directory, prepares dependencies,
+ * runs a command, and then removes the temporary directory.
  */
 export async function runCommandInTemporaryPackageManagerProject(
   options: RunCommandInTemporaryPackageManagerProjectOptions
@@ -175,14 +175,9 @@ function resolveInstallCommand(
   options: RunCommandInTemporaryPackageManagerProjectOptions,
   runDir: string
 ): readonly [string, ...string[]] | undefined {
-  if (!options.install) return undefined;
-  if (options.install === true) {
-    const installCommand = packageManagerInstallCommands[options.packageManager];
-    if (installCommand === undefined) {
-      throw new Error(`No default install command is available for package manager: ${options.packageManager}`);
-    }
-    return installCommand;
-  }
+  if (options.install === false) return undefined;
+  if (options.install === undefined || options.install === true)
+    return packageManagerInstallCommands[options.packageManager];
   return typeof options.install === 'function' ? options.install({ runDir }) : options.install;
 }
 
