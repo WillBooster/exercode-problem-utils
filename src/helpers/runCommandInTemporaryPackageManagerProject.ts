@@ -253,7 +253,7 @@ async function resolvePnpmInstallCommand(runDir: string): Promise<PackageManager
 async function resolveRubyInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
   if (!(await pathExists(path.join(runDir, 'Gemfile')))) return undefined;
   return (await pathExists(path.join(runDir, 'Gemfile.lock')))
-    ? ['bundle', 'install', '--frozen', '--quiet']
+    ? ['bundle', 'install', '--deployment', '--quiet']
     : ['bundle', 'install', '--quiet'];
 }
 
