@@ -22,10 +22,6 @@ export interface RunCommandInTemporaryPackageManagerProjectOptions {
   projectDir: string;
   packageManager: PackageManager;
   command: readonly [string, ...string[]] | ((context: { runDir: string }) => readonly [string, ...string[]]);
-  install?:
-    | boolean
-    | readonly [string, ...string[]]
-    | ((context: { runDir: string }) => readonly [string, ...string[]]);
   stdin?: string;
   env?: NodeJS.ProcessEnv;
   timeLimitSeconds: number;
@@ -86,7 +82,7 @@ export async function runCommandInTemporaryPackageManagerProject(
     });
 
     const env = options.env ? { ...process.env, ...options.env } : process.env;
-    const installCommand = resolveInstallCommand(options, runDir);
+    const installCommand = resolveInstallCommand(options.packageManager);
     const command = typeof options.command === 'function' ? options.command({ runDir }) : options.command;
     const startedAt = Date.now();
     const outputLimitBytes = options.outputLimitBytes ?? defaultOutputLimitBytes;
@@ -171,20 +167,8 @@ function toPackageManagerCommandRunResult(context: {
   };
 }
 
-function resolveInstallCommand(
-  options: RunCommandInTemporaryPackageManagerProjectOptions,
-  runDir: string
-): readonly [string, ...string[]] | undefined {
-  if (options.install === false) return undefined;
-  if (options.install === undefined) return packageManagerInstallCommands[options.packageManager];
-  if (options.install === true) {
-    const installCommand = packageManagerInstallCommands[options.packageManager];
-    if (installCommand === undefined) {
-      throw new Error(`No default install command is available for package manager: ${options.packageManager}`);
-    }
-    return installCommand;
-  }
-  return typeof options.install === 'function' ? options.install({ runDir }) : options.install;
+function resolveInstallCommand(packageManager: PackageManager): readonly [string, ...string[]] | undefined {
+  return packageManagerInstallCommands[packageManager];
 }
 
 function isFailedSpawnResult(result: Awaited<ReturnType<typeof spawnWithInput>>): boolean {
