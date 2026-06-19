@@ -213,6 +213,11 @@ async function resolveGradleInstallCommand(runDir: string): Promise<PackageManag
     ]))
   )
     return undefined;
+  if (process.platform === 'win32') {
+    return (await pathExists(path.join(runDir, 'gradlew.bat')))
+      ? ['cmd.exe', '/c', 'gradlew.bat', '--no-daemon', '--quiet', 'dependencies']
+      : ['gradle', '--no-daemon', '--quiet', 'dependencies'];
+  }
   return (await pathExists(path.join(runDir, 'gradlew')))
     ? ['sh', './gradlew', '--no-daemon', '--quiet', 'dependencies']
     : ['gradle', '--no-daemon', '--quiet', 'dependencies'];
@@ -220,6 +225,11 @@ async function resolveGradleInstallCommand(runDir: string): Promise<PackageManag
 
 async function resolveMavenInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
   if (!(await pathExists(path.join(runDir, 'pom.xml')))) return undefined;
+  if (process.platform === 'win32') {
+    return (await pathExists(path.join(runDir, 'mvnw.cmd')))
+      ? ['cmd.exe', '/c', 'mvnw.cmd', '-q', 'dependency:go-offline']
+      : ['mvn', '-q', 'dependency:go-offline'];
+  }
   return (await pathExists(path.join(runDir, 'mvnw')))
     ? ['sh', './mvnw', '-q', 'dependency:go-offline']
     : ['mvn', '-q', 'dependency:go-offline'];
@@ -241,7 +251,9 @@ async function resolvePnpmInstallCommand(runDir: string): Promise<PackageManager
 
 async function resolveRubyInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
   if (!(await pathExists(path.join(runDir, 'Gemfile')))) return undefined;
-  return ['bundle', 'install', '--quiet'];
+  return (await pathExists(path.join(runDir, 'Gemfile.lock')))
+    ? ['bundle', 'install', '--frozen', '--quiet']
+    : ['bundle', 'install', '--quiet'];
 }
 
 async function resolveUvInstallCommand(): Promise<undefined> {
@@ -250,8 +262,10 @@ async function resolveUvInstallCommand(): Promise<undefined> {
 
 async function resolveYarnInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
   if (!(await pathExists(path.join(runDir, 'package.json')))) return undefined;
-  if ((await pathExists(path.join(runDir, 'yarn.lock'))) && (await hasAnyPath(runDir, ['.yarnrc.yml', '.yarn'])))
-    return ['yarn', 'install', '--immutable'];
+  if (await pathExists(path.join(runDir, 'yarn.lock'))) {
+    if (await hasAnyPath(runDir, ['.yarnrc.yml', '.yarn'])) return ['yarn', 'install', '--immutable'];
+    return ['yarn', 'install', '--frozen-lockfile', '--silent'];
+  }
   return ['yarn', 'install', '--silent'];
 }
 
