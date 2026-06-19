@@ -189,6 +189,7 @@ function isFailedSpawnResult(result: Awaited<ReturnType<typeof spawnWithInput>>)
 
 async function resolveBunInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
   if (!(await pathExists(path.join(runDir, 'package.json')))) return undefined;
+  // Bun supports --silent and it keeps successful preparation output out of judge output buffers.
   return (await hasAnyPath(runDir, ['bun.lock', 'bun.lockb']))
     ? ['bun', 'install', '--frozen-lockfile', '--silent']
     : ['bun', 'install', '--silent'];
@@ -253,7 +254,7 @@ async function resolvePnpmInstallCommand(runDir: string): Promise<PackageManager
 async function resolveRubyInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
   if (!(await pathExists(path.join(runDir, 'Gemfile')))) return undefined;
   return (await pathExists(path.join(runDir, 'Gemfile.lock')))
-    ? ['bundle', 'install', '--deployment', '--quiet']
+    ? ['bundle', 'install', '--frozen', '--quiet']
     : ['bundle', 'install', '--quiet'];
 }
 
