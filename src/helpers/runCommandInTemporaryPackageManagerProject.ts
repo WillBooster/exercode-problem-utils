@@ -216,26 +216,24 @@ async function resolveGradleInstallCommand(runDir: string): Promise<PackageManag
     ]))
   )
     return undefined;
+  const args = ['--no-daemon', '--quiet', 'dependencies'] as const;
   if (process.platform === 'win32') {
     return (await pathExists(path.join(runDir, 'gradlew.bat')))
-      ? ['cmd.exe', '/c', 'gradlew.bat', '--no-daemon', '--quiet', 'dependencies']
-      : ['gradle', '--no-daemon', '--quiet', 'dependencies'];
+      ? ['cmd.exe', '/c', 'gradlew.bat', ...args]
+      : ['gradle', ...args];
   }
-  return (await pathExists(path.join(runDir, 'gradlew')))
-    ? ['sh', './gradlew', '--no-daemon', '--quiet', 'dependencies']
-    : ['gradle', '--no-daemon', '--quiet', 'dependencies'];
+  return (await pathExists(path.join(runDir, 'gradlew'))) ? ['sh', './gradlew', ...args] : ['gradle', ...args];
 }
 
 async function resolveMavenInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
   if (!(await pathExists(path.join(runDir, 'pom.xml')))) return undefined;
+  const args = ['-q', 'dependency:go-offline'] as const;
   if (process.platform === 'win32') {
     return (await pathExists(path.join(runDir, 'mvnw.cmd')))
-      ? ['cmd.exe', '/c', 'mvnw.cmd', '-q', 'dependency:go-offline']
-      : ['mvn', '-q', 'dependency:go-offline'];
+      ? ['cmd.exe', '/c', 'mvnw.cmd', ...args]
+      : ['mvn', ...args];
   }
-  return (await pathExists(path.join(runDir, 'mvnw')))
-    ? ['sh', './mvnw', '-q', 'dependency:go-offline']
-    : ['mvn', '-q', 'dependency:go-offline'];
+  return (await pathExists(path.join(runDir, 'mvnw'))) ? ['sh', './mvnw', ...args] : ['mvn', ...args];
 }
 
 async function resolveNpmInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
