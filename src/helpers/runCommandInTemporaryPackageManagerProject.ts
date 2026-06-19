@@ -41,6 +41,8 @@ const packageManagerProjectFilePaths = {
     'settings.gradle',
     'settings.gradle.kts',
     'gradle.properties',
+    'gradle.lockfile',
+    'buildscript-gradle.lockfile',
     'gradle',
     'gradlew',
     'gradlew.bat',
@@ -50,7 +52,7 @@ const packageManagerProjectFilePaths = {
   pnpm: ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml'],
   ruby: ['Gemfile', 'Gemfile.lock', '.ruby-version'],
   uv: ['pyproject.toml', 'uv.lock'],
-  yarn: ['package.json', 'yarn.lock', '.yarnrc.yml', '.yarn'],
+  yarn: ['package.json', 'yarn.lock', '.yarnrc', '.yarnrc.yml', '.yarn'],
 } as const satisfies Record<PackageManager, readonly string[]>;
 
 const packageManagerInstallCommandResolvers = {
@@ -245,8 +247,8 @@ async function resolveNpmInstallCommand(runDir: string): Promise<PackageManagerI
 async function resolvePnpmInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
   if (!(await pathExists(path.join(runDir, 'package.json')))) return undefined;
   return (await pathExists(path.join(runDir, 'pnpm-lock.yaml')))
-    ? ['pnpm', 'install', '--frozen-lockfile']
-    : ['pnpm', 'install'];
+    ? ['pnpm', 'install', '--frozen-lockfile', '--silent']
+    : ['pnpm', 'install', '--silent'];
 }
 
 async function resolveRubyInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
@@ -262,11 +264,19 @@ async function resolveUvInstallCommand(): Promise<undefined> {
 
 async function resolveYarnInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
   if (!(await pathExists(path.join(runDir, 'package.json')))) return undefined;
-  if (await pathExists(path.join(runDir, 'yarn.lock'))) {
-    if (await hasAnyPath(runDir, ['.yarnrc.yml', '.yarn'])) return ['yarn', 'install', '--immutable'];
-    return ['yarn', 'install', '--frozen-lockfile', '--silent'];
-  }
-  return ['yarn', 'install', '--silent'];
+  const isBerry = await isYarnBerryProject(runDir);
+  const hasLockfile = await pathExists(path.join(runDir, 'yarn.lock'));
+  if (isBerry) return hasLockfile ? ['yarn', 'install', '--immutable'] : ['yarn', 'install'];
+  return hasLockfile ? ['yarn', 'install', '--frozen-lockfile', '--silent'] : ['yarn', 'install', '--silent'];
+}
+
+async function isYarnBerryProject(runDir: string): Promise<boolean> {
+  if (await pathExists(path.join(runDir, '.yarnrc.yml'))) return true;
+
+  const packageJson = await readJson(path.join(runDir, 'package.json'));
+  const packageManager = typeof packageJson.packageManager === 'string' ? packageJson.packageManager : undefined;
+  const yarnMajorVersion = /^yarn@(\d+)/.exec(packageManager ?? '')?.[1];
+  return yarnMajorVersion !== undefined && Number(yarnMajorVersion) >= 2;
 }
 
 async function hasAnyPath(directoryPath: string, relativePaths: readonly string[]): Promise<boolean> {
@@ -286,6 +296,10 @@ async function pathExists(filePath: string): Promise<boolean> {
     if (code !== 'ENOENT') throw error;
     return false;
   }
+}
+
+async function readJson(filePath: string): Promise<Record<string, unknown>> {
+  return JSON.parse(await fs.readFile(filePath, 'utf8')) as Record<string, unknown>;
 }
 
 export async function copyPackageManagerProjectFiles(options: {
