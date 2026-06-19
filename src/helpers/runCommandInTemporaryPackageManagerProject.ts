@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 export type PackageManager = 'bun' | 'cargo' | 'go' | 'gradle' | 'maven' | 'npm' | 'pnpm' | 'ruby' | 'uv' | 'yarn';
+type PackageManagerInstallCommand = readonly [string, ...string[]];
 
 export interface PackageManagerCommandRunResult {
   stdin: string;
@@ -52,12 +53,18 @@ const packageManagerProjectFilePaths = {
   yarn: ['package.json', 'yarn.lock', '.yarnrc.yml', '.yarn'],
 } as const satisfies Record<PackageManager, readonly string[]>;
 
-const packageManagerInstallCommands: Partial<Record<PackageManager, readonly [string, ...string[]]>> = {
-  bun: ['bun', 'install', '--silent'],
-  npm: ['npm', 'install', '--silent'],
-  pnpm: ['pnpm', 'install', '--silent'],
-  yarn: ['yarn', 'install', '--silent'],
-};
+const packageManagerInstallCommandResolvers = {
+  bun: resolveBunInstallCommand,
+  cargo: resolveCargoInstallCommand,
+  go: resolveGoInstallCommand,
+  gradle: resolveGradleInstallCommand,
+  maven: resolveMavenInstallCommand,
+  npm: resolveNpmInstallCommand,
+  pnpm: resolvePnpmInstallCommand,
+  ruby: resolveRubyInstallCommand,
+  uv: resolveUvInstallCommand,
+  yarn: resolveYarnInstallCommand,
+} as const satisfies Record<PackageManager, (runDir: string) => Promise<PackageManagerInstallCommand | undefined>>;
 
 const defaultOutputLimitBytes = 50 * 1024 * 1024;
 const killGracePeriodMilliseconds = 1000;
@@ -82,7 +89,7 @@ export async function runCommandInTemporaryPackageManagerProject(
     });
 
     const env = options.env ? { ...process.env, ...options.env } : process.env;
-    const installCommand = resolveInstallCommand(options.packageManager);
+    const installCommand = await resolveInstallCommand(options.packageManager, runDir);
     const command = typeof options.command === 'function' ? options.command({ runDir }) : options.command;
     const startedAt = Date.now();
     const outputLimitBytes = options.outputLimitBytes ?? defaultOutputLimitBytes;
@@ -167,12 +174,104 @@ function toPackageManagerCommandRunResult(context: {
   };
 }
 
-function resolveInstallCommand(packageManager: PackageManager): readonly [string, ...string[]] | undefined {
-  return packageManagerInstallCommands[packageManager];
+function resolveInstallCommand(
+  packageManager: PackageManager,
+  runDir: string
+): Promise<PackageManagerInstallCommand | undefined> {
+  return packageManagerInstallCommandResolvers[packageManager](runDir);
 }
 
 function isFailedSpawnResult(result: Awaited<ReturnType<typeof spawnWithInput>>): boolean {
   return result.status !== 0 || result.timedOut || result.outputLimitExceeded;
+}
+
+async function resolveBunInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
+  if (!(await pathExists(path.join(runDir, 'package.json')))) return undefined;
+  return (await hasAnyPath(runDir, ['bun.lock', 'bun.lockb']))
+    ? ['bun', 'install', '--frozen-lockfile', '--silent']
+    : ['bun', 'install', '--silent'];
+}
+
+async function resolveCargoInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
+  if (!(await pathExists(path.join(runDir, 'Cargo.toml')))) return undefined;
+  return (await pathExists(path.join(runDir, 'Cargo.lock'))) ? ['cargo', 'fetch', '--locked'] : ['cargo', 'fetch'];
+}
+
+async function resolveGoInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
+  if (!(await pathExists(path.join(runDir, 'go.mod')))) return undefined;
+  return ['go', 'mod', 'download'];
+}
+
+async function resolveGradleInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
+  if (
+    !(await hasAnyPath(runDir, [
+      'build.gradle',
+      'build.gradle.kts',
+      'settings.gradle',
+      'settings.gradle.kts',
+      'gradlew',
+    ]))
+  )
+    return undefined;
+  return (await pathExists(path.join(runDir, 'gradlew')))
+    ? ['sh', './gradlew', '--no-daemon', '--quiet', 'dependencies']
+    : ['gradle', '--no-daemon', '--quiet', 'dependencies'];
+}
+
+async function resolveMavenInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
+  if (!(await pathExists(path.join(runDir, 'pom.xml')))) return undefined;
+  return (await pathExists(path.join(runDir, 'mvnw')))
+    ? ['sh', './mvnw', '-q', 'dependency:go-offline']
+    : ['mvn', '-q', 'dependency:go-offline'];
+}
+
+async function resolveNpmInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
+  if (!(await pathExists(path.join(runDir, 'package.json')))) return undefined;
+  return (await pathExists(path.join(runDir, 'package-lock.json')))
+    ? ['npm', 'ci', '--silent']
+    : ['npm', 'install', '--silent'];
+}
+
+async function resolvePnpmInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
+  if (!(await pathExists(path.join(runDir, 'package.json')))) return undefined;
+  return (await pathExists(path.join(runDir, 'pnpm-lock.yaml')))
+    ? ['pnpm', 'install', '--frozen-lockfile']
+    : ['pnpm', 'install'];
+}
+
+async function resolveRubyInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
+  if (!(await pathExists(path.join(runDir, 'Gemfile')))) return undefined;
+  return ['bundle', 'install', '--quiet'];
+}
+
+async function resolveUvInstallCommand(): Promise<undefined> {
+  return undefined;
+}
+
+async function resolveYarnInstallCommand(runDir: string): Promise<PackageManagerInstallCommand | undefined> {
+  if (!(await pathExists(path.join(runDir, 'package.json')))) return undefined;
+  if ((await pathExists(path.join(runDir, 'yarn.lock'))) && (await hasAnyPath(runDir, ['.yarnrc.yml', '.yarn'])))
+    return ['yarn', 'install', '--immutable'];
+  return ['yarn', 'install', '--silent'];
+}
+
+async function hasAnyPath(directoryPath: string, relativePaths: readonly string[]): Promise<boolean> {
+  for (const relativePath of relativePaths) {
+    if (await pathExists(path.join(directoryPath, relativePath))) return true;
+  }
+  return false;
+}
+
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch (error) {
+    const code =
+      typeof error === 'object' && error !== null && 'code' in error ? (error as { code: unknown }).code : undefined;
+    if (code !== 'ENOENT') throw error;
+    return false;
+  }
 }
 
 export async function copyPackageManagerProjectFiles(options: {
