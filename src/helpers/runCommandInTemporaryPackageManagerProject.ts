@@ -176,8 +176,14 @@ function resolveInstallCommand(
   runDir: string
 ): readonly [string, ...string[]] | undefined {
   if (options.install === false) return undefined;
-  if (options.install === undefined || options.install === true)
-    return packageManagerInstallCommands[options.packageManager];
+  if (options.install === undefined) return packageManagerInstallCommands[options.packageManager];
+  if (options.install === true) {
+    const installCommand = packageManagerInstallCommands[options.packageManager];
+    if (installCommand === undefined) {
+      throw new Error(`No default install command is available for package manager: ${options.packageManager}`);
+    }
+    return installCommand;
+  }
   return typeof options.install === 'function' ? options.install({ runDir }) : options.install;
 }
 
