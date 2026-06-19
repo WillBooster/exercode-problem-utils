@@ -22,6 +22,10 @@ export interface RunCommandInTemporaryPackageManagerProjectOptions {
   projectDir: string;
   packageManager: PackageManager;
   command: readonly [string, ...string[]] | ((context: { runDir: string }) => readonly [string, ...string[]]);
+  install?:
+    | boolean
+    | readonly [string, ...string[]]
+    | ((context: { runDir: string }) => readonly [string, ...string[]]);
   stdin?: string;
   env?: NodeJS.ProcessEnv;
   timeLimitSeconds: number;
@@ -52,14 +56,21 @@ const packageManagerProjectFilePaths = {
   yarn: ['package.json', 'yarn.lock', '.yarnrc.yml', '.yarn'],
 } as const satisfies Record<PackageManager, readonly string[]>;
 
+const packageManagerInstallCommands: Partial<Record<PackageManager, readonly [string, ...string[]]>> = {
+  bun: ['bun', 'install', '--silent'],
+  npm: ['npm', 'install', '--silent'],
+  pnpm: ['pnpm', 'install', '--silent'],
+  yarn: ['yarn', 'install', '--silent'],
+};
+
 const defaultOutputLimitBytes = 50 * 1024 * 1024;
 const killGracePeriodMilliseconds = 1000;
 const timeCommand = resolveTimeCommand();
 
 /**
  * Copies a submission directory to a temporary directory, overlays package
- * manager project files from the problem directory, runs a command, and then
- * removes the temporary directory.
+ * manager project files from the problem directory, optionally installs
+ * dependencies, runs a command, and then removes the temporary directory.
  */
 export async function runCommandInTemporaryPackageManagerProject(
   options: RunCommandInTemporaryPackageManagerProjectOptions
@@ -74,31 +85,109 @@ export async function runCommandInTemporaryPackageManagerProject(
       projectFilePaths: options.projectFilePaths,
     });
 
+    const env = options.env ? { ...process.env, ...options.env } : process.env;
+    const installCommand = resolveInstallCommand(options, runDir);
     const command = typeof options.command === 'function' ? options.command({ runDir }) : options.command;
     const startedAt = Date.now();
+    const outputLimitBytes = options.outputLimitBytes ?? defaultOutputLimitBytes;
+    let installResult: Awaited<ReturnType<typeof spawnWithInput>> | undefined;
+
+    if (installCommand) {
+      installResult = await spawnWithInput(installCommand, {
+        cwd: runDir,
+        env,
+        outputLimitBytes,
+        stdin: '',
+        timeLimitSeconds: options.timeLimitSeconds,
+      });
+      if (isFailedSpawnResult(installResult)) {
+        return toPackageManagerCommandRunResult({
+          elapsedTimeSeconds: (Date.now() - startedAt) / 1000,
+          options,
+          result: installResult,
+        });
+      }
+    }
+
+    const remainingTimeLimitSeconds = options.timeLimitSeconds - (Date.now() - startedAt) / 1000;
+    if (remainingTimeLimitSeconds <= 0) {
+      return {
+        stdin: options.stdin ?? '',
+        stdout: installResult?.stdout ?? '',
+        stderr: installResult?.stderr ?? '',
+        status: 0,
+        timeSeconds: options.timeLimitSeconds + 1e-3,
+        memoryBytes: installResult?.memoryBytes ?? 0,
+        timedOut: true,
+        signal: installResult?.signal,
+        outputLimitExceeded: false,
+      };
+    }
+
     const result = await spawnWithInput(command, {
       cwd: runDir,
-      env: options.env ? { ...process.env, ...options.env } : process.env,
-      outputLimitBytes: options.outputLimitBytes ?? defaultOutputLimitBytes,
+      env,
+      outputLimitBytes,
       stdin: options.stdin ?? '',
-      timeLimitSeconds: options.timeLimitSeconds,
+      timeLimitSeconds: remainingTimeLimitSeconds,
     });
     const elapsedTimeSeconds = (Date.now() - startedAt) / 1000;
 
-    return {
-      stdin: options.stdin ?? '',
-      stdout: result.stdout,
-      stderr: result.stderr,
-      status: result.timedOut || result.outputLimitExceeded ? 0 : result.status,
-      timeSeconds: result.timedOut ? options.timeLimitSeconds + 1e-3 : result.timeSeconds || elapsedTimeSeconds,
-      memoryBytes: result.memoryBytes,
-      timedOut: result.timedOut,
-      signal: result.signal,
-      outputLimitExceeded: result.outputLimitExceeded,
-    };
+    if (installResult) {
+      return toPackageManagerCommandRunResult({
+        elapsedTimeSeconds,
+        options,
+        result: {
+          ...result,
+          timeSeconds: installResult.timeSeconds + result.timeSeconds,
+          memoryBytes: Math.max(installResult.memoryBytes, result.memoryBytes),
+        },
+      });
+    }
+
+    return toPackageManagerCommandRunResult({ elapsedTimeSeconds, options, result });
   } finally {
     await fs.rm(runDir, { force: true, recursive: true });
   }
+}
+
+function toPackageManagerCommandRunResult(context: {
+  elapsedTimeSeconds: number;
+  options: RunCommandInTemporaryPackageManagerProjectOptions;
+  result: Awaited<ReturnType<typeof spawnWithInput>>;
+}): PackageManagerCommandRunResult {
+  return {
+    stdin: context.options.stdin ?? '',
+    stdout: context.result.stdout,
+    stderr: context.result.stderr,
+    status: context.result.timedOut || context.result.outputLimitExceeded ? 0 : context.result.status,
+    timeSeconds: context.result.timedOut
+      ? context.options.timeLimitSeconds + 1e-3
+      : context.result.timeSeconds || context.elapsedTimeSeconds,
+    memoryBytes: context.result.memoryBytes,
+    timedOut: context.result.timedOut,
+    signal: context.result.signal,
+    outputLimitExceeded: context.result.outputLimitExceeded,
+  };
+}
+
+function resolveInstallCommand(
+  options: RunCommandInTemporaryPackageManagerProjectOptions,
+  runDir: string
+): readonly [string, ...string[]] | undefined {
+  if (!options.install) return undefined;
+  if (options.install === true) {
+    const installCommand = packageManagerInstallCommands[options.packageManager];
+    if (installCommand === undefined) {
+      throw new Error(`No default install command is available for package manager: ${options.packageManager}`);
+    }
+    return installCommand;
+  }
+  return typeof options.install === 'function' ? options.install({ runDir }) : options.install;
+}
+
+function isFailedSpawnResult(result: Awaited<ReturnType<typeof spawnWithInput>>): boolean {
+  return result.status !== 0 || result.timedOut || result.outputLimitExceeded;
 }
 
 export async function copyPackageManagerProjectFiles(options: {
