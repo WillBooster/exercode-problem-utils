@@ -91,7 +91,6 @@ export async function runCommandInTemporaryPackageManagerProject(
     const startedAt = Date.now();
     const outputLimitBytes = options.outputLimitBytes ?? defaultOutputLimitBytes;
     let installResult: Awaited<ReturnType<typeof spawnWithInput>> | undefined;
-    let remainingOutputLimitBytes = outputLimitBytes;
 
     if (installCommand) {
       installResult = await spawnWithInput(installCommand, {
@@ -101,24 +100,12 @@ export async function runCommandInTemporaryPackageManagerProject(
         stdin: '',
         timeLimitSeconds: options.timeLimitSeconds,
       });
-      remainingOutputLimitBytes -= outputByteLength(installResult.stdout) + outputByteLength(installResult.stderr);
       if (isFailedSpawnResult(installResult)) {
         return toPackageManagerCommandRunResult({
           elapsedTimeSeconds: (Date.now() - startedAt) / 1000,
           options,
           result: installResult,
         });
-      }
-      if (remainingOutputLimitBytes <= 0) {
-        return {
-          ...toPackageManagerCommandRunResult({
-            elapsedTimeSeconds: (Date.now() - startedAt) / 1000,
-            options,
-            result: installResult,
-          }),
-          outputLimitExceeded: true,
-          status: 0,
-        };
       }
     }
 
@@ -140,7 +127,7 @@ export async function runCommandInTemporaryPackageManagerProject(
     const result = await spawnWithInput(command, {
       cwd: runDir,
       env,
-      outputLimitBytes: remainingOutputLimitBytes,
+      outputLimitBytes,
       stdin: options.stdin ?? '',
       timeLimitSeconds: remainingTimeLimitSeconds,
     });
@@ -152,8 +139,6 @@ export async function runCommandInTemporaryPackageManagerProject(
         options,
         result: {
           ...result,
-          stdout: installResult.stdout + result.stdout,
-          stderr: installResult.stderr + result.stderr,
           timeSeconds: elapsedTimeSeconds,
           memoryBytes: Math.max(installResult.memoryBytes, result.memoryBytes),
         },
@@ -199,10 +184,6 @@ function resolveInstallCommand(
     return installCommand;
   }
   return typeof options.install === 'function' ? options.install({ runDir }) : options.install;
-}
-
-function outputByteLength(output: string): number {
-  return Buffer.byteLength(output);
 }
 
 function isFailedSpawnResult(result: Awaited<ReturnType<typeof spawnWithInput>>): boolean {
