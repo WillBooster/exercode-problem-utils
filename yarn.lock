@@ -41,116 +41,116 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@ai-sdk/amazon-bedrock@npm:4.0.120":
-  version: 4.0.120
-  resolution: "@ai-sdk/amazon-bedrock@npm:4.0.120"
+"@ai-sdk/amazon-bedrock@npm:4.0.124":
+  version: 4.0.124
+  resolution: "@ai-sdk/amazon-bedrock@npm:4.0.124"
   dependencies:
-    "@ai-sdk/anthropic": "npm:3.0.85"
-    "@ai-sdk/openai": "npm:3.0.74"
-    "@ai-sdk/provider": "npm:3.0.10"
-    "@ai-sdk/provider-utils": "npm:4.0.30"
+    "@ai-sdk/anthropic": "npm:3.0.89"
+    "@ai-sdk/openai": "npm:3.0.77"
+    "@ai-sdk/provider": "npm:3.0.12"
+    "@ai-sdk/provider-utils": "npm:4.0.33"
     "@smithy/eventstream-codec": "npm:^4.0.1"
     "@smithy/util-utf8": "npm:^4.0.0"
     aws4fetch: "npm:^1.0.20"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/6efc76792b4873ce5da3dbe937f7648713339c927e2c3237d68970bbfdc6e274bc7f3e2e07bdbebb6ff04a2fe1fd4b13b5dbe500e29bf3a04568fff1f1933120
+  checksum: 10c0/7fcfded79d90dc8038f5a423e1ad1583e8b030f376d9593ccc3072813e5b4153b36cc1c3a0f0621cadd840445d794968bf468bc0bdcc5197242a234538e0e65d
   languageName: node
   linkType: hard
 
-"@ai-sdk/anthropic@npm:3.0.85":
-  version: 3.0.85
-  resolution: "@ai-sdk/anthropic@npm:3.0.85"
+"@ai-sdk/anthropic@npm:3.0.89":
+  version: 3.0.89
+  resolution: "@ai-sdk/anthropic@npm:3.0.89"
   dependencies:
-    "@ai-sdk/provider": "npm:3.0.10"
-    "@ai-sdk/provider-utils": "npm:4.0.30"
+    "@ai-sdk/provider": "npm:3.0.12"
+    "@ai-sdk/provider-utils": "npm:4.0.33"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/fd6569e141965c3e96875af91bf3d708a31c7b00a5343441db1ca5c532b6e12a3d37fb7ae16f48cf826cfeeabdb74cec2508bedd74390cf8edea5e8546dd74c4
+  checksum: 10c0/6cbadba11a8f4ec11f48ce7d5133fd1403f9cc7c7961f3c33f26cf0d6fdbf074618cd26f138907e18b63e8b1f565cd374cef183c7ebc44015908e1d082063436
   languageName: node
   linkType: hard
 
-"@ai-sdk/gateway@npm:3.0.133":
-  version: 3.0.133
-  resolution: "@ai-sdk/gateway@npm:3.0.133"
+"@ai-sdk/gateway@npm:3.0.139":
+  version: 3.0.139
+  resolution: "@ai-sdk/gateway@npm:3.0.139"
   dependencies:
-    "@ai-sdk/provider": "npm:3.0.10"
-    "@ai-sdk/provider-utils": "npm:4.0.30"
+    "@ai-sdk/provider": "npm:3.0.12"
+    "@ai-sdk/provider-utils": "npm:4.0.33"
     "@vercel/oidc": "npm:3.2.0"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/a6e2f9d5a5e53c2f31dadaa903973cce8bff79f8efaf65b4daf61c2644fe9487399e8aa2cc63a338bad219f524fa51feeeb211a62a313102699a958fc0bbd0ae
+  checksum: 10c0/9b7ae61bed3c859ca3d0b6256c32d24f524709b3344e14ca3c1eba1ab91d5e9dad1e63035b80c4a713445d7cbae415080db1cf598b8e377c0c11165eed13b011
   languageName: node
   linkType: hard
 
-"@ai-sdk/google@npm:3.0.83":
-  version: 3.0.83
-  resolution: "@ai-sdk/google@npm:3.0.83"
+"@ai-sdk/google@npm:3.0.86":
+  version: 3.0.86
+  resolution: "@ai-sdk/google@npm:3.0.86"
   dependencies:
-    "@ai-sdk/provider": "npm:3.0.10"
-    "@ai-sdk/provider-utils": "npm:4.0.30"
+    "@ai-sdk/provider": "npm:3.0.12"
+    "@ai-sdk/provider-utils": "npm:4.0.33"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/98eeeef2f3a3e531a89fd57a528321509fea5a225a08404d8956bee7583f856ae505f4e57191816e98ee6ba187a12f7928eb79fa829509c49e5f30618235392c
+  checksum: 10c0/73484e56ad128418f7d45871cf7152aba30ffb2b18a89b820d3191f9c7ff78f89bcc4db62f3baf12b2b80613ac9f14ed4caec01fa5a53bebf5fb2088d52718c2
   languageName: node
   linkType: hard
 
-"@ai-sdk/openai-compatible@npm:2.0.51":
-  version: 2.0.51
-  resolution: "@ai-sdk/openai-compatible@npm:2.0.51"
+"@ai-sdk/openai-compatible@npm:2.0.54":
+  version: 2.0.54
+  resolution: "@ai-sdk/openai-compatible@npm:2.0.54"
   dependencies:
-    "@ai-sdk/provider": "npm:3.0.10"
-    "@ai-sdk/provider-utils": "npm:4.0.30"
+    "@ai-sdk/provider": "npm:3.0.12"
+    "@ai-sdk/provider-utils": "npm:4.0.33"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/6b2234d989c9a6d77af34baa4d789a75254bc05d251584e64f5ad367bcf79379bace1981ded1696c6e21e260190b8d33160c1b1571f124d19188995f41cdcca3
+  checksum: 10c0/fb18d7c136079f3e69674823c01c95677745560d13e73ab36b237c9f40a63e8437c3506cdae8946cf1156f1560baaa7715401da5bc81ac443948de087781c84e
   languageName: node
   linkType: hard
 
-"@ai-sdk/openai@npm:3.0.74":
-  version: 3.0.74
-  resolution: "@ai-sdk/openai@npm:3.0.74"
+"@ai-sdk/openai@npm:3.0.77":
+  version: 3.0.77
+  resolution: "@ai-sdk/openai@npm:3.0.77"
   dependencies:
-    "@ai-sdk/provider": "npm:3.0.10"
-    "@ai-sdk/provider-utils": "npm:4.0.30"
+    "@ai-sdk/provider": "npm:3.0.12"
+    "@ai-sdk/provider-utils": "npm:4.0.33"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/13cafa359160899a3abab7eba3a1bb0f4f158b68ba369ba2d0a58a109025fe9505a4613eaaf62f3ab6b2816ce5e83f3205261cf84a91f01bee49d6528d289152
+  checksum: 10c0/52dcd6a8c586202887d18e091a4d64398019f07faa18a2b10ca90855041cd13cd60629cbd2f16762742bc80c8a969be0336728f8f35e5bf055dbf74606d2b8aa
   languageName: node
   linkType: hard
 
-"@ai-sdk/provider-utils@npm:4.0.30":
-  version: 4.0.30
-  resolution: "@ai-sdk/provider-utils@npm:4.0.30"
+"@ai-sdk/provider-utils@npm:4.0.33":
+  version: 4.0.33
+  resolution: "@ai-sdk/provider-utils@npm:4.0.33"
   dependencies:
-    "@ai-sdk/provider": "npm:3.0.10"
+    "@ai-sdk/provider": "npm:3.0.12"
     "@standard-schema/spec": "npm:^1.1.0"
     eventsource-parser: "npm:^3.0.8"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/4195612c0da1a634ca11043cbfed8e328c9177fc7289b533653529458163e944398539e53f1a689c6ffdf0f728e25b6cc9c927cfc2fe95e80ed22ae008a8053d
+  checksum: 10c0/4f0842720010093e7950c798fccfa9616bbaae390a72adf91193721fa8c94336c6e4fe1e5ed3640d4e35846f4a23b5c0c9ecd5ae91941c77747604d26c71cc8c
   languageName: node
   linkType: hard
 
-"@ai-sdk/provider@npm:3.0.10":
-  version: 3.0.10
-  resolution: "@ai-sdk/provider@npm:3.0.10"
+"@ai-sdk/provider@npm:3.0.12":
+  version: 3.0.12
+  resolution: "@ai-sdk/provider@npm:3.0.12"
   dependencies:
     json-schema: "npm:^0.4.0"
-  checksum: 10c0/c9b162165c3fd4684e4f7a1c041db3ad75785c841d904bac577006b7b2299d1b465557b1d32e3f59b6d8536a0ef5741b195aad86fc3e0e1d2a39f077062a83c4
+  checksum: 10c0/6826ff91b64786eaec6b0bb847a59cc289ab6fccc1c76c81454403bbafc445251629d0e6fbb0b55c95e61e8be77b1441116b824dfcae1cb08716c56fe309ee28
   languageName: node
   linkType: hard
 
-"@ai-sdk/xai@npm:3.0.96":
-  version: 3.0.96
-  resolution: "@ai-sdk/xai@npm:3.0.96"
+"@ai-sdk/xai@npm:3.0.100":
+  version: 3.0.100
+  resolution: "@ai-sdk/xai@npm:3.0.100"
   dependencies:
-    "@ai-sdk/openai-compatible": "npm:2.0.51"
-    "@ai-sdk/provider": "npm:3.0.10"
-    "@ai-sdk/provider-utils": "npm:4.0.30"
+    "@ai-sdk/openai-compatible": "npm:2.0.54"
+    "@ai-sdk/provider": "npm:3.0.12"
+    "@ai-sdk/provider-utils": "npm:4.0.33"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/1564bfc6d142450f59458c620738225b7c90ea60f7ae61e07d4220d6e02066a57a90e2183617d2a63be5805ddbea18c4beafff8ee3fd6feaa5cbccd2a44845bb
+  checksum: 10c0/90818553326c18084f653e58c274447c8bd1d897d7c263387798d2d7abcd044b1e3ea015362c6e6ff2b34b2fd839c3774675164517830be6a84f5b4235785f85
   languageName: node
   linkType: hard
 
@@ -1623,20 +1623,20 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@exercode/problem-utils@workspace:."
   dependencies:
-    "@ai-sdk/amazon-bedrock": "npm:4.0.120"
-    "@ai-sdk/google": "npm:3.0.83"
-    "@ai-sdk/openai": "npm:3.0.74"
-    "@ai-sdk/xai": "npm:3.0.96"
+    "@ai-sdk/amazon-bedrock": "npm:4.0.124"
+    "@ai-sdk/google": "npm:3.0.86"
+    "@ai-sdk/openai": "npm:3.0.77"
+    "@ai-sdk/xai": "npm:3.0.100"
     "@tsconfig/node-lts": "npm:24.0.0"
     "@tsconfig/node-ts": "npm:23.6.4"
     "@tsconfig/node24": "npm:24.0.4"
     "@types/node": "npm:24.13.2"
-    "@typescript/native-preview": "npm:7.0.0-dev.20260622.1"
+    "@typescript/native-preview": "npm:7.0.0-dev.20260628.1"
     "@willbooster/oxfmt-config": "npm:1.2.2"
     "@willbooster/oxlint-config": "npm:1.4.8"
     "@willbooster/prettier-config": "npm:10.4.0"
     "@willbooster/wb": "npm:13.22.19"
-    ai: "npm:6.0.208"
+    ai: "npm:6.0.214"
     build-ts: "npm:17.1.30"
     conventional-changelog-conventionalcommits: "npm:9.3.1"
     front-matter: "npm:4.0.2"
@@ -3205,9 +3205,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@typescript/native-preview-darwin-arm64@npm:7.0.0-dev.20260622.1":
-  version: 7.0.0-dev.20260622.1
-  resolution: "@typescript/native-preview-darwin-arm64@npm:7.0.0-dev.20260622.1"
+"@typescript/native-preview-darwin-arm64@npm:7.0.0-dev.20260628.1":
+  version: 7.0.0-dev.20260628.1
+  resolution: "@typescript/native-preview-darwin-arm64@npm:7.0.0-dev.20260628.1"
   conditions: os=darwin & cpu=arm64
   languageName: node
   linkType: hard
@@ -3219,9 +3219,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@typescript/native-preview-darwin-x64@npm:7.0.0-dev.20260622.1":
-  version: 7.0.0-dev.20260622.1
-  resolution: "@typescript/native-preview-darwin-x64@npm:7.0.0-dev.20260622.1"
+"@typescript/native-preview-darwin-x64@npm:7.0.0-dev.20260628.1":
+  version: 7.0.0-dev.20260628.1
+  resolution: "@typescript/native-preview-darwin-x64@npm:7.0.0-dev.20260628.1"
   conditions: os=darwin & cpu=x64
   languageName: node
   linkType: hard
@@ -3233,9 +3233,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@typescript/native-preview-linux-arm64@npm:7.0.0-dev.20260622.1":
-  version: 7.0.0-dev.20260622.1
-  resolution: "@typescript/native-preview-linux-arm64@npm:7.0.0-dev.20260622.1"
+"@typescript/native-preview-linux-arm64@npm:7.0.0-dev.20260628.1":
+  version: 7.0.0-dev.20260628.1
+  resolution: "@typescript/native-preview-linux-arm64@npm:7.0.0-dev.20260628.1"
   conditions: os=linux & cpu=arm64
   languageName: node
   linkType: hard
@@ -3247,9 +3247,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@typescript/native-preview-linux-arm@npm:7.0.0-dev.20260622.1":
-  version: 7.0.0-dev.20260622.1
-  resolution: "@typescript/native-preview-linux-arm@npm:7.0.0-dev.20260622.1"
+"@typescript/native-preview-linux-arm@npm:7.0.0-dev.20260628.1":
+  version: 7.0.0-dev.20260628.1
+  resolution: "@typescript/native-preview-linux-arm@npm:7.0.0-dev.20260628.1"
   conditions: os=linux & cpu=arm
   languageName: node
   linkType: hard
@@ -3261,9 +3261,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@typescript/native-preview-linux-x64@npm:7.0.0-dev.20260622.1":
-  version: 7.0.0-dev.20260622.1
-  resolution: "@typescript/native-preview-linux-x64@npm:7.0.0-dev.20260622.1"
+"@typescript/native-preview-linux-x64@npm:7.0.0-dev.20260628.1":
+  version: 7.0.0-dev.20260628.1
+  resolution: "@typescript/native-preview-linux-x64@npm:7.0.0-dev.20260628.1"
   conditions: os=linux & cpu=x64
   languageName: node
   linkType: hard
@@ -3275,9 +3275,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@typescript/native-preview-win32-arm64@npm:7.0.0-dev.20260622.1":
-  version: 7.0.0-dev.20260622.1
-  resolution: "@typescript/native-preview-win32-arm64@npm:7.0.0-dev.20260622.1"
+"@typescript/native-preview-win32-arm64@npm:7.0.0-dev.20260628.1":
+  version: 7.0.0-dev.20260628.1
+  resolution: "@typescript/native-preview-win32-arm64@npm:7.0.0-dev.20260628.1"
   conditions: os=win32 & cpu=arm64
   languageName: node
   linkType: hard
@@ -3289,9 +3289,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@typescript/native-preview-win32-x64@npm:7.0.0-dev.20260622.1":
-  version: 7.0.0-dev.20260622.1
-  resolution: "@typescript/native-preview-win32-x64@npm:7.0.0-dev.20260622.1"
+"@typescript/native-preview-win32-x64@npm:7.0.0-dev.20260628.1":
+  version: 7.0.0-dev.20260628.1
+  resolution: "@typescript/native-preview-win32-x64@npm:7.0.0-dev.20260628.1"
   conditions: os=win32 & cpu=x64
   languageName: node
   linkType: hard
@@ -3328,17 +3328,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@typescript/native-preview@npm:7.0.0-dev.20260622.1":
-  version: 7.0.0-dev.20260622.1
-  resolution: "@typescript/native-preview@npm:7.0.0-dev.20260622.1"
+"@typescript/native-preview@npm:7.0.0-dev.20260628.1":
+  version: 7.0.0-dev.20260628.1
+  resolution: "@typescript/native-preview@npm:7.0.0-dev.20260628.1"
   dependencies:
-    "@typescript/native-preview-darwin-arm64": "npm:7.0.0-dev.20260622.1"
-    "@typescript/native-preview-darwin-x64": "npm:7.0.0-dev.20260622.1"
-    "@typescript/native-preview-linux-arm": "npm:7.0.0-dev.20260622.1"
-    "@typescript/native-preview-linux-arm64": "npm:7.0.0-dev.20260622.1"
-    "@typescript/native-preview-linux-x64": "npm:7.0.0-dev.20260622.1"
-    "@typescript/native-preview-win32-arm64": "npm:7.0.0-dev.20260622.1"
-    "@typescript/native-preview-win32-x64": "npm:7.0.0-dev.20260622.1"
+    "@typescript/native-preview-darwin-arm64": "npm:7.0.0-dev.20260628.1"
+    "@typescript/native-preview-darwin-x64": "npm:7.0.0-dev.20260628.1"
+    "@typescript/native-preview-linux-arm": "npm:7.0.0-dev.20260628.1"
+    "@typescript/native-preview-linux-arm64": "npm:7.0.0-dev.20260628.1"
+    "@typescript/native-preview-linux-x64": "npm:7.0.0-dev.20260628.1"
+    "@typescript/native-preview-win32-arm64": "npm:7.0.0-dev.20260628.1"
+    "@typescript/native-preview-win32-x64": "npm:7.0.0-dev.20260628.1"
   dependenciesMeta:
     "@typescript/native-preview-darwin-arm64":
       optional: true
@@ -3355,8 +3355,8 @@ __metadata:
     "@typescript/native-preview-win32-x64":
       optional: true
   bin:
-    tsgo: bin/tsgo.js
-  checksum: 10c0/bd295c0a6d060947f62f6b62cd65a129c1cc62abd5c75d5dd92126803b02c290bd1263ce221a2d89addc0eca31c70fa07cf5ad2aa9e8d12cf33a18c2acce68ce
+    tsgo: bin/tsgo
+  checksum: 10c0/a2e3d1583d2d18e4f0269bdeadee21815c780a02d815e6ca4733c00fba639a83a1296c22cbee44d6f4aeb93af8a0975bb9a46de4abea1312d882376004cbe2a3
   languageName: node
   linkType: hard
 
@@ -3553,17 +3553,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ai@npm:6.0.208":
-  version: 6.0.208
-  resolution: "ai@npm:6.0.208"
+"ai@npm:6.0.214":
+  version: 6.0.214
+  resolution: "ai@npm:6.0.214"
   dependencies:
-    "@ai-sdk/gateway": "npm:3.0.133"
-    "@ai-sdk/provider": "npm:3.0.10"
-    "@ai-sdk/provider-utils": "npm:4.0.30"
+    "@ai-sdk/gateway": "npm:3.0.139"
+    "@ai-sdk/provider": "npm:3.0.12"
+    "@ai-sdk/provider-utils": "npm:4.0.33"
     "@opentelemetry/api": "npm:^1.9.0"
   peerDependencies:
     zod: ^3.25.76 || ^4.1.8
-  checksum: 10c0/1f32d2e7dfb40410b3a0e389529e2469dd79519865563d29bd5f12d00fa5c457bad950a57ff3eebff20ccfdf0ab6e3cdf5f5b5a21bd9229ead19fcedfc5ca832
+  checksum: 10c0/0e4eb9f15f08acde2cab92764364df006ba299a33ff4dd6d60a52d4e312f219a992f534021a47a4c75155c816d59717d790746d94df356cbdb94d77c2e8292af
   languageName: node
   linkType: hard
 
