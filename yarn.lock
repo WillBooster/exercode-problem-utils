@@ -1673,7 +1673,7 @@ __metadata:
     oxlint: "npm:1.72.0"
     oxlint-tsgolint: "npm:0.24.0"
     prettier: "npm:3.9.1"
-    prettier-plugin-java: "npm:2.9.7"
+    prettier-plugin-java: "npm:2.10.1"
     puppeteer: "npm:24.43.1"
     semantic-release: "npm:25.0.5"
     sort-package-json: "npm:4.0.0"
@@ -7268,14 +7268,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"prettier-plugin-java@npm:2.9.7":
-  version: 2.9.7
-  resolution: "prettier-plugin-java@npm:2.9.7"
+"prettier-plugin-java@npm:2.10.1":
+  version: 2.10.1
+  resolution: "prettier-plugin-java@npm:2.10.1"
   dependencies:
     web-tree-sitter: "npm:0.26.9"
   peerDependencies:
     prettier: ^3.0.0
-  checksum: 10c0/2394746eb78f88d211e2ec4530d485142551c5db47cd4143f25887efe9815dd449488fecc3b64186c2424c142bbff33fd272bbf09178b5b3d165e767e13a38c0
+  checksum: 10c0/80ccf4f792c84acd39b38f360185dfa0f6a78a2d53dc6c2d8c70fa2cacfc8a44d4a5a2f6ba565cc6ffcf2e87cdfbfddefe6850367b76add6ca9095bd07ac60ec
   languageName: node
   linkType: hard
 
