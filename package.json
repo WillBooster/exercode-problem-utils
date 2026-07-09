@@ -63,11 +63,10 @@
     "@tsconfig/node-ts": "23.6.4",
     "@tsconfig/node24": "24.0.4",
     "@types/node": "24.13.2",
-    "@typescript/native-preview": "7.0.0-dev.20260629.1",
     "@willbooster/oxfmt-config": "1.2.2",
     "@willbooster/oxlint-config": "1.4.8",
     "@willbooster/prettier-config": "10.4.0",
-    "@willbooster/wb": "13.23.1",
+    "@willbooster/wb": "13.26.0",
     "build-ts": "17.1.31",
     "conventional-changelog-conventionalcommits": "9.3.1",
     "lefthook": "2.1.9",
@@ -79,9 +78,10 @@
     "puppeteer": "24.43.1",
     "semantic-release": "25.0.5",
     "sort-package-json": "4.0.0",
+    "typescript": "7.0.2",
     "vitest": "4.1.9"
   },
-  "packageManager": "yarn@4.17.0",
+  "packageManager": "yarn@4.17.1",
   "engines": {
     "node": ">=24"
   },
