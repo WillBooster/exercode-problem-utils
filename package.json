@@ -34,19 +34,17 @@
   ],
   "scripts": {
     "build": "build-ts lib --input src/index.ts src/presets/*.ts",
-    "cleanup": "yarn format && yarn lint-fix",
-    "format": "sort-package-json && yarn format-code && yarn prettify",
-    "format-code": "oxfmt --write --no-error-on-unmatched-pattern . '!**/package.json'",
-    "lint": "oxlint --type-aware --type-check --no-error-on-unmatched-pattern .",
-    "lint-fix": "yarn lint --fix",
+    "cleanup": "bun wb lint --fix --format",
+    "format": "bun wb lint --format",
+    "lint": "bun wb lint",
+    "lint-fix": "bun wb lint --fix",
     "prepare": "lefthook install || true",
-    "prettify": "prettier --cache --no-error-on-unmatched-pattern --write \"**/{.*/,}*.{java}\" \"!**/test{-,/}fixtures/**\" || true",
     "start": "build-ts run src/index.ts",
-    "test": "rm -fr temp && WB_ENV=test wb dotenv -- yarn vitest test",
-    "test/ci-setup": "yarn build && bun install --cwd example",
-    "typecheck": "wb typecheck",
-    "verify": "wb verify",
-    "verify-full": "wb verify --full"
+    "test": "bun wb test",
+    "test/ci-setup": "bun run build && bun install --cwd example",
+    "typecheck": "bun wb typecheck",
+    "verify": "bun wb verify",
+    "verify-full": "bun wb verify --full"
   },
   "prettier": "@willbooster/prettier-config",
   "dependencies": {
@@ -81,7 +79,6 @@
     "typescript": "7.0.2",
     "vitest": "4.1.10"
   },
-  "packageManager": "yarn@4.17.1",
   "engines": {
     "node": ">=24"
   },
