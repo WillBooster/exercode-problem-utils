@@ -13,16 +13,22 @@
     "outDir": "dist",
     "paths": {
       "@exercode/problem-utils": ["./src/index.ts"],
-      "@exercode/problem-utils/presets/*": ["./src/presets/*.ts"]
+      "@exercode/problem-utils/presets/*": ["./src/presets/*.ts"],
+      "undici-types": ["./node_modules/undici-types/index.d.ts"]
     },
     "resolveJsonModule": true,
     "rootDir": ".",
     "skipLibCheck": true,
     "sourceMap": true,
     "strict": true,
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vitest/globals", "bun"]
   },
   "exclude": ["test/fixtures"],
-  "extends": ["@tsconfig/node-lts/tsconfig.json", "@tsconfig/node-ts/tsconfig.json", "@tsconfig/node24/tsconfig.json"],
+  "extends": [
+    "@tsconfig/bun/tsconfig.json",
+    "@tsconfig/node-lts/tsconfig.json",
+    "@tsconfig/node-ts/tsconfig.json",
+    "@tsconfig/node24/tsconfig.json"
+  ],
   "include": ["*.config.ts", "scripts/**/*", "src/**/*", "test/**/*"]
 }
