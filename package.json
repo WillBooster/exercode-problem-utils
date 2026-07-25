@@ -76,7 +76,7 @@
     "prettier": "3.9.5",
     "prettier-plugin-java": "2.10.2",
     "puppeteer": "25.3.0",
-    "semantic-release": "25.0.7",
+    "semantic-release": "25.0.8",
     "sort-package-json": "4.0.0",
     "typescript": "7.0.2",
     "vitest": "4.1.10"
