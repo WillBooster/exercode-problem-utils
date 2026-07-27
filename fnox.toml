@@ -1,0 +1,24 @@
+[providers.age]
+type = "age"
+recipients = [
+  "age1j2354xhvm3fv9y77t5g6y3q8mexgk2mf00tgrkzgp73tynrvz55s8auayw", # exkazuu
+  "age18rugldf9htc6um5eplpx27k53ep4zn0lhzwffgnxzhrq0c7zgvyq3zccdy", # ponharu1
+  "age1nz2n99crjr7np9xjglwfffc3dud45dhewqzqfzpztkdwu4hj74gq6el533", # ponharu2
+  "age1fhea85xjwp89lwq3jcnwj32swh3v24pwparqh5l7qkgvc4ax3p0ql6du36", # ci-public
+  "age1mw4pz9dujy9dmhk0palqawjkj7m4k7zx78yr9fjt63sa5l3e43uq6nw004", # remin
+]
+
+[secrets]
+WB_ENV = { default = "development" }
+
+[profiles.development.secrets]
+
+[profiles.test.secrets]
+WB_ENV = { default = "test" }
+GOOGLE_GENERATIVE_AI_API_KEY = { provider = "age", value = "YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBpM2FQS0hrejRYNU40WFRyOFROamhpSjVWbDhhRGYxSXV6UC96eDVNdER3ClhSYjA1RWdNTGNCTzIrMFpaUmxZUENzSzRUb3Q1OVBicDg1UkJGa3NIQ1kKLT4gWDI1NTE5IHJTcHVRUTl1WjRUcExsTlZHYzR2N3NRb0FTZitUOGlaWjdOaWl2ME5mUmMKOFpTd09CbHhCaXY2UEJtSFJERjhubmlHYkVZWHJpQllpazNsQ09ZL0NhYwotPiBYMjU1MTkgNkpsdmwxenZhbHMwQ0dBME94YWhaYWNMalRBb0UrUHFTV1hhSUF5WEVHZwplMVFseVhxaFRwT1BSOHBwanU4MitDVmZIVkZtbXMxQkdlV3AyM2JLWUJZCi0+IFgyNTUxOSBscmg1QjVvQStKVFoyRkVnNnk0ZEJNMzk5VXF4akY1K2pNS3lOVWRqbW1RClhiT3VFRzBsSCtFWXFLdmdEbjFENngxM1NrUDlGVFFtckZOWGVRUGFnRlEKLT4gWDI1NTE5IGJyenhuWnB2QVdOQmx1anVpOHdVdTljczVpYjA3Z0JTaDdyL1ZRUlA0RlEKNmNNejRiY0xWcEtsWlpYV0txdit2eWlhZlpEZTFtYmFCaGJYZHU4akJuNAotPiBoVi1ncmVhc2UgR3ZFNXpbI2Ygb2NLCkJsT29ING1VYjYxUTZ0N204OEFUeDRldmhvRVdnalNkZ244ekMvdEJDUXVJZmRPMQotLS0gTndscTRDOWFnYXZVY3FrUlVtMEVTQVJTaE1NQ1FDOHRwdklsaG1LSEdEVQqxvkgybXTVBHV+ipefiHtEAa+m35r6T3lTe4IldRpoVv2tOkfylIaZ+buKsKCdYDttWkoQYuXSJoWikbHJ3EAxAEui6SxEOB+zSxUUBuzaZehUm6tL" }
+
+[profiles.staging.secrets]
+WB_ENV = { default = "staging" }
+
+[profiles.production.secrets]
+WB_ENV = { default = "production" }
