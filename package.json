@@ -42,7 +42,7 @@
     "start": "bun src/index.ts",
     "test": "bun wb test",
     "test/ci": "bun wb test-on-ci",
-    "test/ci-setup": "bun run build && bun install --cwd example",
+    "test/ci-setup": "bun run build && bun install --cwd example && cd example && bun run puppeteer browsers install chrome",
     "typecheck": "bun wb typecheck",
     "verify": "bun wb verify",
     "verify-full": "bun wb verify --full"
@@ -67,7 +67,7 @@
     "@willbooster/oxfmt-config": "1.2.2",
     "@willbooster/oxlint-config": "1.4.8",
     "@willbooster/prettier-config": "10.4.0",
-    "@willbooster/wb": "19.6.0",
+    "@willbooster/wb": "19.6.1",
     "build-ts": "21.0.0",
     "conventional-changelog-conventionalcommits": "10.2.1",
     "lefthook": "2.1.10",
