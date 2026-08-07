@@ -5,8 +5,5 @@
   "dependencies": {
     "@exercode/problem-utils": "file:..",
     "puppeteer": "25.3.0"
-  },
-  "trustedDependencies": [
-    "puppeteer"
-  ]
+  }
 }
