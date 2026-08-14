@@ -585,9 +585,12 @@ async function spawnGuiProgram(context: {
     exitCode = code ?? 1;
   });
 
-  // Everything below must run under the watchdog's `finally`: `takeScreenshots` rethrows spawn
-  // failures (which a submission can provoke by exhausting PIDs), and a leaked watchdog is detached,
-  // so it would outlive the harness and SIGKILL a later request's submission.
+  // Everything below must run under the `finally` that decides the watchdog's fate: it is cancelled
+  // only once the submission is demonstrably stopped. When a helper throws first — `takeScreenshots`
+  // rethrows spawn failures, which a submission can provoke by exhausting PIDs — the watchdog stays
+  // armed on purpose, since nothing else would end the submission. The cost is that a detached
+  // watchdog can outlive this harness and SIGKILL sandbox processes of a request that starts within
+  // its remaining deadline, which is the same trade-off the package-manager runner accepts.
   try {
     if (context.stdin) child.stdin.write(context.stdin);
     child.stdin.end();

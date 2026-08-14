@@ -48,7 +48,7 @@ export async function copyWithoutFollowingSymlinks(source: string, destination: 
  */
 export async function createDirectoryWithoutFollowingSymlinks(root: string, directory: string): Promise<void> {
   const relativePath = path.relative(root, directory);
-  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+  if (!isContainedPath(root, directory)) {
     throw new Error(`directory must be inside root: ${directory} is not inside ${root}`);
   }
 
