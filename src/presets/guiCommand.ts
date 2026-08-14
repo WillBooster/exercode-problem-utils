@@ -245,16 +245,30 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
     return;
   }
 
-  const prepareResult =
-    (options.prepare &&
-      (await runCustomRunner(() =>
+  let customPrepareResult: Partial<GuiJudgeCaseResult> | undefined;
+  if (options.prepare) {
+    try {
+      customPrepareResult = await runCustomRunner(() =>
         options.prepare?.({
           cwd: submissionDir,
           env: { ...env, ...getSandboxUserEnvOverrides(env) },
           mainFilePath: resolvedMainFilePath,
           problemMarkdownFrontMatter,
         })
-      ))) ??
+      );
+    } catch (error) {
+      // Like the `prebuild` step above: report the failed build rather than letting the throw (from
+      // the handler itself, or from the fail-closed sandbox sweep around it) end the run resultless.
+      printTestCaseResult({
+        testCaseId: prebuildTestCaseId,
+        decisionCode: DecisionCode.BUILD_ERROR,
+        stderr: errorToMessage(error),
+      });
+      return;
+    }
+  }
+  const prepareResult =
+    customPrepareResult ??
     runDefaultPrepare({
       cwd: args.cwd,
       env,
