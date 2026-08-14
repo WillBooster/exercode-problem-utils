@@ -10,6 +10,7 @@ import {
   killSandboxUserProcesses,
   makeAccessibleToSandboxUser,
   prependInsideSandboxWrapper,
+  SANDBOX_WATCHDOG_GRACE_SECONDS,
   sandboxUserName,
   startSandboxTimeoutWatchdog,
   wrapCommandWithSandboxUser,
@@ -83,6 +84,8 @@ const packageManagerInstallCommandResolvers = {
 
 const defaultOutputLimitBytes = 50 * 1024 * 1024;
 const killGracePeriodMilliseconds = 1000;
+// Long enough for the watchdog to fire and for the resulting `close` to arrive.
+const watchdogGraceMilliseconds = (SANDBOX_WATCHDOG_GRACE_SECONDS + 2) * 1000;
 const timeCommand = resolveTimeCommand();
 
 /**
@@ -389,28 +392,47 @@ async function spawnWithInput(
     timeCommand === undefined
       ? wrappedCommand
       : prependInsideSandboxWrapper(wrappedCommand, [...timeCommand, `--output=${timeOutputPath}`]);
-  const subprocess = childProcess.spawn(spawnedCommand[0], spawnedCommand.slice(1), {
-    cwd: context.cwd,
-    detached: process.platform !== 'win32',
-    env: { ...context.env, ...getSandboxUserEnvOverrides(context.env) },
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-  // Deadline enforcement on this path otherwise depends entirely on `killSubprocessGroup`, which
-  // cannot spawn its `sudo` once a submission has exhausted the PID cgroup. This watchdog is
-  // started before the submission can do that, so the deadline holds even then.
+  // Started BEFORE the submission: `killSubprocessGroup` cannot spawn its `sudo` once a submission
+  // has exhausted the PID cgroup, and a submission spawned first could exhaust it before this
+  // watchdog exists. It is the deadline of last resort on this path.
   const watchdog = startSandboxTimeoutWatchdog(context.timeLimitSeconds);
+  let subprocess: childProcess.ChildProcessWithoutNullStreams;
+  try {
+    subprocess = childProcess.spawn(spawnedCommand[0], spawnedCommand.slice(1), {
+      cwd: context.cwd,
+      detached: process.platform !== 'win32',
+      env: { ...context.env, ...getSandboxUserEnvOverrides(context.env) },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+  } catch (error) {
+    watchdog.cancel();
+    throw error;
+  }
 
   const stdoutChunks: Buffer[] = [];
   const stderrChunks: Buffer[] = [];
   let outputBytes = 0;
   let timedOut = false;
   let outputLimitExceeded = false;
+  // Set when terminating the submission failed (the cleanup `sudo` could not be spawned). The run
+  // then waits for the watchdog to end the submission rather than throwing out of an EventEmitter
+  // callback, which would be an uncaught exception that kills the harness before any cleanup.
+  let killError: Error | undefined;
+  let onKillFailure: (() => void) | undefined;
+  const killOrRecordFailure = (signal: NodeJS.Signals): void => {
+    try {
+      killSubprocessGroup(subprocess, signal);
+    } catch (error) {
+      killError ??= error instanceof Error ? error : new Error(String(error));
+      onKillFailure?.();
+    }
+  };
 
   const appendOutputChunk = (chunks: Buffer[], chunk: Buffer): void => {
     if (outputBytes >= context.outputLimitBytes) {
       if (chunk.byteLength > 0) {
         outputLimitExceeded = true;
-        killSubprocessGroup(subprocess, 'SIGKILL');
+        killOrRecordFailure('SIGKILL');
       }
       return;
     }
@@ -422,35 +444,27 @@ async function spawnWithInput(
 
     if (chunk.byteLength > remainingBytes) {
       outputLimitExceeded = true;
-      killSubprocessGroup(subprocess, 'SIGKILL');
+      killOrRecordFailure('SIGKILL');
     }
   };
 
   subprocess.stdout.on('data', (chunk: Buffer) => appendOutputChunk(stdoutChunks, chunk));
   subprocess.stderr.on('data', (chunk: Buffer) => appendOutputChunk(stderrChunks, chunk));
 
-  // Set by the promise below so a kill failure can settle the run instead of waiting forever for a
-  // `close` that a still-running submission will never emit.
-  let failRun: ((error: Error) => void) | undefined;
-  const killOrFailRun = (signal: NodeJS.Signals): void => {
-    try {
-      killSubprocessGroup(subprocess, signal);
-    } catch (error) {
-      failRun?.(error instanceof Error ? error : new Error(String(error)));
-    }
-  };
-
   const timeout = setTimeout(() => {
     timedOut = true;
-    killOrFailRun('SIGTERM');
+    killOrRecordFailure('SIGTERM');
   }, context.timeLimitSeconds * 1000);
   const killTimeout = setTimeout(
     () => {
-      if (timedOut) killOrFailRun('SIGKILL');
+      if (timedOut) killOrRecordFailure('SIGKILL');
     },
     context.timeLimitSeconds * 1000 + killGracePeriodMilliseconds
   );
   killTimeout.unref();
+  // Bounds the wait after a kill failure: the watchdog force-kills the sandbox user shortly after
+  // the deadline, so `close` should arrive; if even that fails, give up rather than hang.
+  let killFailureTimeout: ReturnType<typeof setTimeout> | undefined;
 
   const { status, signal } = await new Promise<{ status: number | undefined; signal: NodeJS.Signals | undefined }>(
     (resolve, reject) => {
@@ -459,18 +473,22 @@ async function spawnWithInput(
       const failAfterClose = (error: Error): void => {
         if (settled) return;
         pendingError = error;
-        killSubprocessGroup(subprocess, 'SIGKILL');
+        killOrRecordFailure('SIGKILL');
         if (subprocess.pid === undefined) {
           settled = true;
           reject(error);
         }
       };
-      // Terminating the submission failed, so `close` may never arrive: reject now, which lets the
-      // caller's `finally` sweep and temporary-directory cleanup run and surfaces the failure.
-      failRun = (error) => {
-        if (settled) return;
-        settled = true;
-        reject(error);
+      // Terminating the submission failed. Keep waiting: the watchdog (started before the
+      // submission) force-kills the sandbox user shortly after the deadline, so `close` still
+      // arrives and the caller's `finally` sweep and cleanup run. Only if that also fails to end
+      // the submission do we give up, so the run cannot hang indefinitely.
+      onKillFailure = () => {
+        killFailureTimeout ??= setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          reject(killError ?? new Error('failed to terminate the submission'));
+        }, killGracePeriodMilliseconds + watchdogGraceMilliseconds);
       };
       subprocess.on('error', failAfterClose);
       subprocess.stdin.on('error', (error: NodeJS.ErrnoException) => {
@@ -479,8 +497,9 @@ async function spawnWithInput(
       subprocess.on('close', (code, closeSignal) => {
         if (settled) return;
         settled = true;
-        if (pendingError) {
-          reject(pendingError);
+        const error = pendingError ?? killError;
+        if (error) {
+          reject(error);
           return;
         }
         resolve({ status: code ?? undefined, signal: closeSignal ?? undefined });
@@ -490,7 +509,10 @@ async function spawnWithInput(
   ).finally(() => {
     clearTimeout(timeout);
     clearTimeout(killTimeout);
-    watchdog.cancel();
+    if (killFailureTimeout) clearTimeout(killFailureTimeout);
+    // Leave a watchdog whose kill never landed running: cancelling it here would remove the only
+    // remaining mechanism able to stop the submission.
+    if (!killError) watchdog.cancel();
   });
 
   const { timeSeconds, memoryBytes } =

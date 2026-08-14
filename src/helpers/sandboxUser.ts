@@ -170,6 +170,12 @@ export function relaxPermissionsAsSandboxUser(targetPath: string): void {
   runAsSandboxUser(['chmod', '-R', 'a+rwX', targetPath]);
 }
 
+/**
+ * How long after a command's own deadline {@link startSandboxTimeoutWatchdog} force-kills the
+ * sandbox user. Callers waiting for the watchdog to end a submission must wait at least this long.
+ */
+export const SANDBOX_WATCHDOG_GRACE_SECONDS = 5;
+
 /** Cancels a {@link startSandboxTimeoutWatchdog}; `fired` reports whether its deadline elapsed. */
 export interface SandboxTimeoutWatchdog {
   cancel(): void;
@@ -189,7 +195,7 @@ export interface SandboxTimeoutWatchdog {
 export function startSandboxTimeoutWatchdog(timeoutSeconds: number): SandboxTimeoutWatchdog {
   if (!sandboxUserName) return { cancel: () => {}, fired: () => false };
 
-  const deadlineSeconds = Math.ceil(timeoutSeconds) + 5;
+  const deadlineSeconds = Math.ceil(timeoutSeconds) + SANDBOX_WATCHDOG_GRACE_SECONDS;
   const watchdog = child_process.spawn(
     '/bin/sh',
     ['-c', `${SLEEP_PATH} ${deadlineSeconds}; ${SUDO_PATH} -u "$1" pkill -KILL -u "$1"`, 'sh', sandboxUserName],
