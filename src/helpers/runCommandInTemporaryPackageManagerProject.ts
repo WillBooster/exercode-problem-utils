@@ -1,4 +1,5 @@
 import childProcess from 'node:child_process';
+import nodeFs from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -524,13 +525,21 @@ function killSubprocessGroup(subprocess: childProcess.ChildProcess, signal: Node
 
 async function readTimeResult(timeOutputPath: string): Promise<{ timeSeconds: number; memoryBytes: number }> {
   let content: string;
+  let fileHandle: Awaited<ReturnType<typeof fs.open>> | undefined;
   try {
-    content = await fs.readFile(timeOutputPath, 'utf8');
+    // `O_NOFOLLOW`: this file lives in the sandbox-writable run directory, so the submission can
+    // replace it with a symlink to a harness-readable file (e.g. the problem's expected outputs)
+    // and have the two numbers at its tail reported back as its own time and memory usage.
+    fileHandle = await fs.open(timeOutputPath, nodeFs.constants.O_RDONLY | nodeFs.constants.O_NOFOLLOW);
+    content = await fileHandle.readFile('utf8');
   } catch (error) {
     const code =
       typeof error === 'object' && error !== null && 'code' in error ? (error as { code: unknown }).code : undefined;
-    if (code !== 'ENOENT') throw error;
+    // ELOOP/EMLINK: the path is a symlink the submission planted, so there is no measurement to read.
+    if (code !== 'ENOENT' && code !== 'ELOOP' && code !== 'EMLINK') throw error;
     return { timeSeconds: 0, memoryBytes: 0 };
+  } finally {
+    await fileHandle?.close();
   }
 
   const match = /(\d+(?:[.,]\d+)?) (\d+)\s*$/.exec(content);
