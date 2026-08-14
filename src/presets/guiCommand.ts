@@ -604,6 +604,10 @@ async function spawnGuiProgram(context: {
       child.removeAllListeners('close');
       child.removeAllListeners('error');
     }
+    // A submission can kill its own same-UID `timeout` and be stopped by the watchdog instead,
+    // which surfaces as a SIGKILL rather than a deadline. Report that as the timeout it is, not as
+    // the runtime error the signal would otherwise imply.
+    const watchdogFired = watchdog.fired();
     await stopProcess(child);
     if (spawnError) throw spawnError;
     const {
@@ -616,11 +620,11 @@ async function spawnGuiProgram(context: {
       stdin: context.stdin,
       stdout: stdout.trimEnd(),
       stderr: normalizedStderr,
-      status: exitCode,
+      status: watchdogFired ? 0 : exitCode,
       timeSeconds,
       memoryBytes,
       screenshots,
-      stopReason,
+      stopReason: watchdogFired ? 'timeout' : stopReason,
     };
   } finally {
     watchdog.cancel();
