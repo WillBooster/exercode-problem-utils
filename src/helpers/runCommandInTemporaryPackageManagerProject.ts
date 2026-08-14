@@ -6,9 +6,9 @@ import path from 'node:path';
 import {
   forceRemove,
   getSandboxUserEnvOverrides,
-  isSandboxWrappedCommand,
   killSandboxUserProcesses,
   makeAccessibleToSandboxUser,
+  prependInsideSandboxWrapper,
   sandboxUserName,
   wrapCommandWithSandboxUser,
 } from './sandboxUser.js';
@@ -375,13 +375,14 @@ async function spawnWithInput(
   outputLimitExceeded: boolean;
 }> {
   const timeOutputPath = timeCommand === undefined ? undefined : path.join(context.cwd, '.exercode-time-result');
-  const timedCommand =
+  // `wrapCommandWithSandboxUser` is idempotent, so a command the presets already wrapped is not
+  // nested; `time` is then spliced INSIDE that wrapper so it runs as the sandbox user, never as the
+  // harness user writing `--output` into this sandbox-writable directory.
+  const wrappedCommand = wrapCommandWithSandboxUser(command);
+  const spawnedCommand =
     timeCommand === undefined
-      ? command
-      : ([...timeCommand, `--output=${timeOutputPath}`, ...command] as [string, ...string[]]);
-  // A caller may pass a command the presets already wrapped; wrapping the `time`-prefixed form
-  // again would nest `sudo` inside `sudo` and run the inner one as the unauthorized sandbox user.
-  const spawnedCommand = isSandboxWrappedCommand(command) ? timedCommand : wrapCommandWithSandboxUser(timedCommand);
+      ? wrappedCommand
+      : prependInsideSandboxWrapper(wrappedCommand, [...timeCommand, `--output=${timeOutputPath}`]);
   const subprocess = childProcess.spawn(spawnedCommand[0], spawnedCommand.slice(1), {
     cwd: context.cwd,
     detached: process.platform !== 'win32',

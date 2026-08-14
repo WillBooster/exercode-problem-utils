@@ -71,17 +71,14 @@ export function wrapCommandWithSandboxUser(command: readonly [string, ...string[
   if (!sandboxUserName) return [...command];
   // Idempotent; see {@link isSandboxWrappedCommand}.
   if (isSandboxWrappedCommand(command)) return [...command];
-  return [
-    SUDO_PATH,
-    '--preserve-env',
-    '-u',
-    sandboxUserName,
-    '--',
-    'sh',
-    '-c',
-    'umask 0; if [ -n "$SANDBOX_LD_LIBRARY_PATH" ]; then export LD_LIBRARY_PATH="$SANDBOX_LD_LIBRARY_PATH"; fi; exec "$0" "$@"',
-    ...command,
-  ];
+  return [...buildSandboxWrapperPrefix(sandboxUserName), ...command];
+}
+
+const SANDBOX_WRAPPER_SCRIPT =
+  'umask 0; if [ -n "$SANDBOX_LD_LIBRARY_PATH" ]; then export LD_LIBRARY_PATH="$SANDBOX_LD_LIBRARY_PATH"; fi; exec "$0" "$@"';
+
+function buildSandboxWrapperPrefix(user: string): [string, ...string[]] {
+  return [SUDO_PATH, '--preserve-env', '-u', user, '--', 'sh', '-c', SANDBOX_WRAPPER_SCRIPT];
 }
 
 /**
@@ -89,9 +86,31 @@ export function wrapCommandWithSandboxUser(command: readonly [string, ...string[
  * custom runners a wrapped command, and a runner may forward it to another helper that wraps too;
  * a nested wrapper's inner `sudo` would run AS the sandbox user, which sudoers does not authorize,
  * so every test case of such a problem would fail only under delegation.
+ *
+ * Matches the wrapper prefix exactly rather than looking for `sudo` anywhere: a submission-derived
+ * command could otherwise carry a literal `/usr/bin/sudo` argument and skip wrapping entirely,
+ * which would run the submission as the trusted harness user.
  */
 export function isSandboxWrappedCommand(command: readonly string[]): boolean {
-  return command.includes(SUDO_PATH);
+  if (!sandboxUserName) return false;
+  const prefix = buildSandboxWrapperPrefix(sandboxUserName);
+  return prefix.every((argument, index) => command[index] === argument);
+}
+
+/**
+ * Insert `innerPrefix` (e.g. a `time` measurement prefix) so that it runs INSIDE the sandbox
+ * wrapper when `command` is wrapped, and simply in front otherwise. Prefixing a wrapped command
+ * from the outside would run `innerPrefix` as the trusted harness user while its arguments (such
+ * as an output path) point into a sandbox-writable directory, where a submission can plant a
+ * symlink and have the harness truncate an arbitrary file it owns.
+ */
+export function prependInsideSandboxWrapper(
+  command: readonly [string, ...string[]],
+  innerPrefix: readonly string[]
+): [string, ...string[]] {
+  if (!isSandboxWrappedCommand(command)) return [...innerPrefix, ...command] as [string, ...string[]];
+  const prefixLength = buildSandboxWrapperPrefix(sandboxUserName as string).length;
+  return [...command.slice(0, prefixLength), ...innerPrefix, ...command.slice(prefixLength)] as [string, ...string[]];
 }
 
 /**

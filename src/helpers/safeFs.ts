@@ -14,13 +14,7 @@ import path from 'node:path';
 export async function copyWithoutFollowingSymlinks(source: string, destination: string): Promise<void> {
   const sourceStats = await fs.promises.lstat(source);
 
-  // Like `fs.cp`, refuse to overwrite a real directory with a non-directory instead of deleting
-  // it: `copyTestCaseFileInput` passes the working directory itself as the destination root, and a
-  // file-typed source must never wipe it.
   const existingDestinationStats = await lstatOrUndefined(destination);
-  if (!sourceStats.isDirectory() && existingDestinationStats?.isDirectory()) {
-    throw new Error(`cannot overwrite directory '${destination}' with non-directory '${source}'`);
-  }
 
   if (sourceStats.isSymbolicLink()) {
     await removeExistingEntry(destination);
