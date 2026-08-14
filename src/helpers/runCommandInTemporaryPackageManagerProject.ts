@@ -84,8 +84,8 @@ const packageManagerInstallCommandResolvers = {
 
 const defaultOutputLimitBytes = 50 * 1024 * 1024;
 const killGracePeriodMilliseconds = 1000;
-// Long enough for the watchdog to fire and for the resulting `close` to arrive.
-const watchdogGraceMilliseconds = (SANDBOX_WATCHDOG_GRACE_SECONDS + 2) * 1000;
+// Added to the watchdog's own deadline so its kill has time to land and `close` to arrive.
+const watchdogSettleMarginMilliseconds = 2000;
 const timeCommand = resolveTimeCommand();
 
 /**
@@ -396,6 +396,7 @@ async function spawnWithInput(
   // has exhausted the PID cgroup, and a submission spawned first could exhaust it before this
   // watchdog exists. It is the deadline of last resort on this path.
   const watchdog = startSandboxTimeoutWatchdog(context.timeLimitSeconds);
+  const watchdogDeadlineAt = Date.now() + (Math.ceil(context.timeLimitSeconds) + SANDBOX_WATCHDOG_GRACE_SECONDS) * 1000;
   let subprocess: childProcess.ChildProcessWithoutNullStreams;
   try {
     subprocess = childProcess.spawn(spawnedCommand[0], spawnedCommand.slice(1), {
@@ -462,9 +463,10 @@ async function spawnWithInput(
     context.timeLimitSeconds * 1000 + killGracePeriodMilliseconds
   );
   killTimeout.unref();
-  // Bounds the wait after a kill failure: the watchdog force-kills the sandbox user shortly after
-  // the deadline, so `close` should arrive; if even that fails, give up rather than hang.
+  // Bounds the wait after a kill failure: the watchdog force-kills the sandbox user at its own
+  // deadline, so `close` should arrive; if even that fails, give up rather than hang.
   let killFailureTimeout: ReturnType<typeof setTimeout> | undefined;
+  let closeObserved = false;
 
   const { status, signal } = await new Promise<{ status: number | undefined; signal: NodeJS.Signals | undefined }>(
     (resolve, reject) => {
@@ -480,15 +482,19 @@ async function spawnWithInput(
         }
       };
       // Terminating the submission failed. Keep waiting: the watchdog (started before the
-      // submission) force-kills the sandbox user shortly after the deadline, so `close` still
-      // arrives and the caller's `finally` sweep and cleanup run. Only if that also fails to end
-      // the submission do we give up, so the run cannot hang indefinitely.
+      // submission) force-kills the sandbox user at its own deadline, so `close` still arrives and
+      // the run reports its real verdict. Give up only once that deadline has passed without the
+      // submission ending, so the run can neither hang nor abandon a still-running submission
+      // while its watchdog could still fire.
       onKillFailure = () => {
-        killFailureTimeout ??= setTimeout(() => {
-          if (settled) return;
-          settled = true;
-          reject(killError ?? new Error('failed to terminate the submission'));
-        }, killGracePeriodMilliseconds + watchdogGraceMilliseconds);
+        killFailureTimeout ??= setTimeout(
+          () => {
+            if (settled) return;
+            settled = true;
+            reject(killError ?? new Error('failed to terminate the submission'));
+          },
+          Math.max(0, watchdogDeadlineAt - Date.now()) + watchdogSettleMarginMilliseconds
+        );
       };
       subprocess.on('error', failAfterClose);
       subprocess.stdin.on('error', (error: NodeJS.ErrnoException) => {
@@ -497,9 +503,12 @@ async function spawnWithInput(
       subprocess.on('close', (code, closeSignal) => {
         if (settled) return;
         settled = true;
-        const error = pendingError ?? killError;
-        if (error) {
-          reject(error);
+        // The submission ended, so the watchdog has nothing left to kill and must not outlive this
+        // run. A kill that failed once but succeeded on retry (or was superseded by the watchdog)
+        // is not an error: the timeout/output-limit verdict below is the correct one to report.
+        closeObserved = true;
+        if (pendingError) {
+          reject(pendingError);
           return;
         }
         resolve({ status: code ?? undefined, signal: closeSignal ?? undefined });
@@ -510,9 +519,9 @@ async function spawnWithInput(
     clearTimeout(timeout);
     clearTimeout(killTimeout);
     if (killFailureTimeout) clearTimeout(killFailureTimeout);
-    // Leave a watchdog whose kill never landed running: cancelling it here would remove the only
-    // remaining mechanism able to stop the submission.
-    if (!killError) watchdog.cancel();
+    // Cancel unless the submission is still running after a failed kill: the watchdog is then the
+    // only remaining mechanism able to stop it, and cancelling would leave it running unchecked.
+    if (closeObserved || !killError) watchdog.cancel();
   });
 
   const { timeSeconds, memoryBytes } =
@@ -545,8 +554,9 @@ function killSubprocessGroup(subprocess: childProcess.ChildProcess, signal: Node
   // so go through sudo with the requested signal only; the callers' existing timers provide the
   // TERM → grace → KILL escalation.
   // Throws when the cleanup `sudo` cannot even be spawned (a submission can exhaust the PID
-  // cgroup). Callers must catch it — `killOrFailRun` settles the run so it cannot hang waiting for
-  // a `close` that a still-running submission will never emit.
+  // cgroup). Only `killOrRecordFailure` may call this: it records the failure and lets the
+  // watchdog (or, past its deadline, a bounded timer) settle the run instead of letting the throw
+  // escape an EventEmitter callback.
   if (sandboxUserName) {
     killSandboxUserProcesses([signal === 'SIGKILL' ? 'KILL' : 'TERM']);
     return;
