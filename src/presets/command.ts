@@ -12,6 +12,12 @@ import { parseArgs } from '../helpers/parseArgs.js';
 import { printDebugBanner } from '../helpers/printDebugBanner.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readOutputFiles } from '../helpers/readOutputFiles.js';
+import { runCustomRunner } from '../helpers/runCustomRunner.js';
+import {
+  getSandboxUserEnvOverrides,
+  makeAccessibleToSandboxUser,
+  wrapCommandWithSandboxUser,
+} from '../helpers/sandboxUser.js';
 import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases as readFileTestCases } from '../helpers/readTestCases.js';
 import {
@@ -71,9 +77,25 @@ export interface CommandJudgePresetOptions<
   limits?: CommandJudgeLimits;
   runTimeoutSeconds?: number;
   readTestCases?: (problemDir: string) => Promise<readonly TTestCase[]>;
+  /**
+   * Runs as the trusted harness user with the submission's `cwd`. Fixture files it creates there
+   * must be written with `createDirectoryWithoutFollowingSymlinks`/`writeFileWithoutFollowingSymlinks`
+   * (both exported): a submission can plant a symlink at a fixture path, and a plain `fs.writeFile`
+   * would follow it into a file only the harness can write.
+   */
   resolveInput?: (context: { testCase: TTestCase; cwd: string; env: NodeJS.ProcessEnv }) => Promise<string> | string;
   runCommand?: (context: {
     testCase: TTestCase;
+    /**
+     * The command to run. Under `EXERCODE_SANDBOX_USER` delegation it is already wrapped so it
+     * executes as the sandbox user; spawn it as given (with the supplied `env`) instead of
+     * reconstructing it, or the submission runs as the trusted harness user.
+     *
+     * Its direct child is then a root-owned `sudo` whose descendants belong to the sandbox user, so
+     * the handler cannot signal them: enforce `timeLimitSeconds` with `startSandboxTimeoutWatchdog`
+     * and `killSandboxUserProcesses` (both exported) rather than `child.kill()` or an outer
+     * `timeout`. The preset terminates leftover sandbox processes after the handler returns.
+     */
     command: readonly [string, ...string[]];
     stdin: string;
     cwd: string;
@@ -167,6 +189,9 @@ async function runCommandJudgeForCwd<
   params: JudgeParams,
   options: CommandJudgePresetOptions<TTestCase, TRunResult>
 ): Promise<{ allAccepted: boolean }> {
+  // The sandboxed submission must read its sources and write build/run outputs in its directory.
+  makeAccessibleToSandboxUser(cwd);
+
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
   const testCases = await (options.readTestCases ?? readCommandTestCases)(problemDir);
   const prebuildTestCaseId = testCases[0]?.id ?? 'prebuild';
@@ -262,14 +287,20 @@ async function runCommandJudgeForCwd<
       }
 
       runResult = options.runCommand
-        ? await options.runCommand({
-            testCase,
-            command,
-            stdin,
-            cwd,
-            env,
-            timeLimitSeconds,
-          })
+        ? await runCustomRunner(
+            () =>
+              // Hand custom runners a command that is already sandbox-wrapped, and the matching
+              // environment: they spawn it themselves, so an unwrapped command would run the
+              // submission as the trusted harness user and defeat the delegation boundary.
+              options.runCommand?.({
+                testCase,
+                command: wrapCommandWithSandboxUser(command),
+                stdin,
+                cwd,
+                env: { ...env, ...getSandboxUserEnvOverrides(env) },
+                timeLimitSeconds,
+              }) as Promise<TRunResult>
+          )
         : (runCommand(command, {
             stdin,
             cwd,

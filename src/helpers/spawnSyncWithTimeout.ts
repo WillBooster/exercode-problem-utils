@@ -1,8 +1,24 @@
 import child_process from 'node:child_process';
 import os from 'node:os';
 
+import {
+  getSandboxUserEnvOverrides,
+  killSandboxUserProcesses,
+  sandboxUserName,
+  startSandboxTimeoutWatchdog,
+  TIMEOUT_COMMAND,
+  wrapCommandWithSandboxUser,
+} from './sandboxUser.js';
+
 const TIME_COMMAND = [os.platform() === 'darwin' ? 'gtime' : '/usr/bin/time', '--format', '%e %M'] as const;
 
+/**
+ * Run an untrusted (submission-derived) command with a timeout. When a judge server delegates
+ * untrusted execution via `EXERCODE_SANDBOX_USER` (see `sandboxUser.ts`), the whole command,
+ * including `timeout`, runs as the sandbox user so the timer can signal the sandboxed process; a
+ * harness-owned watchdog enforces the deadline even if the submission kills its own `timeout`, and
+ * leftover sandbox processes (e.g. daemonized children) are killed after every run.
+ */
 export function spawnSyncWithTimeout(
   command: string,
   args: readonly string[],
@@ -11,11 +27,29 @@ export function spawnSyncWithTimeout(
 ): child_process.SpawnSyncReturns<string> & { timeSeconds: number; memoryBytes: number } {
   const startTimeMilliseconds = Date.now();
 
-  const spawnResult = child_process.spawnSync(
-    'timeout',
-    [timeoutSeconds.toFixed(3), ...TIME_COMMAND, command, ...args],
-    options
-  );
+  const env = { ...(options.env ?? process.env) };
+  const wrappedCommand = wrapCommandWithSandboxUser([
+    TIMEOUT_COMMAND,
+    timeoutSeconds.toFixed(3),
+    ...TIME_COMMAND,
+    command,
+    ...args,
+  ]);
+  const watchdog = startSandboxTimeoutWatchdog(timeoutSeconds);
+  let spawnResult: child_process.SpawnSyncReturns<string>;
+  let watchdogFired: boolean;
+  try {
+    spawnResult = child_process.spawnSync(wrappedCommand[0], wrappedCommand.slice(1), {
+      ...options,
+      env: { ...env, ...getSandboxUserEnvOverrides(env) },
+    });
+  } finally {
+    // Read the watchdog state before cancelling, then always cancel: a leaked watchdog is detached
+    // and would SIGKILL a later request's submission.
+    watchdogFired = watchdog.fired();
+    watchdog.cancel();
+    if (sandboxUserName) killSandboxUserProcesses();
+  }
 
   const stopTimeMilliseconds = Date.now();
 
@@ -24,8 +58,10 @@ export function spawnSyncWithTimeout(
   const timeSeconds = Number(match?.[1]) || (stopTimeMilliseconds - startTimeMilliseconds) / 1000;
   const memoryBytes = Number(match?.[2]) * 1024 || 0;
 
-  // timeout
-  if (spawnResult.status === 124) {
+  // `timeout` reports 124, but a sandboxed submission can kill its own same-UID `timeout` and be
+  // stopped by the watchdog instead, which surfaces as a signal-derived status. Both are timeouts:
+  // reporting the latter as a runtime error would mislabel a submission that outran its deadline.
+  if (spawnResult.status === 124 || watchdogFired) {
     return { ...spawnResult, status: 0, stderr, timeSeconds: timeoutSeconds + 1e-3, memoryBytes };
   }
 

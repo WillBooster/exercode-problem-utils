@@ -11,7 +11,8 @@ import { findLanguageDefinitionByPath } from '../helpers/findLanguageDefinitionB
 import { judgeByStaticAnalysis } from '../helpers/judgeByStaticAnalysis.js';
 import { parseArgs } from '../helpers/parseArgs.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
-import { readOutputFiles } from '../helpers/readOutputFiles.js';
+import { isSafeSubmissionOutputPath, readOutputFiles } from '../helpers/readOutputFiles.js';
+import { makeAccessibleToSandboxUser } from '../helpers/sandboxUser.js';
 import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases } from '../helpers/readTestCases.js';
 import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
@@ -56,6 +57,9 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
   const args = parseArgs(process.argv);
   if (!args.cwd) throw new Error('cwd argument required');
   const params = judgeParamsSchema.parse(args.params);
+
+  // The sandboxed submission must read its sources and write build/run outputs in its directory.
+  makeAccessibleToSandboxUser(args.cwd);
 
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
   const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
@@ -207,7 +211,10 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
         const direntRelativePath = path.relative(testCase.fileOutputPath, dirent.parentPath);
         const expected = await fs.promises.readFile(path.join(dirent.parentPath, dirent.name));
         try {
-          const received = await fs.promises.readFile(path.join(args.cwd, direntRelativePath, dirent.name));
+          const receivedPath = path.join(args.cwd, direntRelativePath, dirent.name);
+          // A submission-planted symlink to the expected file itself would otherwise compare equal.
+          if (!(await isSafeSubmissionOutputPath(args.cwd, receivedPath))) throw new Error('unsafe output path');
+          const received = await fs.promises.readFile(receivedPath);
           if (received.compare(expected) !== 0) decisionCode = DecisionCode.WRONG_ANSWER;
         } catch (error) {
           console.error(error);
@@ -255,6 +262,9 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
   const args = parseArgs(process.argv);
   if (!args.cwd) throw new Error('cwd argument required');
   const params = debugParamsSchema.parse(args.params);
+
+  // The sandboxed submission must read its sources and write build/run outputs in its directory.
+  makeAccessibleToSandboxUser(args.cwd);
 
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
 
