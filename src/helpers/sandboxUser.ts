@@ -12,7 +12,8 @@ import os from 'node:os';
  * absent or empty (local development, course authoring, or an all-sandbox judge run), commands run
  * as the current user like before.
  *
- * Contract for the delegating judge server:
+ * Contract for the delegating judge server (delegation is Linux-only — sudo user separation and
+ * `/home/<user>` homes are provisioned in the judge Docker image; never set this on macOS):
  * - The harness process environment is forwarded verbatim to sandboxed submissions (sudo runs with
  *   `--preserve-env`), so it must not contain secrets beyond what submissions may see.
  * - sudoers must let the harness user run arbitrary commands as the sandbox user without a

@@ -14,6 +14,14 @@ import path from 'node:path';
 export async function copyWithoutFollowingSymlinks(source: string, destination: string): Promise<void> {
   const sourceStats = await fs.promises.lstat(source);
 
+  // Like `fs.cp`, refuse to overwrite a real directory with a non-directory instead of deleting
+  // it: `copyTestCaseFileInput` passes the working directory itself as the destination root, and a
+  // file-typed source must never wipe it.
+  const existingDestinationStats = await lstatOrUndefined(destination);
+  if (!sourceStats.isDirectory() && existingDestinationStats?.isDirectory()) {
+    throw new Error(`cannot overwrite directory '${destination}' with non-directory '${source}'`);
+  }
+
   if (sourceStats.isSymbolicLink()) {
     await removeExistingEntry(destination);
     await fs.promises.symlink(await fs.promises.readlink(source), destination);
@@ -21,10 +29,9 @@ export async function copyWithoutFollowingSymlinks(source: string, destination: 
   }
 
   if (sourceStats.isDirectory()) {
-    const destinationStats = await lstatOrUndefined(destination);
     // A pre-existing symlink (or file) at the destination is removed so the merge target is a real
     // directory the harness owns, not something the submission redirected.
-    if (!destinationStats?.isDirectory()) await removeExistingEntry(destination);
+    if (!existingDestinationStats?.isDirectory()) await removeExistingEntry(destination);
     await fs.promises.mkdir(destination, { recursive: true });
     for (const entry of await fs.promises.readdir(source)) {
       await copyWithoutFollowingSymlinks(path.join(source, entry), path.join(destination, entry));
