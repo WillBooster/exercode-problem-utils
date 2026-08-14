@@ -1,7 +1,10 @@
-import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { DecisionCode } from '@exercode/problem-utils';
+import {
+  createDirectoryWithoutFollowingSymlinks,
+  DecisionCode,
+  writeFileWithoutFollowingSymlinks,
+} from '@exercode/problem-utils';
 import { commandJudgePreset } from '@exercode/problem-utils/presets/command';
 
 interface FixtureInput {
@@ -46,7 +49,7 @@ await commandJudgePreset<CommandExampleTestCase>(import.meta.dirname, {
     })),
   resolveInput: async ({ testCase, cwd }) => {
     const inputDirectoryPath = path.join(cwd, FIXTURE_ROOT, testCase.id);
-    await writeFixtureFiles(inputDirectoryPath, testCase.fixtureInput);
+    await writeFixtureFiles(cwd, inputDirectoryPath, testCase.fixtureInput);
     return path.relative(cwd, inputDirectoryPath);
   },
   test: ({ runResult, testCase }) => {
@@ -73,9 +76,12 @@ function toTokens(value: string): string[] {
     .filter((token) => token.length > 0);
 }
 
-async function writeFixtureFiles(basePath: string, files: FixtureInput): Promise<void> {
-  await fs.mkdir(basePath, { recursive: true });
+// This runs as the trusted harness user while `cwd` belongs to the submission, so it must not
+// follow a symlink the submission planted at a fixture path (or at one of its parents) — that
+// would hand the submission a write to a file only the harness can reach.
+async function writeFixtureFiles(cwd: string, basePath: string, files: FixtureInput): Promise<void> {
+  await createDirectoryWithoutFollowingSymlinks(cwd, basePath);
   for (const [fileName, content] of Object.entries(files)) {
-    await fs.writeFile(path.join(basePath, fileName), content);
+    await writeFileWithoutFollowingSymlinks(path.join(basePath, fileName), content);
   }
 }

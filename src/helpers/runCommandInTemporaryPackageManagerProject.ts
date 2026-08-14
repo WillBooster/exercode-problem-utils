@@ -358,6 +358,9 @@ export async function copyPackageManagerProjectFiles(options: {
 
 async function copyPathIfExists(sourcePath: string, destinationPath: string, runDir: string): Promise<void> {
   try {
+    // Before touching the destination: creating the parent levels replaces whatever the submission
+    // put there, which must not happen for a project file the problem does not even ship.
+    await fs.lstat(sourcePath);
     // No-follow copy: the destination was seeded from the (sandbox-writable) submission tree, so a
     // planted symlink there — at the destination itself or at any directory level of a nested
     // project file path — must not redirect this trusted project-file overlay outside runDir.
@@ -581,6 +584,10 @@ function killSubprocessGroup(subprocess: childProcess.ChildProcess, signal: Node
   }
 }
 
+function isErrorWithCode(error: unknown, code: string): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && (error as { code: unknown }).code === code;
+}
+
 async function readTimeResult(timeOutputPath: string): Promise<{ timeSeconds: number; memoryBytes: number }> {
   // The submission owns this directory and can put anything at this path, so decide what was
   // opened from the handle itself rather than from a prior `lstat` it could race:
@@ -589,6 +596,10 @@ async function readTimeResult(timeOutputPath: string): Promise<{ timeSeconds: nu
   //   time and memory usage;
   // - `O_NONBLOCK` keeps a planted FIFO from blocking the harness forever waiting for a writer;
   // - the `fstat` then rejects anything that is not a regular file.
+  //
+  // Only an absent file means "no measurement" (the command was killed before `time` wrote one).
+  // Anything else at this path is the submission tampering with its own accounting — reporting zero
+  // memory would let it slip past a memory limit — so that fails the run instead.
   let content: string;
   let fileHandle: Awaited<ReturnType<typeof fs.open>> | undefined;
   try {
@@ -597,11 +608,11 @@ async function readTimeResult(timeOutputPath: string): Promise<{ timeSeconds: nu
       nodeFs.constants.O_RDONLY | nodeFs.constants.O_NOFOLLOW | nodeFs.constants.O_NONBLOCK
     );
     const stats = await fileHandle.stat();
-    if (!stats.isFile()) return { timeSeconds: 0, memoryBytes: 0 };
+    if (!stats.isFile()) throw new Error(`${timeOutputPath} is not a regular file`);
     content = await fileHandle.readFile('utf8');
-  } catch {
-    // Whatever the submission swapped in, there is no measurement to report.
-    return { timeSeconds: 0, memoryBytes: 0 };
+  } catch (error) {
+    if (isErrorWithCode(error, 'ENOENT')) return { timeSeconds: 0, memoryBytes: 0 };
+    throw new Error(`failed to read the time measurement at ${timeOutputPath}`, { cause: error });
   } finally {
     await fileHandle?.close();
   }

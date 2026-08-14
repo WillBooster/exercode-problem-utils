@@ -68,6 +68,18 @@ async function removeExistingEntry(target: string): Promise<void> {
   await forceRemove(target);
 }
 
+/**
+ * Write `data` to `filePath` without following a symlink already there. `fs.writeFile` follows one,
+ * so a sandboxed submission could point a file the harness is about to write (a generated project
+ * file, a fixture) at something only the harness can reach and have it overwritten. Trusted
+ * callbacks that create files inside a submission directory must use this instead.
+ */
+export async function writeFileWithoutFollowingSymlinks(filePath: string, data: string | Uint8Array): Promise<void> {
+  await removeExistingEntry(filePath);
+  // `wx` fails rather than following a symlink planted between the removal and the write.
+  await fs.promises.writeFile(filePath, data, { flag: 'wx' });
+}
+
 /** Whether `realTargetPath` is `realDirectoryPath` itself or below it. Both must be realpaths. */
 export function isContainedPath(realDirectoryPath: string, realTargetPath: string): boolean {
   const relativePath = path.relative(realDirectoryPath, realTargetPath);

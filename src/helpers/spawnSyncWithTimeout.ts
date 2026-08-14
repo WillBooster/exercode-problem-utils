@@ -6,6 +6,7 @@ import {
   killSandboxUserProcesses,
   sandboxUserName,
   startSandboxTimeoutWatchdog,
+  TIMEOUT_COMMAND,
   wrapCommandWithSandboxUser,
 } from './sandboxUser.js';
 
@@ -28,7 +29,7 @@ export function spawnSyncWithTimeout(
 
   const env = { ...(options.env ?? process.env) };
   const wrappedCommand = wrapCommandWithSandboxUser([
-    'timeout',
+    TIMEOUT_COMMAND,
     timeoutSeconds.toFixed(3),
     ...TIME_COMMAND,
     command,

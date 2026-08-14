@@ -24,6 +24,7 @@ import {
   makeAccessibleToSandboxUser,
   sandboxUserName,
   startSandboxTimeoutWatchdog,
+  TIMEOUT_COMMAND,
   wrapCommandWithSandboxUser,
 } from '../helpers/sandboxUser.js';
 import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
@@ -86,10 +87,24 @@ export interface GuiCommandJudgePresetOptions<TTestCase extends BaseGuiTestCase 
   readTestCases?: (problemDir: string) => Promise<readonly TTestCase[]>;
   prepare?: (context: {
     cwd: string;
+    /**
+     * Build the submission with it. Under `EXERCODE_SANDBOX_USER` delegation it already carries the
+     * sandbox user's overrides, but the handler must still wrap whatever it spawns with
+     * `wrapCommandWithSandboxUser` (both exported): a build runs the submission's own scripts
+     * (`package.json` lifecycle scripts, `build.gradle`, `build.rs`), which as the trusted harness
+     * user could read the problem's test cases and rewrite the harness. The preset terminates
+     * leftover sandbox processes after the handler returns.
+     */
     env: NodeJS.ProcessEnv;
     mainFilePath: string;
     problemMarkdownFrontMatter: ProblemMarkdownFrontMatter;
   }) => Promise<Partial<GuiJudgeCaseResult> | undefined> | Partial<GuiJudgeCaseResult> | undefined;
+  /**
+   * Runs as the trusted harness user with the submission's `cwd`. Fixture files it creates there
+   * must be written with `createDirectoryWithoutFollowingSymlinks`/`writeFileWithoutFollowingSymlinks`
+   * (both exported): a submission can plant a symlink at a fixture path, and a plain `fs.writeFile`
+   * would follow it into a file only the harness can write.
+   */
   resolveInput?: (context: { testCase: TTestCase; cwd: string; env: NodeJS.ProcessEnv }) => Promise<string> | string;
   command?: (context: {
     testCase: TTestCase;
@@ -231,12 +246,15 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
   }
 
   const prepareResult =
-    (await options.prepare?.({
-      cwd: args.cwd,
-      env,
-      mainFilePath: resolvedMainFilePath,
-      problemMarkdownFrontMatter,
-    })) ??
+    (options.prepare &&
+      (await runCustomRunner(() =>
+        options.prepare?.({
+          cwd: submissionDir,
+          env: { ...env, ...getSandboxUserEnvOverrides(env) },
+          mainFilePath: resolvedMainFilePath,
+          problemMarkdownFrontMatter,
+        })
+      ))) ??
     runDefaultPrepare({
       cwd: args.cwd,
       env,
@@ -499,7 +517,7 @@ async function spawnGuiProgram(context: {
   stopDetectionThreshold: number;
 }): Promise<GuiCommandRunResult> {
   const wrappedCommand = wrapCommandWithSandboxUser([
-    'timeout',
+    TIMEOUT_COMMAND,
     context.timeLimitSeconds.toFixed(3),
     ...TIME_COMMAND,
     ...context.command,

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { removeCommentsInSourceCode } from '../helpers/removeCommentsInSourceCode.js';
+import { writeFileWithoutFollowingSymlinks } from '../helpers/safeFs.js';
 
 export interface LanguageDefinition {
   /** File extensions to judge with this config. */
@@ -58,7 +59,9 @@ export const languageIdToDefinition: Readonly<Record<string, Readonly<LanguageDe
   csharp: {
     fileExtensions: ['.cs'],
     prebuild: async (cwd) => {
-      await fs.promises.writeFile(
+      // No-follow write: the submission owns `cwd` and could point `Main.csproj` at a file only the
+      // trusted harness user can write.
+      await writeFileWithoutFollowingSymlinks(
         path.join(cwd, 'Main.csproj'),
         `<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>

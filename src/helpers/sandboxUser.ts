@@ -54,7 +54,9 @@ export function getTrustedHelperEnv(extraEnv?: NodeJS.ProcessEnv): NodeJS.Proces
   // pinning `PATH` would only break setups whose X11/`ps` binaries live elsewhere (e.g. /usr/games,
   // /snap/bin, Nix). Keep the inherited environment there, exactly as before delegation existed.
   if (!sandboxUserName) return { ...process.env, ...extraEnv };
-  return { ...MINIMAL_ENV, ...extraEnv };
+  // `PATH` last: a caller passing a whole environment through would otherwise reinstate the
+  // submission-influenced one this function exists to replace.
+  return { ...extraEnv, PATH: MINIMAL_ENV.PATH };
 }
 
 export const sandboxUserName = process.env[SANDBOX_USER_ENV_NAME] || undefined;
@@ -66,6 +68,14 @@ if (sandboxUserName && sandboxUserName === os.userInfo().username) {
     `${SANDBOX_USER_ENV_NAME} must name a different OS user than the one running the harness (got "${sandboxUserName}"). Leave it unset to run everything as the current user.`
   );
 }
+
+/**
+ * The deadline supervisor. Absolute under delegation: the wrapper's `exec "$0"` resolves it through
+ * the submission's own `PATH` (which a judge server may set via {@link SANDBOX_ENV_PREFIX}), so a
+ * bare name would let a submission replace the very process that enforces its time limit. The bare
+ * name is kept without delegation, where `timeout` may live elsewhere (Homebrew coreutils).
+ */
+export const TIMEOUT_COMMAND = sandboxUserName ? '/usr/bin/timeout' : 'timeout';
 
 /**
  * Wrap a command so it runs as the sandbox user. `umask 0` makes every file the sandboxed process

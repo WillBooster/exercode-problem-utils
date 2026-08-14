@@ -77,6 +77,12 @@ export interface CommandJudgePresetOptions<
   limits?: CommandJudgeLimits;
   runTimeoutSeconds?: number;
   readTestCases?: (problemDir: string) => Promise<readonly TTestCase[]>;
+  /**
+   * Runs as the trusted harness user with the submission's `cwd`. Fixture files it creates there
+   * must be written with `createDirectoryWithoutFollowingSymlinks`/`writeFileWithoutFollowingSymlinks`
+   * (both exported): a submission can plant a symlink at a fixture path, and a plain `fs.writeFile`
+   * would follow it into a file only the harness can write.
+   */
   resolveInput?: (context: { testCase: TTestCase; cwd: string; env: NodeJS.ProcessEnv }) => Promise<string> | string;
   runCommand?: (context: {
     testCase: TTestCase;
