@@ -37,7 +37,9 @@ export async function isSafeSubmissionOutputPath(cwd: string, filePath: string):
   try {
     const realFilePath = await fs.promises.realpath(filePath);
     const realCwd = await fs.promises.realpath(cwd);
-    return !path.relative(realCwd, realFilePath).startsWith('..');
+    const relativePath = path.relative(realCwd, realFilePath);
+    // A bare `..`-prefix test would also reject an in-directory name like `..result`.
+    return relativePath !== '..' && !relativePath.startsWith(`..${path.sep}`) && !path.isAbsolute(relativePath);
   } catch {
     return false;
   }

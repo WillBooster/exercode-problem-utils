@@ -15,9 +15,13 @@ import fs from 'node:fs';
  * - The harness process environment is forwarded verbatim to sandboxed submissions (sudo runs with
  *   `--preserve-env`), so it must not contain secrets beyond what submissions may see.
  * - sudoers must let the harness user run arbitrary commands as the sandbox user without a
- *   password and pass the environment through (e.g. `Defaults:<harness> !env_reset, !env_delete,
- *   !env_check, !secure_path` plus `<harness> ALL=(<sandbox>) NOPASSWD:SETENV: ALL`).
- * - The sandbox user's home directory must exist at `/home/<sandbox user>` and be writable.
+ *   password, pass the environment through, and keep sudo off a pseudo-terminal (a pty would merge
+ *   stderr into stdout and CRLF-mangle output when the harness happens to run from a terminal):
+ *   e.g. `Defaults:<harness> !env_reset, !env_delete, !env_check, !secure_path, !use_pty` plus
+ *   `<harness> ALL=(<sandbox>) NOPASSWD:SETENV: ALL`.
+ * - The sandbox user's home directory must exist at `/home/<sandbox user>` and be writable. It is
+ *   shared across sequential requests, so the server is responsible for resetting whatever
+ *   cross-request persistence there matters to it.
  */
 export const SANDBOX_USER_ENV_NAME = 'EXERCODE_SANDBOX_USER';
 
@@ -25,6 +29,7 @@ export const SANDBOX_USER_ENV_NAME = 'EXERCODE_SANDBOX_USER';
 // harness user executes (`sudo` is also setuid and must be the real one).
 const SUDO_PATH = '/usr/bin/sudo';
 const CHMOD_PATH = '/bin/chmod';
+const SLEEP_PATH = '/bin/sleep';
 // Minimal environment for trusted helper processes; never forward the harness environment to them.
 const MINIMAL_ENV = { PATH: '/usr/local/bin:/usr/bin:/bin' } as const;
 
@@ -117,7 +122,7 @@ export function startSandboxTimeoutWatchdog(timeoutSeconds: number): () => void 
   const deadlineSeconds = Math.ceil(timeoutSeconds) + 5;
   const watchdog = child_process.spawn(
     '/bin/sh',
-    ['-c', `sleep ${deadlineSeconds}; ${SUDO_PATH} -u "$1" pkill -KILL -u "$1"`, 'sh', sandboxUserName],
+    ['-c', `${SLEEP_PATH} ${deadlineSeconds}; ${SUDO_PATH} -u "$1" pkill -KILL -u "$1"`, 'sh', sandboxUserName],
     { detached: true, stdio: 'ignore', env: MINIMAL_ENV }
   );
   watchdog.unref();
