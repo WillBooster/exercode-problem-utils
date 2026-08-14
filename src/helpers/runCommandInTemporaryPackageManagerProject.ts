@@ -576,23 +576,22 @@ function killSubprocessGroup(subprocess: childProcess.ChildProcess, signal: Node
 }
 
 async function readTimeResult(timeOutputPath: string): Promise<{ timeSeconds: number; memoryBytes: number }> {
-  // The submission owns this directory and can put anything at this path. Anything but a regular
-  // file means there is no measurement to read — and opening a FIFO without `O_NONBLOCK` would
-  // block the harness forever waiting for a writer.
-  try {
-    const stats = await fs.lstat(timeOutputPath);
-    if (!stats.isFile()) return { timeSeconds: 0, memoryBytes: 0 };
-  } catch {
-    return { timeSeconds: 0, memoryBytes: 0 };
-  }
-
+  // The submission owns this directory and can put anything at this path, so decide what was
+  // opened from the handle itself rather than from a prior `lstat` it could race:
+  // - `O_NOFOLLOW` refuses a symlink to a harness-readable file (e.g. the problem's expected
+  //   outputs), which would otherwise report that file's trailing numbers as the submission's own
+  //   time and memory usage;
+  // - `O_NONBLOCK` keeps a planted FIFO from blocking the harness forever waiting for a writer;
+  // - the `fstat` then rejects anything that is not a regular file.
   let content: string;
   let fileHandle: Awaited<ReturnType<typeof fs.open>> | undefined;
   try {
-    // `O_NOFOLLOW` closes the lstat/open race: the submission can swap in a symlink to a
-    // harness-readable file (e.g. the problem's expected outputs) and have the two numbers at its
-    // tail reported back as its own time and memory usage.
-    fileHandle = await fs.open(timeOutputPath, nodeFs.constants.O_RDONLY | nodeFs.constants.O_NOFOLLOW);
+    fileHandle = await fs.open(
+      timeOutputPath,
+      nodeFs.constants.O_RDONLY | nodeFs.constants.O_NOFOLLOW | nodeFs.constants.O_NONBLOCK
+    );
+    const stats = await fileHandle.stat();
+    if (!stats.isFile()) return { timeSeconds: 0, memoryBytes: 0 };
     content = await fileHandle.readFile('utf8');
   } catch {
     // Whatever the submission swapped in, there is no measurement to report.
