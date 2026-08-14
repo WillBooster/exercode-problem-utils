@@ -21,6 +21,9 @@ import os from 'node:os';
  *   stderr into stdout and CRLF-mangle output when the harness happens to run from a terminal):
  *   e.g. `Defaults:<harness> !env_reset, !env_delete, !env_check, !secure_path, !use_pty` plus
  *   `<harness> ALL=(<sandbox>) NOPASSWD:SETENV: ALL`.
+ * - Variables meant for the submitted program rather than for the harness must be passed under
+ *   {@link SANDBOX_ENV_PREFIX}; problem-utils strips that prefix when it builds a submission's
+ *   environment.
  * - The sandbox user's home directory must exist at `/home/<sandbox user>` and be writable. It is
  *   shared across sequential requests, so the server is responsible for resetting whatever
  *   cross-request persistence there matters to it.
@@ -121,11 +124,32 @@ export function prependInsideSandboxWrapper(
  */
 export function getSandboxUserEnvOverrides(env?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   if (!sandboxUserName) return {};
-  const ldLibraryPath = env?.LD_LIBRARY_PATH ?? process.env.LD_LIBRARY_PATH;
+  const sourceEnv = env ?? process.env;
+  const ldLibraryPath = sourceEnv.LD_LIBRARY_PATH ?? process.env.LD_LIBRARY_PATH;
   return {
     HOME: `/home/${sandboxUserName}`,
     ...(ldLibraryPath && { SANDBOX_LD_LIBRARY_PATH: ldLibraryPath }),
+    ...unwrapSubmissionOnlyEnv(sourceEnv),
   };
+}
+
+/**
+ * Prefix under which a delegating judge server passes variables that belong to the submitted
+ * program alone. Applying a request's variables to the harness itself would let a submission point
+ * e.g. `PATH` or `NODE_OPTIONS` at its own files and get code executed as the trusted harness user,
+ * so the server prefixes them and problem-utils strips the prefix back off here, where the
+ * environment of a sandboxed submission is built.
+ */
+export const SANDBOX_ENV_PREFIX = 'SANDBOX_ENV_';
+
+function unwrapSubmissionOnlyEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const unwrapped: NodeJS.ProcessEnv = {};
+  for (const [name, value] of Object.entries(env)) {
+    if (!name.startsWith(SANDBOX_ENV_PREFIX)) continue;
+    const unwrappedName = name.slice(SANDBOX_ENV_PREFIX.length);
+    if (unwrappedName) unwrapped[unwrappedName] = value;
+  }
+  return unwrapped;
 }
 
 /**
