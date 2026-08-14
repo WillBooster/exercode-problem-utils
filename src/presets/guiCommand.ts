@@ -606,8 +606,10 @@ async function spawnGuiProgram(context: {
     }
     // A submission can kill its own same-UID `timeout` and be stopped by the watchdog instead,
     // which surfaces as a SIGKILL rather than a deadline. Report that as the timeout it is, not as
-    // the runtime error the signal would otherwise imply.
-    const watchdogFired = watchdog.fired();
+    // the runtime error the signal would otherwise imply — but only when the child's fate is what
+    // decided the verdict. A `stable_screenshot` (or the loop's own `timeout`) was already decided
+    // from the screenshots, so the watchdog must not overwrite it.
+    const watchdogFired = stopReason === 'process_exit' && watchdog.fired();
     await stopProcess(child);
     if (spawnError) throw spawnError;
     const {
