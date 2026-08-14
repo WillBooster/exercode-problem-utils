@@ -504,12 +504,24 @@ async function spawnGuiProgram(context: {
     ...TIME_COMMAND,
     ...context.command,
   ]);
-  const child = childProcess.spawn(wrappedCommand[0], wrappedCommand.slice(1), {
-    cwd: context.cwd,
-    env: { ...context.env, ...getSandboxUserEnvOverrides(context.env) },
-    detached: process.platform !== 'win32',
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
+  // A submission can signal its own sandboxed `timeout` and then wedge the event loop (e.g.
+  // XGrabServer makes the synchronous `xwininfo`/`maim` block), so a harness-owned watchdog
+  // force-kills the sandbox user at the deadline; killing the client also releases its X grab.
+  // Armed before the submission starts: a submission that exhausts the PID cgroup would otherwise
+  // prevent the watchdog from spawning at all.
+  const watchdog = startSandboxTimeoutWatchdog(context.timeLimitSeconds);
+  let child: childProcess.ChildProcessWithoutNullStreams;
+  try {
+    child = childProcess.spawn(wrappedCommand[0], wrappedCommand.slice(1), {
+      cwd: context.cwd,
+      env: { ...context.env, ...getSandboxUserEnvOverrides(context.env) },
+      detached: process.platform !== 'win32',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+  } catch (error) {
+    watchdog.cancel();
+    throw error;
+  }
 
   child.stdout.setEncoding('utf8');
   child.stderr.setEncoding('utf8');
@@ -519,15 +531,11 @@ async function spawnGuiProgram(context: {
   let exitCode: number | undefined;
   let spawnError: Error | undefined;
   let stopReason: GuiCommandRunResult['stopReason'] = 'process_exit';
+  let submissionStopped = false;
   const screenshotSignaturesHistory: string[][] = [];
   let screenshots: GuiScreenshotFile[] = [];
   const startTimeSeconds = Date.now() / 1000;
   let sampledMemoryBytes = 0;
-  // A submission can signal its own sandboxed `timeout` and then wedge the event loop (e.g.
-  // XGrabServer makes the synchronous `xwininfo`/`maim` block), so a harness-owned watchdog
-  // force-kills the sandbox user at the deadline; killing the client also releases its X grab.
-  const watchdog = startSandboxTimeoutWatchdog(context.timeLimitSeconds);
-
   child.stdout.on('data', (chunk: string) => {
     stdout += chunk;
   });
@@ -611,6 +619,7 @@ async function spawnGuiProgram(context: {
     // from the screenshots, so the watchdog must not overwrite it.
     const watchdogFired = stopReason === 'process_exit' && watchdog.fired();
     await stopProcess(child);
+    submissionStopped = true;
     if (spawnError) throw spawnError;
     const {
       memoryBytes,
@@ -629,7 +638,10 @@ async function spawnGuiProgram(context: {
       stopReason: watchdogFired ? 'timeout' : stopReason,
     };
   } finally {
-    watchdog.cancel();
+    // Only once the submission is demonstrably stopped: if termination itself failed (or never ran
+    // because a helper threw), the watchdog is the only thing left able to end it, and cancelling
+    // would leave it running unchecked.
+    if (submissionStopped) watchdog.cancel();
   }
 }
 

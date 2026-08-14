@@ -1,6 +1,7 @@
 import child_process from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
+import path from 'node:path';
 
 /**
  * Name of the environment variable through which a judge server tells problem-utils to run
@@ -14,8 +15,11 @@ import os from 'node:os';
  *
  * Contract for the delegating judge server (delegation is Linux-only — sudo user separation and
  * `/home/<user>` homes are provisioned in the judge Docker image; never set this on macOS):
- * - The harness process environment is forwarded verbatim to sandboxed submissions (sudo runs with
- *   `--preserve-env`), so it must not contain secrets beyond what submissions may see.
+ * - The harness process environment is forwarded to sandboxed submissions (sudo runs with
+ *   `--preserve-env`), so it must not contain secrets beyond what submissions may see. The one
+ *   exception is the set glibc strips when executing the setuid `sudo` (secure-execution mode:
+ *   `LD_*`, `TMPDIR`, `LOCPATH`, `NLSPATH`, `TZDIR`, … — see ld.so(8)); no sudoers setting can
+ *   recover those, and only `LD_LIBRARY_PATH` is restored, by the wrapper below.
  * - sudoers must let the harness user run arbitrary commands as the sandbox user without a
  *   password, pass the environment through, and keep sudo off a pseudo-terminal (a pty would merge
  *   stderr into stdout and CRLF-mangle output when the harness happens to run from a terminal):
@@ -125,11 +129,14 @@ export function prependInsideSandboxWrapper(
 export function getSandboxUserEnvOverrides(env?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   if (!sandboxUserName) return {};
   const sourceEnv = env ?? process.env;
-  const ldLibraryPath = sourceEnv.LD_LIBRARY_PATH ?? process.env.LD_LIBRARY_PATH;
+  const submissionOnlyEnv = unwrapSubmissionOnlyEnv(sourceEnv);
+  // A submission-only `LD_LIBRARY_PATH` must be the one smuggled past the exec, not the harness's.
+  const ldLibraryPath = submissionOnlyEnv.LD_LIBRARY_PATH ?? sourceEnv.LD_LIBRARY_PATH ?? process.env.LD_LIBRARY_PATH;
   return {
     HOME: `/home/${sandboxUserName}`,
+    ...submissionOnlyEnv,
+    // Last: the wrapper reads this one, so a caller must not be able to overwrite it.
     ...(ldLibraryPath && { SANDBOX_LD_LIBRARY_PATH: ldLibraryPath }),
-    ...unwrapSubmissionOnlyEnv(sourceEnv),
   };
 }
 
@@ -270,7 +277,10 @@ function runAsSandboxUser(command: [string, ...string[]]): child_process.SpawnSy
 
 /**
  * `fs.rm`-like removal with a fallback for trees holding sandbox-user-owned entries whose
- * permissions block deletion: let the sandbox user reopen its own files first, then retry.
+ * permissions block deletion: let the sandbox user reopen its own files first, then retry. The
+ * containing directory is relaxed as well — unlinking an entry needs write permission on its
+ * parent, so a submission that chmods a directory it owns would otherwise make everything inside it
+ * undeletable.
  */
 export async function forceRemove(targetPath: string): Promise<void> {
   try {
@@ -278,6 +288,8 @@ export async function forceRemove(targetPath: string): Promise<void> {
   } catch (error) {
     if (!sandboxUserName) throw error;
     relaxPermissionsAsSandboxUser(targetPath);
+    // Not recursive: only the containing directory's own write bit governs the unlink.
+    runAsSandboxUser(['chmod', 'a+rwX', path.dirname(targetPath)]);
     await fs.promises.rm(targetPath, { force: true, recursive: true });
   }
 }

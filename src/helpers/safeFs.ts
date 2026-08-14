@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { forceRemove } from './sandboxUser.js';
+
 /**
  * Recursively copy `source` into `destination` without ever following a symlink that already
  * exists at a destination path. A sandboxed submission (running as a different OS user) can plant
@@ -13,6 +15,8 @@ import path from 'node:path';
  */
 export async function copyWithoutFollowingSymlinks(source: string, destination: string): Promise<void> {
   const sourceStats = await fs.promises.lstat(source);
+  // `fs.cp` creates missing destination parents; `copyFile`/`symlink` would fail with ENOENT.
+  await fs.promises.mkdir(path.dirname(destination), { recursive: true });
 
   if (sourceStats.isSymbolicLink()) {
     await removeExistingEntry(destination);
@@ -36,9 +40,10 @@ export async function copyWithoutFollowingSymlinks(source: string, destination: 
   await fs.promises.copyFile(source, destination);
 }
 
-// `fs.rm` unlinks a symlink itself rather than following it, and removes files/directories otherwise.
+// `fs.rm` unlinks a symlink itself rather than following it, and removes files/directories
+// otherwise; `forceRemove` adds the retry for entries a sandboxed submission left unreadable.
 async function removeExistingEntry(target: string): Promise<void> {
-  await fs.promises.rm(target, { force: true, recursive: true });
+  await forceRemove(target);
 }
 
 async function lstatOrUndefined(target: string): Promise<fs.Stats | undefined> {
