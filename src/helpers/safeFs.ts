@@ -14,8 +14,6 @@ import path from 'node:path';
 export async function copyWithoutFollowingSymlinks(source: string, destination: string): Promise<void> {
   const sourceStats = await fs.promises.lstat(source);
 
-  const existingDestinationStats = await lstatOrUndefined(destination);
-
   if (sourceStats.isSymbolicLink()) {
     await removeExistingEntry(destination);
     await fs.promises.symlink(await fs.promises.readlink(source), destination);
@@ -25,6 +23,7 @@ export async function copyWithoutFollowingSymlinks(source: string, destination: 
   if (sourceStats.isDirectory()) {
     // A pre-existing symlink (or file) at the destination is removed so the merge target is a real
     // directory the harness owns, not something the submission redirected.
+    const existingDestinationStats = await lstatOrUndefined(destination);
     if (!existingDestinationStats?.isDirectory()) await removeExistingEntry(destination);
     await fs.promises.mkdir(destination, { recursive: true });
     for (const entry of await fs.promises.readdir(source)) {
