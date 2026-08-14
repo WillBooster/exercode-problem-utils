@@ -6,6 +6,7 @@ import path from 'node:path';
 import {
   forceRemove,
   getSandboxUserEnvOverrides,
+  isSandboxWrappedCommand,
   killSandboxUserProcesses,
   makeAccessibleToSandboxUser,
   sandboxUserName,
@@ -378,7 +379,9 @@ async function spawnWithInput(
     timeCommand === undefined
       ? command
       : ([...timeCommand, `--output=${timeOutputPath}`, ...command] as [string, ...string[]]);
-  const spawnedCommand = wrapCommandWithSandboxUser(timedCommand);
+  // A caller may pass a command the presets already wrapped; wrapping the `time`-prefixed form
+  // again would nest `sudo` inside `sudo` and run the inner one as the unauthorized sandbox user.
+  const spawnedCommand = isSandboxWrappedCommand(command) ? timedCommand : wrapCommandWithSandboxUser(timedCommand);
   const subprocess = childProcess.spawn(spawnedCommand[0], spawnedCommand.slice(1), {
     cwd: context.cwd,
     detached: process.platform !== 'win32',

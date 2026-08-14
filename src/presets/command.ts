@@ -12,6 +12,7 @@ import { parseArgs } from '../helpers/parseArgs.js';
 import { printDebugBanner } from '../helpers/printDebugBanner.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readOutputFiles } from '../helpers/readOutputFiles.js';
+import { runCustomRunner } from '../helpers/runCustomRunner.js';
 import {
   getSandboxUserEnvOverrides,
   makeAccessibleToSandboxUser,
@@ -83,6 +84,11 @@ export interface CommandJudgePresetOptions<
      * The command to run. Under `EXERCODE_SANDBOX_USER` delegation it is already wrapped so it
      * executes as the sandbox user; spawn it as given (with the supplied `env`) instead of
      * reconstructing it, or the submission runs as the trusted harness user.
+     *
+     * Its direct child is then a root-owned `sudo` whose descendants belong to the sandbox user, so
+     * the handler cannot signal them: enforce `timeLimitSeconds` with `startSandboxTimeoutWatchdog`
+     * and `killSandboxUserProcesses` (both exported) rather than `child.kill()` or an outer
+     * `timeout`. The preset terminates leftover sandbox processes after the handler returns.
      */
     command: readonly [string, ...string[]];
     stdin: string;
@@ -275,17 +281,20 @@ async function runCommandJudgeForCwd<
       }
 
       runResult = options.runCommand
-        ? await options.runCommand({
-            testCase,
-            // Hand custom runners a command that is already sandbox-wrapped, and the matching
-            // environment: they spawn it themselves, so an unwrapped command would run the
-            // submission as the trusted harness user and defeat the delegation boundary.
-            command: wrapCommandWithSandboxUser(command),
-            stdin,
-            cwd,
-            env: { ...env, ...getSandboxUserEnvOverrides(env) },
-            timeLimitSeconds,
-          })
+        ? await runCustomRunner(
+            () =>
+              // Hand custom runners a command that is already sandbox-wrapped, and the matching
+              // environment: they spawn it themselves, so an unwrapped command would run the
+              // submission as the trusted harness user and defeat the delegation boundary.
+              options.runCommand?.({
+                testCase,
+                command: wrapCommandWithSandboxUser(command),
+                stdin,
+                cwd,
+                env: { ...env, ...getSandboxUserEnvOverrides(env) },
+                timeLimitSeconds,
+              }) as Promise<TRunResult>
+          )
         : (runCommand(command, {
             stdin,
             cwd,

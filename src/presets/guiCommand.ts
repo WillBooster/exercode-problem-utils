@@ -16,6 +16,7 @@ import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readOutputFiles } from '../helpers/readOutputFiles.js';
 import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases as readFileTestCases } from '../helpers/readTestCases.js';
+import { runCustomRunner } from '../helpers/runCustomRunner.js';
 import {
   getSandboxUserEnvOverrides,
   getTrustedHelperEnv,
@@ -102,6 +103,11 @@ export interface GuiCommandJudgePresetOptions<TTestCase extends BaseGuiTestCase 
      * The command to run. Under `EXERCODE_SANDBOX_USER` delegation it is already wrapped so it
      * executes as the sandbox user; spawn it as given (with the supplied `env`) instead of
      * reconstructing it, or the submission runs as the trusted harness user.
+     *
+     * Its direct child is then a root-owned `sudo` whose descendants belong to the sandbox user, so
+     * the handler cannot signal them: enforce `timeLimitSeconds` with `startSandboxTimeoutWatchdog`
+     * and `killSandboxUserProcesses` (both exported) rather than `child.kill()` or an outer
+     * `timeout`. The preset terminates leftover sandbox processes after the handler returns.
      */
     command: readonly [string, ...string[]];
     stdin: string;
@@ -148,9 +154,10 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
   const args = parseArgs(process.argv);
   if (!args.cwd) throw new Error('cwd argument required');
   const params = judgeParamsSchema.parse(args.params);
+  const submissionDir = args.cwd;
 
   // The sandboxed submission must read its sources and write build/run outputs in its directory.
-  makeAccessibleToSandboxUser(args.cwd);
+  makeAccessibleToSandboxUser(submissionDir);
 
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
   const configuredTestCases = await (options.readTestCases ?? readGuiTestCases<TTestCase>)(problemDir);
@@ -275,19 +282,22 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
       let runResult: GuiCommandRunResult;
       try {
         runResult = options.runCommand
-          ? await options.runCommand({
-              testCase,
-              // Hand custom runners a command that is already sandbox-wrapped, and the matching
-              // environment: they spawn it themselves, so an unwrapped command would run the
-              // submission as the trusted harness user and defeat the delegation boundary.
-              command: wrapCommandWithSandboxUser(command),
-              stdin,
-              cwd: args.cwd,
-              env: { ...runEnv, ...getSandboxUserEnvOverrides(runEnv) },
-              timeLimitSeconds,
-              screenshotWaitSeconds: options.screenshotWaitSeconds ?? SCREENSHOT_WAIT_SECONDS,
-              stopDetectionThreshold: options.stopDetectionThreshold ?? STOP_DETECTION_THRESHOLD,
-            })
+          ? await runCustomRunner(
+              () =>
+                // Hand custom runners a command that is already sandbox-wrapped, and the matching
+                // environment: they spawn it themselves, so an unwrapped command would run the
+                // submission as the trusted harness user and defeat the delegation boundary.
+                options.runCommand?.({
+                  testCase,
+                  command: wrapCommandWithSandboxUser(command),
+                  stdin,
+                  cwd: submissionDir,
+                  env: { ...runEnv, ...getSandboxUserEnvOverrides(runEnv) },
+                  timeLimitSeconds,
+                  screenshotWaitSeconds: options.screenshotWaitSeconds ?? SCREENSHOT_WAIT_SECONDS,
+                  stopDetectionThreshold: options.stopDetectionThreshold ?? STOP_DETECTION_THRESHOLD,
+                }) as Promise<GuiCommandRunResult>
+            )
           : await spawnGuiProgram({
               command,
               stdin,

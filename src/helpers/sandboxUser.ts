@@ -43,6 +43,10 @@ const MINIMAL_ENV = { PATH: '/usr/local/bin:/usr/bin:/bin' } as const;
  * command through the child environment's `PATH`, so a fixed `PATH` here pins them to system paths.
  */
 export function getTrustedHelperEnv(extraEnv?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  // Without delegation the submission runs as this same user, so there is no boundary to defend and
+  // pinning `PATH` would only break setups whose X11/`ps` binaries live elsewhere (e.g. /usr/games,
+  // /snap/bin, Nix). Keep the inherited environment there, exactly as before delegation existed.
+  if (!sandboxUserName) return { ...process.env, ...extraEnv };
   return { ...MINIMAL_ENV, ...extraEnv };
 }
 
@@ -65,6 +69,8 @@ if (sandboxUserName && sandboxUserName === os.userInfo().username) {
  */
 export function wrapCommandWithSandboxUser(command: readonly [string, ...string[]]): [string, ...string[]] {
   if (!sandboxUserName) return [...command];
+  // Idempotent; see {@link isSandboxWrappedCommand}.
+  if (isSandboxWrappedCommand(command)) return [...command];
   return [
     SUDO_PATH,
     '--preserve-env',
@@ -76,6 +82,16 @@ export function wrapCommandWithSandboxUser(command: readonly [string, ...string[
     'umask 0; if [ -n "$SANDBOX_LD_LIBRARY_PATH" ]; then export LD_LIBRARY_PATH="$SANDBOX_LD_LIBRARY_PATH"; fi; exec "$0" "$@"',
     ...command,
   ];
+}
+
+/**
+ * Whether the command was already wrapped by {@link wrapCommandWithSandboxUser}. The presets hand
+ * custom runners a wrapped command, and a runner may forward it to another helper that wraps too;
+ * a nested wrapper's inner `sudo` would run AS the sandbox user, which sudoers does not authorize,
+ * so every test case of such a problem would fail only under delegation.
+ */
+export function isSandboxWrappedCommand(command: readonly string[]): boolean {
+  return command.includes(SUDO_PATH);
 }
 
 /**
@@ -116,7 +132,12 @@ export function killSandboxUserProcesses(signals: readonly ('TERM' | 'KILL')[] =
   // would run as the sandbox user too, so the first pkill would kill it before the second ran.
   // Each `pkill` exits with 1 when no process matches, so ignore the exit status.
   for (const signal of signals) {
-    runAsSandboxUser(['pkill', `-${signal}`, '-u', sandboxUserName]);
+    const result = runAsSandboxUser(['pkill', `-${signal}`, '-u', sandboxUserName]);
+    // Fail closed: a submission can exhaust the PID cgroup so this `sudo` cannot even be spawned.
+    // Reporting success would leave its processes alive for the next request on this instance.
+    if (result.error) {
+      throw new Error(`failed to terminate ${sandboxUserName} processes: ${result.error.message}`);
+    }
   }
 }
 
@@ -194,8 +215,8 @@ export function startSandboxTimeoutWatchdog(timeoutSeconds: number): SandboxTime
  * passed: sudoers forwards it verbatim, and after sudo drops privileges the helper's
  * `/proc/<pid>/environ` becomes readable by every other sandbox process.
  */
-function runAsSandboxUser(command: [string, ...string[]]): void {
-  child_process.spawnSync(SUDO_PATH, ['-u', sandboxUserName as string, ...command], { env: MINIMAL_ENV });
+function runAsSandboxUser(command: [string, ...string[]]): child_process.SpawnSyncReturns<Buffer> {
+  return child_process.spawnSync(SUDO_PATH, ['-u', sandboxUserName as string, ...command], { env: MINIMAL_ENV });
 }
 
 /**
