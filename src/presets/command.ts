@@ -12,7 +12,11 @@ import { parseArgs } from '../helpers/parseArgs.js';
 import { printDebugBanner } from '../helpers/printDebugBanner.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readOutputFiles } from '../helpers/readOutputFiles.js';
-import { makeAccessibleToSandboxUser } from '../helpers/sandboxUser.js';
+import {
+  getSandboxUserEnvOverrides,
+  makeAccessibleToSandboxUser,
+  wrapCommandWithSandboxUser,
+} from '../helpers/sandboxUser.js';
 import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases as readFileTestCases } from '../helpers/readTestCases.js';
 import {
@@ -75,6 +79,11 @@ export interface CommandJudgePresetOptions<
   resolveInput?: (context: { testCase: TTestCase; cwd: string; env: NodeJS.ProcessEnv }) => Promise<string> | string;
   runCommand?: (context: {
     testCase: TTestCase;
+    /**
+     * The command to run. Under `EXERCODE_SANDBOX_USER` delegation it is already wrapped so it
+     * executes as the sandbox user; spawn it as given (with the supplied `env`) instead of
+     * reconstructing it, or the submission runs as the trusted harness user.
+     */
     command: readonly [string, ...string[]];
     stdin: string;
     cwd: string;
@@ -268,10 +277,13 @@ async function runCommandJudgeForCwd<
       runResult = options.runCommand
         ? await options.runCommand({
             testCase,
-            command,
+            // Hand custom runners a command that is already sandbox-wrapped, and the matching
+            // environment: they spawn it themselves, so an unwrapped command would run the
+            // submission as the trusted harness user and defeat the delegation boundary.
+            command: wrapCommandWithSandboxUser(command),
             stdin,
             cwd,
-            env,
+            env: { ...env, ...getSandboxUserEnvOverrides(env) },
             timeLimitSeconds,
           })
         : (runCommand(command, {

@@ -35,6 +35,17 @@ const SLEEP_PATH = '/bin/sleep';
 // Minimal environment for trusted helper processes; never forward the harness environment to them.
 const MINIMAL_ENV = { PATH: '/usr/local/bin:/usr/bin:/bin' } as const;
 
+/**
+ * Environment for helper processes the *trusted* harness user runs (`ps`, `xwininfo`, `Xvfb`, …).
+ * The judge server overlays caller-supplied variables onto the harness environment, and a sandboxed
+ * submission can create executables in its persistent home, so resolving these helpers through the
+ * inherited `PATH` would hand the submission code execution as the harness user. Node resolves the
+ * command through the child environment's `PATH`, so a fixed `PATH` here pins them to system paths.
+ */
+export function getTrustedHelperEnv(extraEnv?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return { ...MINIMAL_ENV, ...extraEnv };
+}
+
 export const sandboxUserName = process.env[SANDBOX_USER_ENV_NAME] || undefined;
 
 // Fail fast on the catastrophic misconfiguration where the sandbox user is the harness's own user:
@@ -119,30 +130,62 @@ export function relaxPermissionsAsSandboxUser(targetPath: string): void {
   runAsSandboxUser(['chmod', '-R', 'a+rwX', targetPath]);
 }
 
+/** Cancels a {@link startSandboxTimeoutWatchdog}; `fired` reports whether its deadline elapsed. */
+export interface SandboxTimeoutWatchdog {
+  cancel(): void;
+  fired(): boolean;
+}
+
 /**
- * Start a harness-owned watchdog that force-kills every sandbox process after the given deadline,
- * and return a function that cancels it. A sandboxed submission can signal its own `timeout`
- * supervisor (same UID), and a synchronous spawn blocks the harness's event loop, so without this
- * external deadline a submission could run until the outer judge-server limit. The watchdog's
- * `sh`/`sleep` run as the harness user, out of the submission's reach; killing the watchdog's
- * process group cancels it before it spawns sudo.
+ * Start a harness-owned watchdog that force-kills every sandbox process after the given deadline.
+ * A sandboxed submission can signal its own `timeout` supervisor (same UID), and a synchronous
+ * spawn blocks the harness's event loop, so without this external deadline a submission could run
+ * until the outer judge-server limit. The watchdog's `sh`/`sleep` run as the harness user, out of
+ * the submission's reach; killing the watchdog's process group cancels it before it spawns sudo.
+ *
+ * ALWAYS cancel in a `finally`: the watchdog is detached and `unref`'d, so a leaked one keeps
+ * running after the harness exits and would SIGKILL a later request's submission.
  */
-export function startSandboxTimeoutWatchdog(timeoutSeconds: number): () => void {
-  if (!sandboxUserName) return () => {};
+export function startSandboxTimeoutWatchdog(timeoutSeconds: number): SandboxTimeoutWatchdog {
+  if (!sandboxUserName) return { cancel: () => {}, fired: () => false };
+
   const deadlineSeconds = Math.ceil(timeoutSeconds) + 5;
   const watchdog = child_process.spawn(
     '/bin/sh',
     ['-c', `${SLEEP_PATH} ${deadlineSeconds}; ${SUDO_PATH} -u "$1" pkill -KILL -u "$1"`, 'sh', sandboxUserName],
     { detached: true, stdio: 'ignore', env: MINIMAL_ENV }
   );
+  // Without a listener, a spawn failure (e.g. the submission exhausted the PID cgroup) would be an
+  // unhandled 'error' event that terminates the harness. Fail closed instead: callers check
+  // `fired()`, and a watchdog that never started reports its deadline as elapsed.
+  let spawnFailed = false;
+  watchdog.on('error', () => {
+    spawnFailed = true;
+  });
+  let exited = false;
+  watchdog.on('exit', () => {
+    exited = true;
+  });
   watchdog.unref();
-  return () => {
-    if (watchdog.pid === undefined) return;
-    try {
-      process.kill(-watchdog.pid, 'SIGKILL');
-    } catch {
-      // The watchdog already fired and exited.
-    }
+
+  const startTimeMilliseconds = Date.now();
+  let cancelled = false;
+  return {
+    cancel: () => {
+      cancelled = true;
+      if (watchdog.pid === undefined || exited) return;
+      try {
+        process.kill(-watchdog.pid, 'SIGKILL');
+      } catch {
+        // The watchdog already fired and exited.
+      }
+    },
+    // The `exit`/`error` events cannot be observed from a synchronous caller (they need the event
+    // loop), so decide by elapsed time, which is what the watchdog itself waits on.
+    fired: () =>
+      spawnFailed ||
+      watchdog.pid === undefined ||
+      (!cancelled && Date.now() - startTimeMilliseconds >= deadlineSeconds * 1000),
   };
 }
 

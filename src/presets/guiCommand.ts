@@ -18,6 +18,7 @@ import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFr
 import { readTestCases as readFileTestCases } from '../helpers/readTestCases.js';
 import {
   getSandboxUserEnvOverrides,
+  getTrustedHelperEnv,
   killSandboxUserProcesses,
   makeAccessibleToSandboxUser,
   sandboxUserName,
@@ -97,6 +98,11 @@ export interface GuiCommandJudgePresetOptions<TTestCase extends BaseGuiTestCase 
   }) => Promise<readonly [string, ...string[]]> | readonly [string, ...string[]];
   runCommand?: (context: {
     testCase: TTestCase;
+    /**
+     * The command to run. Under `EXERCODE_SANDBOX_USER` delegation it is already wrapped so it
+     * executes as the sandbox user; spawn it as given (with the supplied `env`) instead of
+     * reconstructing it, or the submission runs as the trusted harness user.
+     */
     command: readonly [string, ...string[]];
     stdin: string;
     cwd: string;
@@ -271,10 +277,13 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
         runResult = options.runCommand
           ? await options.runCommand({
               testCase,
-              command,
+              // Hand custom runners a command that is already sandbox-wrapped, and the matching
+              // environment: they spawn it themselves, so an unwrapped command would run the
+              // submission as the trusted harness user and defeat the delegation boundary.
+              command: wrapCommandWithSandboxUser(command),
               stdin,
               cwd: args.cwd,
-              env: runEnv,
+              env: { ...runEnv, ...getSandboxUserEnvOverrides(runEnv) },
               timeLimitSeconds,
               screenshotWaitSeconds: options.screenshotWaitSeconds ?? SCREENSHOT_WAIT_SECONDS,
               stopDetectionThreshold: options.stopDetectionThreshold ?? STOP_DETECTION_THRESHOLD,
@@ -502,7 +511,7 @@ async function spawnGuiProgram(context: {
   // A submission can signal its own sandboxed `timeout` and then wedge the event loop (e.g.
   // XGrabServer makes the synchronous `xwininfo`/`maim` block), so a harness-owned watchdog
   // force-kills the sandbox user at the deadline; killing the client also releases its X grab.
-  const stopWatchdog = startSandboxTimeoutWatchdog(context.timeLimitSeconds);
+  const watchdog = startSandboxTimeoutWatchdog(context.timeLimitSeconds);
 
   child.stdout.on('data', (chunk: string) => {
     stdout += chunk;
@@ -513,6 +522,11 @@ async function spawnGuiProgram(context: {
   child.on('error', (error) => {
     spawnError = error;
     exitCode = 1;
+  });
+  // A child that exits before the input is fully written makes the write fail; without a listener
+  // that EPIPE would be an unhandled stream error terminating the harness mid-run.
+  child.stdin.on('error', () => {
+    // The submission simply stopped reading its input; the exit handling below reports the result.
   });
   child.on('close', (code, signal) => {
     if (code === 124) {
@@ -530,67 +544,78 @@ async function spawnGuiProgram(context: {
     exitCode = code ?? 1;
   });
 
-  if (context.stdin) child.stdin.write(context.stdin);
-  child.stdin.end();
+  // Everything below must run under the watchdog's `finally`: `takeScreenshots` rethrows spawn
+  // failures (which a submission can provoke by exhausting PIDs), and a leaked watchdog is detached,
+  // so it would outlive the harness and SIGKILL a later request's submission.
+  try {
+    if (context.stdin) child.stdin.write(context.stdin);
+    child.stdin.end();
 
-  while (exitCode === undefined) {
-    await wait(context.screenshotWaitSeconds * 1000);
-    sampledMemoryBytes = Math.max(sampledMemoryBytes, readProcessGroupMemoryBytes(child.pid));
-    const currentScreenshots = takeScreenshots(context.env.DISPLAY);
-    screenshots = currentScreenshots.toSorted((a, b) => a.data.length - b.data.length);
+    while (exitCode === undefined) {
+      await wait(context.screenshotWaitSeconds * 1000);
+      sampledMemoryBytes = Math.max(sampledMemoryBytes, readProcessGroupMemoryBytes(child.pid));
+      const currentScreenshots = takeScreenshots(context.env.DISPLAY);
+      screenshots = currentScreenshots.toSorted((a, b) => a.data.length - b.data.length);
 
-    if (screenshots.length > 0) {
-      const screenshotSignatures = screenshots.map((file) => file.data).toSorted();
-      screenshotSignaturesHistory.unshift(screenshotSignatures);
-      screenshotSignaturesHistory.length = Math.min(screenshotSignaturesHistory.length, context.stopDetectionThreshold);
-      if (
-        screenshotSignaturesHistory.length === context.stopDetectionThreshold &&
-        screenshotSignaturesHistory.every(
-          (files) =>
-            files.length === screenshotSignatures.length &&
-            files.every((file, index) => file === screenshotSignatures[index])
-        )
-      ) {
-        stopReason = 'stable_screenshot';
+      if (screenshots.length > 0) {
+        const screenshotSignatures = screenshots.map((file) => file.data).toSorted();
+        screenshotSignaturesHistory.unshift(screenshotSignatures);
+        screenshotSignaturesHistory.length = Math.min(
+          screenshotSignaturesHistory.length,
+          context.stopDetectionThreshold
+        );
+        if (
+          screenshotSignaturesHistory.length === context.stopDetectionThreshold &&
+          screenshotSignaturesHistory.every(
+            (files) =>
+              files.length === screenshotSignatures.length &&
+              files.every((file, index) => file === screenshotSignatures[index])
+          )
+        ) {
+          stopReason = 'stable_screenshot';
+          exitCode = 0;
+          break;
+        }
+      }
+
+      if (Date.now() / 1000 - startTimeSeconds > context.timeLimitSeconds) {
+        stopReason = 'timeout';
         exitCode = 0;
         break;
       }
     }
 
-    if (Date.now() / 1000 - startTimeSeconds > context.timeLimitSeconds) {
-      stopReason = 'timeout';
-      exitCode = 0;
-      break;
+    if (stopReason !== 'process_exit' && child.exitCode === null) {
+      child.removeAllListeners('close');
+      child.removeAllListeners('error');
     }
-  }
+    await stopProcess(child);
+    if (spawnError) throw spawnError;
+    const {
+      memoryBytes,
+      stderr: normalizedStderr,
+      timeSeconds,
+    } = parseTimedStderr(stderr, startTimeSeconds, sampledMemoryBytes);
 
-  if (stopReason !== 'process_exit' && child.exitCode === null) {
-    child.removeAllListeners('close');
-    child.removeAllListeners('error');
+    return {
+      stdin: context.stdin,
+      stdout: stdout.trimEnd(),
+      stderr: normalizedStderr,
+      status: exitCode,
+      timeSeconds,
+      memoryBytes,
+      screenshots,
+      stopReason,
+    };
+  } finally {
+    watchdog.cancel();
   }
-  await stopProcess(child);
-  stopWatchdog();
-  if (spawnError) throw spawnError;
-  const {
-    memoryBytes,
-    stderr: normalizedStderr,
-    timeSeconds,
-  } = parseTimedStderr(stderr, startTimeSeconds, sampledMemoryBytes);
-
-  return {
-    stdin: context.stdin,
-    stdout: stdout.trimEnd(),
-    stderr: normalizedStderr,
-    status: exitCode,
-    timeSeconds,
-    memoryBytes,
-    screenshots,
-    stopReason,
-  };
 }
 
 function takeScreenshots(display: string | undefined): GuiScreenshotFile[] {
-  const env = display ? { ...process.env, DISPLAY: display } : process.env;
+  // These helpers run as the trusted harness user, so they must not be resolved through a
+  // submission-influenced `PATH` (see `getTrustedHelperEnv`).
+  const env = getTrustedHelperEnv(display ? { DISPLAY: display } : { DISPLAY: process.env.DISPLAY });
   const xwininfo = childProcess.spawnSync('xwininfo', ['-root', '-tree'], { encoding: 'utf8', env });
   if (xwininfo.error) throw xwininfo.error;
   if (xwininfo.status !== 0 || !xwininfo.stdout) return [];
@@ -653,6 +678,8 @@ async function ensureDisplayServer(): Promise<{ display: string; dispose: () => 
     let spawnError: Error | undefined;
     const xvfb = childProcess.spawn('Xvfb', [display, '-screen', '0', '1280x1024x24', '-ac'], {
       stdio: 'ignore',
+      // Runs as the trusted harness user, so pin the lookup to system paths.
+      env: getTrustedHelperEnv(),
     });
     xvfb.on('error', (error) => {
       spawnError = error;
@@ -700,6 +727,8 @@ function readProcessGroupMemoryBytes(processGroupId: number | undefined): number
   // stays in the detached child's process group; `--pgroup` therefore still captures it there.
   const result = childProcess.spawnSync('ps', ['-o', 'rss=', '--no-headers', '--pgroup', String(processGroupId)], {
     encoding: 'utf8',
+    // Runs as the trusted harness user, so pin the lookup to system paths.
+    env: getTrustedHelperEnv(),
   });
   if (result.error || result.status !== 0 || !result.stdout) return 0;
 

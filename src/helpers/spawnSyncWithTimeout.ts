@@ -34,15 +34,19 @@ export function spawnSyncWithTimeout(
     command,
     ...args,
   ]);
-  const stopWatchdog = startSandboxTimeoutWatchdog(timeoutSeconds);
+  const watchdog = startSandboxTimeoutWatchdog(timeoutSeconds);
   let spawnResult: child_process.SpawnSyncReturns<string>;
+  let watchdogFired: boolean;
   try {
     spawnResult = child_process.spawnSync(wrappedCommand[0], wrappedCommand.slice(1), {
       ...options,
       env: { ...env, ...getSandboxUserEnvOverrides(env) },
     });
   } finally {
-    stopWatchdog();
+    // Read the watchdog state before cancelling, then always cancel: a leaked watchdog is detached
+    // and would SIGKILL a later request's submission.
+    watchdogFired = watchdog.fired();
+    watchdog.cancel();
     if (sandboxUserName) killSandboxUserProcesses();
   }
 
@@ -53,8 +57,10 @@ export function spawnSyncWithTimeout(
   const timeSeconds = Number(match?.[1]) || (stopTimeMilliseconds - startTimeMilliseconds) / 1000;
   const memoryBytes = Number(match?.[2]) * 1024 || 0;
 
-  // timeout
-  if (spawnResult.status === 124) {
+  // `timeout` reports 124, but a sandboxed submission can kill its own same-UID `timeout` and be
+  // stopped by the watchdog instead, which surfaces as a signal-derived status. Both are timeouts:
+  // reporting the latter as a runtime error would mislabel a submission that outran its deadline.
+  if (spawnResult.status === 124 || watchdogFired) {
     return { ...spawnResult, status: 0, stderr, timeSeconds: timeoutSeconds + 1e-3, memoryBytes };
   }
 

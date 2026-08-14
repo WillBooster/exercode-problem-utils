@@ -3,30 +3,36 @@ import path from 'node:path';
 
 import { forceRemove, relaxPermissionsAsSandboxUser, sandboxUserName } from './sandboxUser.js';
 
+/** Snapshot of the working directory: each entry's relative path and whether it was a directory. */
+export type WorkingDirectorySnapshot = ReadonlyMap<string, boolean>;
+
 // Currently, it does not support changing file contents and deleting files.
-export async function snapshotWorkingDirectory(cwd: string): Promise<ReadonlySet<string>> {
-  const snapshot = new Set<string>();
+export async function snapshotWorkingDirectory(cwd: string): Promise<WorkingDirectorySnapshot> {
+  const snapshot = new Map<string, boolean>();
   await collectEntries(cwd, cwd, snapshot);
   return snapshot;
 }
 
-export async function cleanWorkingDirectory(cwd: string, snapshot: ReadonlySet<string>): Promise<void> {
+export async function cleanWorkingDirectory(cwd: string, snapshot: WorkingDirectorySnapshot): Promise<void> {
   await removeUnsnapshotted(cwd, cwd, snapshot);
 }
 
-async function collectEntries(root: string, dir: string, into: Set<string>): Promise<void> {
+async function collectEntries(root: string, dir: string, into: Map<string, boolean>): Promise<void> {
   for (const entry of await readdirWithTypes(dir)) {
     const absolutePath = path.join(dir, entry.name);
-    into.add(path.relative(root, absolutePath));
+    into.set(path.relative(root, absolutePath), entry.isDirectory());
     // Never descend into a symlink: a sandboxed submission could point it outside the directory.
     if (entry.isDirectory()) await collectEntries(root, absolutePath, into);
   }
 }
 
-async function removeUnsnapshotted(root: string, dir: string, snapshot: ReadonlySet<string>): Promise<void> {
+async function removeUnsnapshotted(root: string, dir: string, snapshot: WorkingDirectorySnapshot): Promise<void> {
   for (const entry of await readdirWithTypes(dir)) {
     const absolutePath = path.join(dir, entry.name);
-    if (!snapshot.has(path.relative(root, absolutePath))) {
+    const snapshottedAsDirectory = snapshot.get(path.relative(root, absolutePath));
+    // The type must still match: a sandboxed submission can replace one of its own snapshotted
+    // entries with a symlink, and matching by path alone would preserve it across test cases.
+    if (snapshottedAsDirectory === undefined || snapshottedAsDirectory !== entry.isDirectory()) {
       // `absolutePath` has no symlink ancestor (we only recurse into real directories), and
       // `forceRemove`/`fs.rm` unlinks a leaf symlink instead of following it, so this cannot delete
       // outside the working directory even if the submission planted symlinks.
