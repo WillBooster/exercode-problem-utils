@@ -15,7 +15,7 @@ import {
   startSandboxTimeoutWatchdog,
   wrapCommandWithSandboxUser,
 } from './sandboxUser.js';
-import { copyWithoutFollowingSymlinks } from './safeFs.js';
+import { copyWithoutFollowingSymlinks, createDirectoryWithoutFollowingSymlinks } from './safeFs.js';
 
 export type PackageManager = 'bun' | 'cargo' | 'go' | 'gradle' | 'maven' | 'npm' | 'pnpm' | 'ruby' | 'uv' | 'yarn';
 type PackageManagerInstallCommand = readonly [string, ...string[]];
@@ -348,14 +348,20 @@ export async function copyPackageManagerProjectFiles(options: {
   projectFilePaths?: readonly string[];
 }): Promise<void> {
   for (const projectFilePath of options.projectFilePaths ?? packageManagerProjectFilePaths[options.packageManager]) {
-    await copyPathIfExists(path.join(options.projectDir, projectFilePath), path.join(options.runDir, projectFilePath));
+    await copyPathIfExists(
+      path.join(options.projectDir, projectFilePath),
+      path.join(options.runDir, projectFilePath),
+      options.runDir
+    );
   }
 }
 
-async function copyPathIfExists(sourcePath: string, destinationPath: string): Promise<void> {
+async function copyPathIfExists(sourcePath: string, destinationPath: string, runDir: string): Promise<void> {
   try {
     // No-follow copy: the destination was seeded from the (sandbox-writable) submission tree, so a
-    // planted symlink there must not redirect this trusted project-file overlay outside runDir.
+    // planted symlink there — at the destination itself or at any directory level of a nested
+    // project file path — must not redirect this trusted project-file overlay outside runDir.
+    await createDirectoryWithoutFollowingSymlinks(runDir, path.dirname(destinationPath));
     await copyWithoutFollowingSymlinks(sourcePath, destinationPath);
   } catch (error) {
     const code =

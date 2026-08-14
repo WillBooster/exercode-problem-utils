@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { TestCaseResult } from '../types/testCaseResult.js';
 
 import { encodeFileForTestCaseResult } from './printTestCaseResult.js';
+import { isContainedPath } from './safeFs.js';
 import { sandboxUserName } from './sandboxUser.js';
 
 export async function readOutputFiles(
@@ -37,9 +38,7 @@ export async function isSafeSubmissionOutputPath(cwd: string, filePath: string):
   try {
     const realFilePath = await fs.promises.realpath(filePath);
     const realCwd = await fs.promises.realpath(cwd);
-    const relativePath = path.relative(realCwd, realFilePath);
-    // A bare `..`-prefix test would also reject an in-directory name like `..result`.
-    return relativePath !== '..' && !relativePath.startsWith(`..${path.sep}`) && !path.isAbsolute(relativePath);
+    return isContainedPath(realCwd, realFilePath);
   } catch {
     return false;
   }

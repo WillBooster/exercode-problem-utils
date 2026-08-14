@@ -15,8 +15,6 @@ import { forceRemove } from './sandboxUser.js';
  */
 export async function copyWithoutFollowingSymlinks(source: string, destination: string): Promise<void> {
   const sourceStats = await fs.promises.lstat(source);
-  // `fs.cp` creates missing destination parents; `copyFile`/`symlink` would fail with ENOENT.
-  await fs.promises.mkdir(path.dirname(destination), { recursive: true });
 
   if (sourceStats.isSymbolicLink()) {
     await removeExistingEntry(destination);
@@ -40,10 +38,41 @@ export async function copyWithoutFollowingSymlinks(source: string, destination: 
   await fs.promises.copyFile(source, destination);
 }
 
+/**
+ * Create `directory` and the missing levels between it and `root`, replacing anything that is not
+ * already a real directory. `fs.mkdir(..., { recursive: true })` follows a symlink it finds on the
+ * way, which a submission can plant to place a trusted-user write outside the tree; this walks the
+ * levels one at a time instead. Only levels BELOW `root` are inspected, so an unrelated symlink
+ * above the caller's tree (`/tmp` on macOS, for instance) is never touched. `root` must already be
+ * a directory the harness trusts, and `directory` must be inside it.
+ */
+export async function createDirectoryWithoutFollowingSymlinks(root: string, directory: string): Promise<void> {
+  const relativePath = path.relative(root, directory);
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    throw new Error(`directory must be inside root: ${directory} is not inside ${root}`);
+  }
+
+  let currentPath = root;
+  for (const level of relativePath.split(path.sep).filter(Boolean)) {
+    currentPath = path.join(currentPath, level);
+    const stats = await lstatOrUndefined(currentPath);
+    if (stats?.isDirectory()) continue;
+    if (stats) await removeExistingEntry(currentPath);
+    await fs.promises.mkdir(currentPath);
+  }
+}
+
 // `fs.rm` unlinks a symlink itself rather than following it, and removes files/directories
 // otherwise; `forceRemove` adds the retry for entries a sandboxed submission left unreadable.
 async function removeExistingEntry(target: string): Promise<void> {
   await forceRemove(target);
+}
+
+/** Whether `realTargetPath` is `realDirectoryPath` itself or below it. Both must be realpaths. */
+export function isContainedPath(realDirectoryPath: string, realTargetPath: string): boolean {
+  const relativePath = path.relative(realDirectoryPath, realTargetPath);
+  // A bare `..`-prefix test would also reject an in-directory name like `..result`.
+  return relativePath !== '..' && !relativePath.startsWith(`..${path.sep}`) && !path.isAbsolute(relativePath);
 }
 
 async function lstatOrUndefined(target: string): Promise<fs.Stats | undefined> {
