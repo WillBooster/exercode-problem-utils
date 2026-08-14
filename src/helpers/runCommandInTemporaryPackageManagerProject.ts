@@ -11,6 +11,7 @@ import {
   makeAccessibleToSandboxUser,
   prependInsideSandboxWrapper,
   sandboxUserName,
+  startSandboxTimeoutWatchdog,
   wrapCommandWithSandboxUser,
 } from './sandboxUser.js';
 import { copyWithoutFollowingSymlinks } from './safeFs.js';
@@ -394,6 +395,10 @@ async function spawnWithInput(
     env: { ...context.env, ...getSandboxUserEnvOverrides(context.env) },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
+  // Deadline enforcement on this path otherwise depends entirely on `killSubprocessGroup`, which
+  // cannot spawn its `sudo` once a submission has exhausted the PID cgroup. This watchdog is
+  // started before the submission can do that, so the deadline holds even then.
+  const watchdog = startSandboxTimeoutWatchdog(context.timeLimitSeconds);
 
   const stdoutChunks: Buffer[] = [];
   const stderrChunks: Buffer[] = [];
@@ -424,13 +429,24 @@ async function spawnWithInput(
   subprocess.stdout.on('data', (chunk: Buffer) => appendOutputChunk(stdoutChunks, chunk));
   subprocess.stderr.on('data', (chunk: Buffer) => appendOutputChunk(stderrChunks, chunk));
 
+  // Set by the promise below so a kill failure can settle the run instead of waiting forever for a
+  // `close` that a still-running submission will never emit.
+  let failRun: ((error: Error) => void) | undefined;
+  const killOrFailRun = (signal: NodeJS.Signals): void => {
+    try {
+      killSubprocessGroup(subprocess, signal);
+    } catch (error) {
+      failRun?.(error instanceof Error ? error : new Error(String(error)));
+    }
+  };
+
   const timeout = setTimeout(() => {
     timedOut = true;
-    killSubprocessGroup(subprocess, 'SIGTERM');
+    killOrFailRun('SIGTERM');
   }, context.timeLimitSeconds * 1000);
   const killTimeout = setTimeout(
     () => {
-      if (timedOut) killSubprocessGroup(subprocess, 'SIGKILL');
+      if (timedOut) killOrFailRun('SIGKILL');
     },
     context.timeLimitSeconds * 1000 + killGracePeriodMilliseconds
   );
@@ -448,6 +464,13 @@ async function spawnWithInput(
           settled = true;
           reject(error);
         }
+      };
+      // Terminating the submission failed, so `close` may never arrive: reject now, which lets the
+      // caller's `finally` sweep and temporary-directory cleanup run and surfaces the failure.
+      failRun = (error) => {
+        if (settled) return;
+        settled = true;
+        reject(error);
       };
       subprocess.on('error', failAfterClose);
       subprocess.stdin.on('error', (error: NodeJS.ErrnoException) => {
@@ -467,6 +490,7 @@ async function spawnWithInput(
   ).finally(() => {
     clearTimeout(timeout);
     clearTimeout(killTimeout);
+    watchdog.cancel();
   });
 
   const { timeSeconds, memoryBytes } =
@@ -498,15 +522,11 @@ function killSubprocessGroup(subprocess: childProcess.ChildProcess, signal: Node
   // The current user cannot signal the root-owned sudo wrapper nor the sandbox user's processes,
   // so go through sudo with the requested signal only; the callers' existing timers provide the
   // TERM → grace → KILL escalation.
+  // Throws when the cleanup `sudo` cannot even be spawned (a submission can exhaust the PID
+  // cgroup). Callers must catch it — `killOrFailRun` settles the run so it cannot hang waiting for
+  // a `close` that a still-running submission will never emit.
   if (sandboxUserName) {
-    try {
-      killSandboxUserProcesses([signal === 'SIGKILL' ? 'KILL' : 'TERM']);
-    } catch (error) {
-      // Reached from stream `data` listeners and timer callbacks, where a throw would be an
-      // uncaught exception that kills the harness before any result is printed. The run's `finally`
-      // sweep still fails closed.
-      console.error('failed to signal sandbox processes', error);
-    }
+    killSandboxUserProcesses([signal === 'SIGKILL' ? 'KILL' : 'TERM']);
     return;
   }
 
@@ -524,19 +544,26 @@ function killSubprocessGroup(subprocess: childProcess.ChildProcess, signal: Node
 }
 
 async function readTimeResult(timeOutputPath: string): Promise<{ timeSeconds: number; memoryBytes: number }> {
+  // The submission owns this directory and can put anything at this path. Anything but a regular
+  // file means there is no measurement to read — and opening a FIFO without `O_NONBLOCK` would
+  // block the harness forever waiting for a writer.
+  try {
+    const stats = await fs.lstat(timeOutputPath);
+    if (!stats.isFile()) return { timeSeconds: 0, memoryBytes: 0 };
+  } catch {
+    return { timeSeconds: 0, memoryBytes: 0 };
+  }
+
   let content: string;
   let fileHandle: Awaited<ReturnType<typeof fs.open>> | undefined;
   try {
-    // `O_NOFOLLOW`: this file lives in the sandbox-writable run directory, so the submission can
-    // replace it with a symlink to a harness-readable file (e.g. the problem's expected outputs)
-    // and have the two numbers at its tail reported back as its own time and memory usage.
+    // `O_NOFOLLOW` closes the lstat/open race: the submission can swap in a symlink to a
+    // harness-readable file (e.g. the problem's expected outputs) and have the two numbers at its
+    // tail reported back as its own time and memory usage.
     fileHandle = await fs.open(timeOutputPath, nodeFs.constants.O_RDONLY | nodeFs.constants.O_NOFOLLOW);
     content = await fileHandle.readFile('utf8');
-  } catch (error) {
-    const code =
-      typeof error === 'object' && error !== null && 'code' in error ? (error as { code: unknown }).code : undefined;
-    // ELOOP/EMLINK: the path is a symlink the submission planted, so there is no measurement to read.
-    if (code !== 'ENOENT' && code !== 'ELOOP' && code !== 'EMLINK') throw error;
+  } catch {
+    // Whatever the submission swapped in, there is no measurement to report.
     return { timeSeconds: 0, memoryBytes: 0 };
   } finally {
     await fileHandle?.close();
