@@ -3,6 +3,15 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+import {
+  forceRemove,
+  getSandboxUserEnvOverrides,
+  killSandboxUserProcesses,
+  makeAccessibleToSandboxUser,
+  sandboxUserName,
+  wrapCommandWithSandboxUser,
+} from './sandboxUser.js';
+
 export type PackageManager = 'bun' | 'cargo' | 'go' | 'gradle' | 'maven' | 'npm' | 'pnpm' | 'ruby' | 'uv' | 'yarn';
 type PackageManagerInstallCommand = readonly [string, ...string[]];
 
@@ -89,6 +98,9 @@ export async function runCommandInTemporaryPackageManagerProject(
       runDir,
       projectFilePaths: options.projectFilePaths,
     });
+    // The sandbox user (if any) runs the install/run commands below and must read the copied
+    // sources and create outputs (e.g. `node_modules`, `.venv`) next to them.
+    makeAccessibleToSandboxUser(runDir);
 
     const env = options.env ? { ...process.env, ...options.env } : process.env;
     const installCommand = await resolveInstallCommand(options.packageManager, runDir);
@@ -152,7 +164,7 @@ export async function runCommandInTemporaryPackageManagerProject(
 
     return toPackageManagerCommandRunResult({ elapsedTimeSeconds, options, result });
   } finally {
-    await fs.rm(runDir, { force: true, recursive: true });
+    await forceRemove(runDir);
   }
 }
 
@@ -354,12 +366,15 @@ async function spawnWithInput(
   outputLimitExceeded: boolean;
 }> {
   const timeOutputPath = timeCommand === undefined ? undefined : path.join(context.cwd, '.exercode-time-result');
-  const spawnedCommand =
-    timeCommand === undefined ? command : ([...timeCommand, `--output=${timeOutputPath}`, ...command] as const);
+  const timedCommand =
+    timeCommand === undefined
+      ? command
+      : ([...timeCommand, `--output=${timeOutputPath}`, ...command] as [string, ...string[]]);
+  const spawnedCommand = wrapCommandWithSandboxUser(timedCommand);
   const subprocess = childProcess.spawn(spawnedCommand[0], spawnedCommand.slice(1), {
     cwd: context.cwd,
     detached: process.platform !== 'win32',
-    env: context.env,
+    env: { ...context.env, ...getSandboxUserEnvOverrides() },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
@@ -462,6 +477,12 @@ function resolveTimeCommand(): readonly [string, ...string[]] | undefined {
 
 function killSubprocessGroup(subprocess: childProcess.ChildProcess, signal: NodeJS.Signals): void {
   if (subprocess.pid === undefined) return;
+
+  // The current user cannot signal the root-owned sudo wrapper nor the sandbox user's processes.
+  if (sandboxUserName) {
+    killSandboxUserProcesses();
+    return;
+  }
 
   try {
     if (process.platform === 'win32') {

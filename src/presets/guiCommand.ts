@@ -16,6 +16,12 @@ import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readOutputFiles } from '../helpers/readOutputFiles.js';
 import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases as readFileTestCases } from '../helpers/readTestCases.js';
+import {
+  getSandboxUserEnvOverrides,
+  killSandboxUserProcesses,
+  sandboxUserName,
+  wrapCommandWithSandboxUser,
+} from '../helpers/sandboxUser.js';
 import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
 import { DecisionCode } from '../types/decisionCode.js';
 import { languageIdToDefinition } from '../types/language.js';
@@ -460,10 +466,15 @@ async function spawnGuiProgram(context: {
   screenshotWaitSeconds: number;
   stopDetectionThreshold: number;
 }): Promise<GuiCommandRunResult> {
-  const wrappedCommand = ['timeout', context.timeLimitSeconds.toFixed(3), ...TIME_COMMAND, ...context.command] as const;
+  const wrappedCommand = wrapCommandWithSandboxUser([
+    'timeout',
+    context.timeLimitSeconds.toFixed(3),
+    ...TIME_COMMAND,
+    ...context.command,
+  ]);
   const child = childProcess.spawn(wrappedCommand[0], wrappedCommand.slice(1), {
     cwd: context.cwd,
-    env: context.env,
+    env: { ...context.env, ...getSandboxUserEnvOverrides() },
     detached: process.platform !== 'win32',
     stdio: ['pipe', 'pipe', 'pipe'],
   });
@@ -655,6 +666,11 @@ async function ensureDisplayServer(): Promise<{ display: string; dispose: () => 
 
 async function stopProcess(child: childProcess.ChildProcess): Promise<void> {
   if (!child.pid) return;
+  // The current user cannot signal the root-owned sudo wrapper nor the sandbox user's processes.
+  if (sandboxUserName) {
+    killSandboxUserProcesses();
+    return;
+  }
   killProcessGroup(child.pid, 'SIGTERM');
   await wait(PROCESS_SHUTDOWN_WAIT_SECONDS * 1000);
   if (child.exitCode === null) killProcessGroup(child.pid, 'SIGKILL');

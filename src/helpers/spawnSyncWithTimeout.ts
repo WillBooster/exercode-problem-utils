@@ -1,8 +1,15 @@
 import child_process from 'node:child_process';
 import os from 'node:os';
 
+import { getSandboxUserEnvOverrides, wrapCommandWithSandboxUser } from './sandboxUser.js';
+
 const TIME_COMMAND = [os.platform() === 'darwin' ? 'gtime' : '/usr/bin/time', '--format', '%e %M'] as const;
 
+/**
+ * Run an untrusted (submission-derived) command with a timeout. When a judge server delegates
+ * untrusted execution via `EXERCODE_SANDBOX_USER` (see `sandboxUser.ts`), the whole command,
+ * including `timeout`, runs as the sandbox user so the timer can signal the sandboxed process.
+ */
 export function spawnSyncWithTimeout(
   command: string,
   args: readonly string[],
@@ -11,11 +18,17 @@ export function spawnSyncWithTimeout(
 ): child_process.SpawnSyncReturns<string> & { timeSeconds: number; memoryBytes: number } {
   const startTimeMilliseconds = Date.now();
 
-  const spawnResult = child_process.spawnSync(
+  const wrappedCommand = wrapCommandWithSandboxUser([
     'timeout',
-    [timeoutSeconds.toFixed(3), ...TIME_COMMAND, command, ...args],
-    options
-  );
+    timeoutSeconds.toFixed(3),
+    ...TIME_COMMAND,
+    command,
+    ...args,
+  ]);
+  const spawnResult = child_process.spawnSync(wrappedCommand[0], wrappedCommand.slice(1), {
+    ...options,
+    env: { ...(options.env ?? process.env), ...getSandboxUserEnvOverrides() },
+  });
 
   const stopTimeMilliseconds = Date.now();
 
