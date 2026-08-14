@@ -1,5 +1,6 @@
 import child_process from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 
 /**
  * Name of the environment variable through which a judge server tells problem-utils to run
@@ -34,6 +35,14 @@ const SLEEP_PATH = '/bin/sleep';
 const MINIMAL_ENV = { PATH: '/usr/local/bin:/usr/bin:/bin' } as const;
 
 export const sandboxUserName = process.env[SANDBOX_USER_ENV_NAME] || undefined;
+
+// Fail fast on the catastrophic misconfiguration where the sandbox user is the harness's own user:
+// cleanup (`killSandboxUserProcesses`) would then SIGKILL the harness itself on the first run.
+if (sandboxUserName && sandboxUserName === os.userInfo().username) {
+  throw new Error(
+    `${SANDBOX_USER_ENV_NAME} must name a different OS user than the one running the harness (got "${sandboxUserName}"). Leave it unset to run everything as the current user.`
+  );
+}
 
 /**
  * Wrap a command so it runs as the sandbox user. `umask 0` makes every file the sandboxed process

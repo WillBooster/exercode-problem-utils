@@ -11,6 +11,7 @@ import {
   sandboxUserName,
   wrapCommandWithSandboxUser,
 } from './sandboxUser.js';
+import { copyWithoutFollowingSymlinks } from './safeFs.js';
 
 export type PackageManager = 'bun' | 'cargo' | 'go' | 'gradle' | 'maven' | 'npm' | 'pnpm' | 'ruby' | 'uv' | 'yarn';
 type PackageManagerInstallCommand = readonly [string, ...string[]];
@@ -85,6 +86,9 @@ const timeCommand = resolveTimeCommand();
  * Copies a submission directory to a temporary directory, overlays package
  * manager project files from the problem directory, prepares dependencies,
  * runs a command, and then removes the temporary directory.
+ *
+ * Under `EXERCODE_SANDBOX_USER` delegation, cleanup kills every process of the sandbox user, so do
+ * not run multiple invocations concurrently in that mode — one finishing would kill the others.
  */
 export async function runCommandInTemporaryPackageManagerProject(
   options: RunCommandInTemporaryPackageManagerProjectOptions
@@ -340,7 +344,9 @@ export async function copyPackageManagerProjectFiles(options: {
 
 async function copyPathIfExists(sourcePath: string, destinationPath: string): Promise<void> {
   try {
-    await fs.cp(sourcePath, destinationPath, { recursive: true });
+    // No-follow copy: the destination was seeded from the (sandbox-writable) submission tree, so a
+    // planted symlink there must not redirect this trusted project-file overlay outside runDir.
+    await copyWithoutFollowingSymlinks(sourcePath, destinationPath);
   } catch (error) {
     const code =
       typeof error === 'object' && error !== null && 'code' in error ? (error as { code: unknown }).code : undefined;

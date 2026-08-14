@@ -21,6 +21,7 @@ import {
   killSandboxUserProcesses,
   makeAccessibleToSandboxUser,
   sandboxUserName,
+  startSandboxTimeoutWatchdog,
   wrapCommandWithSandboxUser,
 } from '../helpers/sandboxUser.js';
 import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
@@ -359,6 +360,9 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
     });
     await cleanWorkingDirectory(args.cwd, cwdSnapshot);
   } finally {
+    // Sweep any sandbox processes the run left behind (e.g. a SIGTERM-ignoring forked child) so they
+    // cannot race the harness's output reads or survive into the next test case/request.
+    if (sandboxUserName) killSandboxUserProcesses();
     await displayServer?.dispose();
   }
 }
@@ -495,6 +499,10 @@ async function spawnGuiProgram(context: {
   let screenshots: GuiScreenshotFile[] = [];
   const startTimeSeconds = Date.now() / 1000;
   let sampledMemoryBytes = 0;
+  // A submission can signal its own sandboxed `timeout` and then wedge the event loop (e.g.
+  // XGrabServer makes the synchronous `xwininfo`/`maim` block), so a harness-owned watchdog
+  // force-kills the sandbox user at the deadline; killing the client also releases its X grab.
+  const stopWatchdog = startSandboxTimeoutWatchdog(context.timeLimitSeconds);
 
   child.stdout.on('data', (chunk: string) => {
     stdout += chunk;
@@ -561,6 +569,7 @@ async function spawnGuiProgram(context: {
     child.removeAllListeners('error');
   }
   await stopProcess(child);
+  stopWatchdog();
   if (spawnError) throw spawnError;
   const {
     memoryBytes,
@@ -670,12 +679,13 @@ async function ensureDisplayServer(): Promise<{ display: string; dispose: () => 
 
 async function stopProcess(child: childProcess.ChildProcess): Promise<void> {
   if (!child.pid) return;
-  // The current user cannot signal the root-owned sudo wrapper nor the sandbox user's processes,
-  // so go through sudo, keeping the same TERM → grace → KILL sequence as the direct path.
+  // The current user cannot signal the root-owned sudo wrapper nor the sandbox user's processes, so
+  // go through sudo. SIGKILL is unconditional after the grace period: `child.exitCode` reflects only
+  // the sudo wrapper, so a daemonized child that ignored SIGTERM would survive if we gated on it.
   if (sandboxUserName) {
     killSandboxUserProcesses(['TERM']);
     await wait(PROCESS_SHUTDOWN_WAIT_SECONDS * 1000);
-    if (child.exitCode === null) killSandboxUserProcesses(['KILL']);
+    killSandboxUserProcesses(['KILL']);
     return;
   }
   killProcessGroup(child.pid, 'SIGTERM');
@@ -686,12 +696,9 @@ async function stopProcess(child: childProcess.ChildProcess): Promise<void> {
 function readProcessGroupMemoryBytes(processGroupId: number | undefined): number {
   if (!processGroupId || process.platform !== 'linux') return 0;
 
-  // Under delegation the child pid belongs to sudo, whose command may run in a different process
-  // group (sudo's use_pty mode calls setsid), so sample by user instead of by group there.
-  const psArgs = sandboxUserName
-    ? ['-o', 'rss=', '--no-headers', '-u', sandboxUserName]
-    : ['-o', 'rss=', '--no-headers', '--pgroup', String(processGroupId)];
-  const result = childProcess.spawnSync('/usr/bin/ps', psArgs, {
+  // The delegation contract requires sudoers `!use_pty`, so sudo execs the command in place and it
+  // stays in the detached child's process group; `--pgroup` therefore still captures it there.
+  const result = childProcess.spawnSync('ps', ['-o', 'rss=', '--no-headers', '--pgroup', String(processGroupId)], {
     encoding: 'utf8',
   });
   if (result.error || result.status !== 0 || !result.stdout) return 0;
