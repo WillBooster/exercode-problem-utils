@@ -379,10 +379,15 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
     });
     await cleanWorkingDirectory(args.cwd, cwdSnapshot);
   } finally {
-    // Sweep any sandbox processes the run left behind (e.g. a SIGTERM-ignoring forked child) so they
-    // cannot race the harness's output reads or survive into the next test case/request.
-    if (sandboxUserName) killSandboxUserProcesses();
-    await displayServer?.dispose();
+    try {
+      // Sweep any sandbox processes the run left behind (e.g. a SIGTERM-ignoring forked child) so
+      // they cannot race the harness's output reads or survive into the next test case/request.
+      if (sandboxUserName) killSandboxUserProcesses();
+    } finally {
+      // Must run even when the sweep fails closed, or Xvfb keeps holding its display number and
+      // later GUI requests exhaust the `:90`–`:99` range.
+      await displayServer?.dispose();
+    }
   }
 }
 

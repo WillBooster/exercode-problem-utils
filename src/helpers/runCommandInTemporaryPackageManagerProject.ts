@@ -169,9 +169,13 @@ export async function runCommandInTemporaryPackageManagerProject(
 
     return toPackageManagerCommandRunResult({ elapsedTimeSeconds, options, result });
   } finally {
-    // Daemonized children of the sandboxed command would otherwise outlive the run.
-    if (sandboxUserName) killSandboxUserProcesses();
-    await forceRemove(runDir);
+    try {
+      // Daemonized children of the sandboxed command would otherwise outlive the run.
+      if (sandboxUserName) killSandboxUserProcesses();
+    } finally {
+      // Must run even when the sweep fails closed, or the temporary submission copy leaks.
+      await forceRemove(runDir);
+    }
   }
 }
 
@@ -494,7 +498,14 @@ function killSubprocessGroup(subprocess: childProcess.ChildProcess, signal: Node
   // so go through sudo with the requested signal only; the callers' existing timers provide the
   // TERM → grace → KILL escalation.
   if (sandboxUserName) {
-    killSandboxUserProcesses([signal === 'SIGKILL' ? 'KILL' : 'TERM']);
+    try {
+      killSandboxUserProcesses([signal === 'SIGKILL' ? 'KILL' : 'TERM']);
+    } catch (error) {
+      // Reached from stream `data` listeners and timer callbacks, where a throw would be an
+      // uncaught exception that kills the harness before any result is printed. The run's `finally`
+      // sweep still fails closed.
+      console.error('failed to signal sandbox processes', error);
+    }
     return;
   }
 
