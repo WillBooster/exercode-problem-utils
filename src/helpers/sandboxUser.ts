@@ -10,11 +10,23 @@ import fs from 'node:fs';
  * submissions while the submissions themselves run under the sandbox user. When the variable is
  * absent or empty (local development, course authoring, or an all-sandbox judge run), commands run
  * as the current user like before.
+ *
+ * Contract for the delegating judge server:
+ * - The harness process environment is forwarded verbatim to sandboxed submissions (sudo runs with
+ *   `--preserve-env`), so it must not contain secrets beyond what submissions may see.
+ * - sudoers must let the harness user run arbitrary commands as the sandbox user without a
+ *   password and pass the environment through (e.g. `Defaults:<harness> !env_reset, !env_delete,
+ *   !env_check, !secure_path` plus `<harness> ALL=(<sandbox>) NOPASSWD:SETENV: ALL`).
+ * - The sandbox user's home directory must exist at `/home/<sandbox user>` and be writable.
  */
 export const SANDBOX_USER_ENV_NAME = 'EXERCODE_SANDBOX_USER';
 
-// Absolute path so a submission-controlled `PATH` cannot redirect the privileged `sudo`.
+// Absolute paths so a submission-influenced `PATH` cannot redirect binaries that the trusted
+// harness user executes (`sudo` is also setuid and must be the real one).
 const SUDO_PATH = '/usr/bin/sudo';
+const CHMOD_PATH = '/bin/chmod';
+// Minimal environment for trusted helper processes; never forward the harness environment to them.
+const MINIMAL_ENV = { PATH: '/usr/local/bin:/usr/bin:/bin' } as const;
 
 export const sandboxUserName = process.env[SANDBOX_USER_ENV_NAME] || undefined;
 
@@ -42,13 +54,16 @@ export function wrapCommandWithSandboxUser(command: readonly [string, ...string[
 
 /**
  * Environment overrides for sandboxed processes: a writable home and the `LD_LIBRARY_PATH`
- * smuggled past the setuid `sudo` exec (see {@link wrapCommandWithSandboxUser}).
+ * smuggled past the setuid `sudo` exec (see {@link wrapCommandWithSandboxUser}). Pass the
+ * environment the command will actually run with so a caller-supplied `LD_LIBRARY_PATH` survives
+ * the exec; the harness's own value is only the fallback.
  */
-export function getSandboxUserEnvOverrides(): NodeJS.ProcessEnv {
+export function getSandboxUserEnvOverrides(env?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   if (!sandboxUserName) return {};
+  const ldLibraryPath = env?.LD_LIBRARY_PATH ?? process.env.LD_LIBRARY_PATH;
   return {
     HOME: `/home/${sandboxUserName}`,
-    ...(process.env.LD_LIBRARY_PATH && { SANDBOX_LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH }),
+    ...(ldLibraryPath && { SANDBOX_LD_LIBRARY_PATH: ldLibraryPath }),
   };
 }
 
@@ -59,43 +74,82 @@ export function getSandboxUserEnvOverrides(): NodeJS.ProcessEnv {
 export function makeAccessibleToSandboxUser(targetPath: string): void {
   if (!sandboxUserName) return;
   // Files owned by the sandbox user fail to chmod but are already world-writable (umask 0).
-  child_process.spawnSync('chmod', ['-R', 'a+rwX', targetPath]);
+  child_process.spawnSync(CHMOD_PATH, ['-R', 'a+rwX', targetPath], { env: MINIMAL_ENV });
 }
 
 /**
- * Kill all processes of the sandbox user. The harness user cannot signal another user's processes
- * (nor the root-owned `sudo` wrapper), so this goes through sudo. Killing every sandbox process is
- * safe because the judge server handles one request at a time. SIGTERM is followed by SIGKILL so a
- * submission that traps SIGTERM cannot survive cleanup.
+ * Kill the sandbox user's processes with the given signals. The harness user cannot signal another
+ * user's processes (nor the root-owned `sudo` wrapper), so this goes through sudo. Killing every
+ * sandbox process is safe because the judge server handles one request at a time. The default
+ * sends SIGTERM immediately followed by SIGKILL (final cleanup); callers that want a grace period
+ * send `['TERM']`, wait, and then send `['KILL']`.
  */
-export function killSandboxUserProcesses(): void {
+export function killSandboxUserProcesses(signals: readonly ('TERM' | 'KILL')[] = ['TERM', 'KILL']): void {
   if (!sandboxUserName) return;
-  // Two direct calls instead of one `sh -c 'pkill ...; pkill ...'`: the wrapping shell would run as
-  // the sandbox user too, so the first pkill would kill it before the second ran. Each `pkill`
-  // exits with 1 when no process matches, so ignore the exit status.
-  for (const signal of ['-TERM', '-KILL']) {
-    child_process.spawnSync(SUDO_PATH, ['-u', sandboxUserName, 'pkill', signal, '-u', sandboxUserName], {
-      // The harness environment must not be passed: sudoers forwards it verbatim, and after sudo
-      // drops privileges the helper's `/proc/<pid>/environ` becomes readable by every other
-      // sandbox process.
-      env: { PATH: '/usr/local/bin:/usr/bin:/bin' },
-    });
+  // One direct call per signal instead of one `sh -c 'pkill ...; pkill ...'`: the wrapping shell
+  // would run as the sandbox user too, so the first pkill would kill it before the second ran.
+  // Each `pkill` exits with 1 when no process matches, so ignore the exit status.
+  for (const signal of signals) {
+    runAsSandboxUser(['pkill', `-${signal}`, '-u', sandboxUserName]);
   }
 }
 
 /**
+ * Let the sandbox user reopen the permissions of its own files under the given path, for
+ * harness-side traversal/cleanup of trees where a sandboxed process restricted permissions
+ * (some tools chmod their outputs regardless of umask).
+ */
+export function relaxPermissionsAsSandboxUser(targetPath: string): void {
+  if (!sandboxUserName) return;
+  runAsSandboxUser(['chmod', '-R', 'a+rwX', targetPath]);
+}
+
+/**
+ * Start a harness-owned watchdog that force-kills every sandbox process after the given deadline,
+ * and return a function that cancels it. A sandboxed submission can signal its own `timeout`
+ * supervisor (same UID), and a synchronous spawn blocks the harness's event loop, so without this
+ * external deadline a submission could run until the outer judge-server limit. The watchdog's
+ * `sh`/`sleep` run as the harness user, out of the submission's reach; killing the watchdog's
+ * process group cancels it before it spawns sudo.
+ */
+export function startSandboxTimeoutWatchdog(timeoutSeconds: number): () => void {
+  if (!sandboxUserName) return () => {};
+  const deadlineSeconds = Math.ceil(timeoutSeconds) + 5;
+  const watchdog = child_process.spawn(
+    '/bin/sh',
+    ['-c', `sleep ${deadlineSeconds}; ${SUDO_PATH} -u "$1" pkill -KILL -u "$1"`, 'sh', sandboxUserName],
+    { detached: true, stdio: 'ignore', env: MINIMAL_ENV }
+  );
+  watchdog.unref();
+  return () => {
+    if (watchdog.pid === undefined) return;
+    try {
+      process.kill(-watchdog.pid, 'SIGKILL');
+    } catch {
+      // The watchdog already fired and exited.
+    }
+  };
+}
+
+/**
+ * Run a helper as the sandbox user with a minimal environment. The harness environment must not be
+ * passed: sudoers forwards it verbatim, and after sudo drops privileges the helper's
+ * `/proc/<pid>/environ` becomes readable by every other sandbox process.
+ */
+function runAsSandboxUser(command: [string, ...string[]]): void {
+  child_process.spawnSync(SUDO_PATH, ['-u', sandboxUserName as string, ...command], { env: MINIMAL_ENV });
+}
+
+/**
  * `fs.rm`-like removal with a fallback for trees holding sandbox-user-owned entries whose
- * permissions block deletion (some tools chmod their outputs regardless of umask): let the sandbox
- * user reopen its own files first, then retry.
+ * permissions block deletion: let the sandbox user reopen its own files first, then retry.
  */
 export async function forceRemove(targetPath: string): Promise<void> {
   try {
     await fs.promises.rm(targetPath, { force: true, recursive: true });
   } catch (error) {
     if (!sandboxUserName) throw error;
-    child_process.spawnSync(SUDO_PATH, ['-u', sandboxUserName, 'chmod', '-R', 'a+rwX', targetPath], {
-      env: { PATH: '/usr/local/bin:/usr/bin:/bin' },
-    });
+    relaxPermissionsAsSandboxUser(targetPath);
     await fs.promises.rm(targetPath, { force: true, recursive: true });
   }
 }

@@ -164,6 +164,8 @@ export async function runCommandInTemporaryPackageManagerProject(
 
     return toPackageManagerCommandRunResult({ elapsedTimeSeconds, options, result });
   } finally {
+    // Daemonized children of the sandboxed command would otherwise outlive the run.
+    if (sandboxUserName) killSandboxUserProcesses();
     await forceRemove(runDir);
   }
 }
@@ -374,7 +376,7 @@ async function spawnWithInput(
   const subprocess = childProcess.spawn(spawnedCommand[0], spawnedCommand.slice(1), {
     cwd: context.cwd,
     detached: process.platform !== 'win32',
-    env: { ...context.env, ...getSandboxUserEnvOverrides() },
+    env: { ...context.env, ...getSandboxUserEnvOverrides(context.env) },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
@@ -478,9 +480,11 @@ function resolveTimeCommand(): readonly [string, ...string[]] | undefined {
 function killSubprocessGroup(subprocess: childProcess.ChildProcess, signal: NodeJS.Signals): void {
   if (subprocess.pid === undefined) return;
 
-  // The current user cannot signal the root-owned sudo wrapper nor the sandbox user's processes.
+  // The current user cannot signal the root-owned sudo wrapper nor the sandbox user's processes,
+  // so go through sudo with the requested signal only; the callers' existing timers provide the
+  // TERM → grace → KILL escalation.
   if (sandboxUserName) {
-    killSandboxUserProcesses();
+    killSandboxUserProcesses([signal === 'SIGKILL' ? 'KILL' : 'TERM']);
     return;
   }
 

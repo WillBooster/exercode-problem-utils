@@ -1,14 +1,22 @@
 import child_process from 'node:child_process';
 import os from 'node:os';
 
-import { getSandboxUserEnvOverrides, wrapCommandWithSandboxUser } from './sandboxUser.js';
+import {
+  getSandboxUserEnvOverrides,
+  killSandboxUserProcesses,
+  sandboxUserName,
+  startSandboxTimeoutWatchdog,
+  wrapCommandWithSandboxUser,
+} from './sandboxUser.js';
 
 const TIME_COMMAND = [os.platform() === 'darwin' ? 'gtime' : '/usr/bin/time', '--format', '%e %M'] as const;
 
 /**
  * Run an untrusted (submission-derived) command with a timeout. When a judge server delegates
  * untrusted execution via `EXERCODE_SANDBOX_USER` (see `sandboxUser.ts`), the whole command,
- * including `timeout`, runs as the sandbox user so the timer can signal the sandboxed process.
+ * including `timeout`, runs as the sandbox user so the timer can signal the sandboxed process; a
+ * harness-owned watchdog enforces the deadline even if the submission kills its own `timeout`, and
+ * leftover sandbox processes (e.g. daemonized children) are killed after every run.
  */
 export function spawnSyncWithTimeout(
   command: string,
@@ -18,6 +26,7 @@ export function spawnSyncWithTimeout(
 ): child_process.SpawnSyncReturns<string> & { timeSeconds: number; memoryBytes: number } {
   const startTimeMilliseconds = Date.now();
 
+  const env = { ...(options.env ?? process.env) };
   const wrappedCommand = wrapCommandWithSandboxUser([
     'timeout',
     timeoutSeconds.toFixed(3),
@@ -25,10 +34,17 @@ export function spawnSyncWithTimeout(
     command,
     ...args,
   ]);
-  const spawnResult = child_process.spawnSync(wrappedCommand[0], wrappedCommand.slice(1), {
-    ...options,
-    env: { ...(options.env ?? process.env), ...getSandboxUserEnvOverrides() },
-  });
+  const stopWatchdog = startSandboxTimeoutWatchdog(timeoutSeconds);
+  let spawnResult: child_process.SpawnSyncReturns<string>;
+  try {
+    spawnResult = child_process.spawnSync(wrappedCommand[0], wrappedCommand.slice(1), {
+      ...options,
+      env: { ...env, ...getSandboxUserEnvOverrides(env) },
+    });
+  } finally {
+    stopWatchdog();
+    if (sandboxUserName) killSandboxUserProcesses();
+  }
 
   const stopTimeMilliseconds = Date.now();
 

@@ -19,6 +19,7 @@ import { readTestCases as readFileTestCases } from '../helpers/readTestCases.js'
 import {
   getSandboxUserEnvOverrides,
   killSandboxUserProcesses,
+  makeAccessibleToSandboxUser,
   sandboxUserName,
   wrapCommandWithSandboxUser,
 } from '../helpers/sandboxUser.js';
@@ -140,6 +141,9 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
   const args = parseArgs(process.argv);
   if (!args.cwd) throw new Error('cwd argument required');
   const params = judgeParamsSchema.parse(args.params);
+
+  // The sandboxed submission must read its sources and write build/run outputs in its directory.
+  makeAccessibleToSandboxUser(args.cwd);
 
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
   const configuredTestCases = await (options.readTestCases ?? readGuiTestCases<TTestCase>)(problemDir);
@@ -474,7 +478,7 @@ async function spawnGuiProgram(context: {
   ]);
   const child = childProcess.spawn(wrappedCommand[0], wrappedCommand.slice(1), {
     cwd: context.cwd,
-    env: { ...context.env, ...getSandboxUserEnvOverrides() },
+    env: { ...context.env, ...getSandboxUserEnvOverrides(context.env) },
     detached: process.platform !== 'win32',
     stdio: ['pipe', 'pipe', 'pipe'],
   });
@@ -666,9 +670,12 @@ async function ensureDisplayServer(): Promise<{ display: string; dispose: () => 
 
 async function stopProcess(child: childProcess.ChildProcess): Promise<void> {
   if (!child.pid) return;
-  // The current user cannot signal the root-owned sudo wrapper nor the sandbox user's processes.
+  // The current user cannot signal the root-owned sudo wrapper nor the sandbox user's processes,
+  // so go through sudo, keeping the same TERM → grace → KILL sequence as the direct path.
   if (sandboxUserName) {
-    killSandboxUserProcesses();
+    killSandboxUserProcesses(['TERM']);
+    await wait(PROCESS_SHUTDOWN_WAIT_SECONDS * 1000);
+    if (child.exitCode === null) killSandboxUserProcesses(['KILL']);
     return;
   }
   killProcessGroup(child.pid, 'SIGTERM');
@@ -679,7 +686,12 @@ async function stopProcess(child: childProcess.ChildProcess): Promise<void> {
 function readProcessGroupMemoryBytes(processGroupId: number | undefined): number {
   if (!processGroupId || process.platform !== 'linux') return 0;
 
-  const result = childProcess.spawnSync('ps', ['-o', 'rss=', '--no-headers', '--pgroup', String(processGroupId)], {
+  // Under delegation the child pid belongs to sudo, whose command may run in a different process
+  // group (sudo's use_pty mode calls setsid), so sample by user instead of by group there.
+  const psArgs = sandboxUserName
+    ? ['-o', 'rss=', '--no-headers', '-u', sandboxUserName]
+    : ['-o', 'rss=', '--no-headers', '--pgroup', String(processGroupId)];
+  const result = childProcess.spawnSync('/usr/bin/ps', psArgs, {
     encoding: 'utf8',
   });
   if (result.error || result.status !== 0 || !result.stdout) return 0;

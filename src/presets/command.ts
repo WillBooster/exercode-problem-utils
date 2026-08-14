@@ -12,6 +12,7 @@ import { parseArgs } from '../helpers/parseArgs.js';
 import { printDebugBanner } from '../helpers/printDebugBanner.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readOutputFiles } from '../helpers/readOutputFiles.js';
+import { makeAccessibleToSandboxUser } from '../helpers/sandboxUser.js';
 import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases as readFileTestCases } from '../helpers/readTestCases.js';
 import {
@@ -167,6 +168,9 @@ async function runCommandJudgeForCwd<
   params: JudgeParams,
   options: CommandJudgePresetOptions<TTestCase, TRunResult>
 ): Promise<{ allAccepted: boolean }> {
+  // The sandboxed submission must read its sources and write build/run outputs in its directory.
+  makeAccessibleToSandboxUser(cwd);
+
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
   const testCases = await (options.readTestCases ?? readCommandTestCases)(problemDir);
   const prebuildTestCaseId = testCases[0]?.id ?? 'prebuild';
