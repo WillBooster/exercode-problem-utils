@@ -49,11 +49,11 @@
   },
   "prettier": "@willbooster/prettier-config",
   "dependencies": {
-    "@ai-sdk/amazon-bedrock": "5.0.40",
-    "@ai-sdk/google": "4.0.31",
-    "@ai-sdk/openai": "4.0.27",
-    "@ai-sdk/xai": "4.0.25",
-    "ai": "7.0.47",
+    "@ai-sdk/amazon-bedrock": "5.0.50",
+    "@ai-sdk/google": "4.0.39",
+    "@ai-sdk/openai": "4.0.36",
+    "@ai-sdk/xai": "4.0.33",
+    "ai": "7.0.58",
     "front-matter": "4.0.2",
     "zod": "4.4.3"
   },
