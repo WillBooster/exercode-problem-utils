@@ -1,10 +1,8 @@
 import child_process from 'node:child_process';
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
-import util from 'node:util';
 
-import { copyProblemDirToTemporaryRoot } from '../helpers/checkProblemDirIsolation.js';
+import { copyProblemDirToTemporaryRoot, forciblyRemoveDirectory } from '../helpers/checkProblemDirIsolation.js';
 import { findDefaultStdioHarnessFiles } from '../helpers/defaultStdioHarness.js';
 import { findFailingModelAnswerDirs, findModelAnswerDirs } from '../helpers/findModelAnswerDirs.js';
 import { readTestCases } from '../helpers/readTestCases.js';
@@ -12,8 +10,6 @@ import { DecisionCode } from '../types/decisionCode.js';
 import { TEST_CASE_RESULT_PREFIX, testCaseResultSchema } from '../types/testCaseResult.js';
 
 import { formatDefaultHarnessError } from './runSingleHarness.js';
-
-const execFileAsync = util.promisify(child_process.execFile);
 
 const RUN_TIMEOUT_MS = 600_000;
 const MAX_RUN_OUTPUT_BYTES = 64 * 1024 * 1024;
@@ -128,11 +124,6 @@ export async function checkAllProblems(args: readonly string[]): Promise<number>
  * artifacts in answer directories) never modifies the checked repository.
  */
 async function executeCheckRun(run: CheckRun, cliEntryPath: string): Promise<string | undefined> {
-  let stdout = '';
-  let stderr = '';
-  let exitCode: number | undefined = 0;
-  let errorCode: string | undefined;
-  let timedOut = false;
   let tempRoot: string;
   let copiedProblemDir: string;
   try {
@@ -142,30 +133,20 @@ async function executeCheckRun(run: CheckRun, cliEntryPath: string): Promise<str
       `failed to copy the problem directory to a temporary location: ${error instanceof Error ? error.message : String(error)}`
     );
   }
-  try {
-    ({ stdout, stderr } = await execFileAsync(
-      'bun',
-      ['run', cliEntryPath, path.relative(run.problemDir, run.answerDir)],
-      { cwd: copiedProblemDir, encoding: 'utf8', maxBuffer: MAX_RUN_OUTPUT_BYTES, timeout: RUN_TIMEOUT_MS }
-    ));
-  } catch (error) {
-    const execError = error as child_process.ExecFileException & { stdout?: string; stderr?: string };
-    stdout = execError.stdout ?? '';
-    stderr = execError.stderr ?? '';
-    exitCode = typeof execError.code === 'number' ? execError.code : undefined;
-    errorCode = typeof execError.code === 'string' ? execError.code : undefined;
-    timedOut = execError.killed === true && errorCode === undefined;
-  } finally {
-    await fs.rm(tempRoot, { recursive: true, force: true }).catch(() => {});
-  }
 
-  if (timedOut) return `timed out after ${RUN_TIMEOUT_MS / 1000} seconds`;
-  if (errorCode === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
-    return `the harness printed more than ${MAX_RUN_OUTPUT_BYTES / 1024 / 1024} MB of output`;
+  const result = await runHarnessProcess(
+    ['run', cliEntryPath, path.relative(run.problemDir, run.answerDir)],
+    copiedProblemDir
+  );
+  const removedTempRoot = await forciblyRemoveDirectory(tempRoot);
+
+  const { stdout, stderr } = result;
+  if (result.failureReason !== undefined) return truncate(result.failureReason);
+  if (result.exitCode !== 0) {
+    return truncate(`harness exited with ${result.exitCode ?? 'a signal'}${stderr.trim() ? `: ${stderr.trim()}` : ''}`);
   }
-  if (errorCode !== undefined) return truncate(`failed to run the harness: ${errorCode}`);
-  if (exitCode !== 0) {
-    return truncate(`harness exited with ${exitCode ?? 'a signal'}${stderr.trim() ? `: ${stderr.trim()}` : ''}`);
+  if (!removedTempRoot) {
+    return `failed to remove the temporary copy at ${tempRoot} (judged code may have left permission-locked files)`;
   }
 
   const resultLines = stdout.split('\n').filter((line) => line.startsWith(TEST_CASE_RESULT_PREFIX));
@@ -196,10 +177,95 @@ async function executeCheckRun(run: CheckRun, cliEntryPath: string): Promise<str
     : undefined;
 }
 
+interface HarnessProcessResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number | undefined;
+  failureReason: string | undefined;
+}
+
+/**
+ * Run the harness in its own process group, killing the whole group on timeout or when the output
+ * cap is exceeded so grandchild submission processes cannot outlive the run.
+ */
+function runHarnessProcess(commandArgs: readonly string[], cwd: string): Promise<HarnessProcessResult> {
+  return new Promise((resolve) => {
+    const child = child_process.spawn('bun', commandArgs, {
+      cwd,
+      detached: process.platform !== 'win32',
+      env: createHarnessEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    let failureReason: string | undefined;
+    let settled = false;
+
+    const killProcessGroup = (reason: string): void => {
+      if (failureReason !== undefined) return;
+      failureReason = reason;
+      try {
+        if (process.platform !== 'win32' && child.pid !== undefined) {
+          process.kill(-child.pid, 'SIGKILL');
+        } else {
+          child.kill('SIGKILL');
+        }
+      } catch {
+        child.kill('SIGKILL');
+      }
+    };
+    const timeoutId = setTimeout(
+      () => killProcessGroup(`timed out after ${RUN_TIMEOUT_MS / 1000} seconds`),
+      RUN_TIMEOUT_MS
+    );
+
+    const appendOutput = (chunk: string, target: 'stdout' | 'stderr'): void => {
+      if (target === 'stdout') stdout += chunk;
+      else stderr += chunk;
+      if (stdout.length + stderr.length > MAX_RUN_OUTPUT_BYTES) {
+        killProcessGroup(`the harness printed more than ${MAX_RUN_OUTPUT_BYTES / 1024 / 1024} MB of output`);
+      }
+    };
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => appendOutput(chunk, 'stdout'));
+    child.stderr.on('data', (chunk: string) => appendOutput(chunk, 'stderr'));
+
+    child.on('error', (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      resolve({
+        stdout,
+        stderr,
+        exitCode: undefined,
+        failureReason: failureReason ?? `failed to run the harness: ${error.message}`,
+      });
+    });
+    child.on('close', (exitCode) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      resolve({ stdout, stderr, exitCode: exitCode ?? undefined, failureReason });
+    });
+  });
+}
+
+// `check` runs harnesses concurrently and has no sandbox-delegation contract, while the sandbox
+// helpers assume one harness at a time (their pkill targets every process of the sandbox user), so
+// never forward the sandbox user to judged runs.
+function createHarnessEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  delete env.EXERCODE_SANDBOX_USER;
+  return env;
+}
+
 function parseCheckArgs(args: readonly string[]): CheckOptions {
   const options: CheckOptions = {
     rootDir: '.',
-    concurrency: Math.max(1, Math.min(4, os.availableParallelism())),
+    // Serial by default: judging decides TIME_LIMIT_EXCEEDED from wall-clock time, so parallel
+    // runs on a small CI runner could fail timing-sensitive problems non-deterministically.
+    concurrency: 1,
     only: [],
     skip: [],
   };

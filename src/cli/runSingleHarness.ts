@@ -25,6 +25,10 @@ export async function runSingleHarness(kind: 'judge' | 'debug'): Promise<number>
       cwd: problemDir,
       stdio: 'inherit',
     });
+    if (spawnResult.error) {
+      console.error(`failed to run ${harnessFileName}: ${spawnResult.error.message}`);
+      return 1;
+    }
     return spawnResult.status ?? 1;
   }
 

@@ -89,13 +89,8 @@ export async function checkProblemDirIsolation(
     ]);
     return { passed: false };
   } finally {
-    if (tempRoot) {
-      try {
-        await fs.promises.rm(tempRoot, { recursive: true, force: true });
-      } catch {
-        // Cleanup errors should not mask the primary isolation check result.
-      }
-    }
+    // Cleanup failures must not mask the primary isolation check result.
+    if (tempRoot) await forciblyRemoveDirectory(tempRoot);
   }
 }
 
@@ -114,16 +109,34 @@ export async function copyProblemDirToTemporaryRoot(
     await fs.promises.cp(absoluteProblemDir, copiedProblemDir, {
       recursive: true,
       filter: isCopiedProblemPath,
+      // Keep relative symlinks relative: the default rewrites them to absolute paths into the
+      // source tree, so judging the copy could write through them into the checked repository.
+      verbatimSymlinks: true,
     });
     await symlinkAllAncestorNodeModules(tempRoot, absoluteProblemDir);
     return { tempRoot, copiedProblemDir };
   } catch (error) {
-    try {
-      await fs.promises.rm(tempRoot, { recursive: true, force: true });
-    } catch {
-      // Cleanup errors should not mask the original copy error.
-    }
+    await forciblyRemoveDirectory(tempRoot);
     throw error;
+  }
+}
+
+/**
+ * Remove a temporary directory even when judged code left permission-locked entries in it (e.g. a
+ * mode-000 directory makes a plain `fs.rm` fail with EACCES). Returns whether removal succeeded.
+ */
+export async function forciblyRemoveDirectory(dir: string): Promise<boolean> {
+  try {
+    await fs.promises.rm(dir, { recursive: true, force: true });
+    return true;
+  } catch {
+    child_process.spawnSync('chmod', ['-R', 'u+rwX', dir]);
+    try {
+      await fs.promises.rm(dir, { recursive: true, force: true });
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 
