@@ -1,4 +1,5 @@
 import child_process from 'node:child_process';
+import fsSync from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -136,7 +137,8 @@ async function executeCheckRun(run: CheckRun, cliEntryPath: string): Promise<str
 
   const result = await runHarnessProcess(
     ['run', cliEntryPath, path.relative(run.problemDir, run.answerDir)],
-    copiedProblemDir
+    copiedProblemDir,
+    tempRoot
   );
   const removedTempRoot = await forciblyRemoveDirectory(tempRoot);
 
@@ -184,11 +186,26 @@ interface HarnessProcessResult {
   failureReason: string | undefined;
 }
 
+interface LiveHarnessRun {
+  pid: number;
+  tempRoot: string;
+}
+
+// Detached harness groups no longer receive the terminal's SIGINT, so an interrupted `check` must
+// tear them down (and remove their temp copies) itself before exiting.
+const liveHarnessRuns = new Set<LiveHarnessRun>();
+let signalHandlersInstalled = false;
+
 /**
  * Run the harness in its own process group, killing the whole group on timeout or when the output
  * cap is exceeded so grandchild submission processes cannot outlive the run.
  */
-function runHarnessProcess(commandArgs: readonly string[], cwd: string): Promise<HarnessProcessResult> {
+function runHarnessProcess(
+  commandArgs: readonly string[],
+  cwd: string,
+  tempRoot: string
+): Promise<HarnessProcessResult> {
+  installSignalHandlers();
   return new Promise((resolve) => {
     const child = child_process.spawn('bun', commandArgs, {
       cwd,
@@ -196,8 +213,11 @@ function runHarnessProcess(commandArgs: readonly string[], cwd: string): Promise
       env: createHarnessEnv(),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    let stdout = '';
-    let stderr = '';
+    const liveRun: LiveHarnessRun | undefined = child.pid === undefined ? undefined : { pid: child.pid, tempRoot };
+    if (liveRun) liveHarnessRuns.add(liveRun);
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    let totalOutputBytes = 0;
     let failureReason: string | undefined;
     let settled = false;
 
@@ -219,36 +239,54 @@ function runHarnessProcess(commandArgs: readonly string[], cwd: string): Promise
       RUN_TIMEOUT_MS
     );
 
-    const appendOutput = (chunk: string, target: 'stdout' | 'stderr'): void => {
-      if (target === 'stdout') stdout += chunk;
-      else stderr += chunk;
-      if (stdout.length + stderr.length > MAX_RUN_OUTPUT_BYTES) {
+    const appendOutput = (chunk: Buffer, chunks: Buffer[]): void => {
+      totalOutputBytes += chunk.byteLength;
+      if (totalOutputBytes > MAX_RUN_OUTPUT_BYTES) {
         killProcessGroup(`the harness printed more than ${MAX_RUN_OUTPUT_BYTES / 1024 / 1024} MB of output`);
+        return;
       }
+      chunks.push(chunk);
     };
-    child.stdout.setEncoding('utf8');
-    child.stderr.setEncoding('utf8');
-    child.stdout.on('data', (chunk: string) => appendOutput(chunk, 'stdout'));
-    child.stderr.on('data', (chunk: string) => appendOutput(chunk, 'stderr'));
+    child.stdout.on('data', (chunk: Buffer) => appendOutput(chunk, stdoutChunks));
+    child.stderr.on('data', (chunk: Buffer) => appendOutput(chunk, stderrChunks));
 
-    child.on('error', (error) => {
+    const settle = (exitCode: number | undefined, spawnError?: Error): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timeoutId);
+      if (liveRun) liveHarnessRuns.delete(liveRun);
       resolve({
-        stdout,
-        stderr,
-        exitCode: undefined,
-        failureReason: failureReason ?? `failed to run the harness: ${error.message}`,
+        stdout: Buffer.concat(stdoutChunks).toString('utf8'),
+        stderr: Buffer.concat(stderrChunks).toString('utf8'),
+        exitCode,
+        failureReason: failureReason ?? (spawnError ? `failed to run the harness: ${spawnError.message}` : undefined),
       });
-    });
-    child.on('close', (exitCode) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeoutId);
-      resolve({ stdout, stderr, exitCode: exitCode ?? undefined, failureReason });
-    });
+    };
+    child.on('error', (error) => settle(undefined, error));
+    child.on('close', (exitCode) => settle(exitCode ?? undefined));
   });
+}
+
+function installSignalHandlers(): void {
+  if (signalHandlersInstalled || process.platform === 'win32') return;
+  signalHandlersInstalled = true;
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.once(signal, () => {
+      for (const liveRun of liveHarnessRuns) {
+        try {
+          process.kill(-liveRun.pid, 'SIGKILL');
+        } catch {
+          // The group already exited.
+        }
+        try {
+          fsSync.rmSync(liveRun.tempRoot, { recursive: true, force: true });
+        } catch {
+          // Best-effort cleanup while exiting.
+        }
+      }
+      process.kill(process.pid, signal);
+    });
+  }
 }
 
 // `check` runs harnesses concurrently and has no sandbox-delegation contract, while the sandbox
