@@ -28,6 +28,14 @@ export async function runSingleHarness(kind: 'judge' | 'debug'): Promise<number>
     return spawnResult.status ?? 1;
   }
 
+  // A custom judge.ts marks the problem as non-standard, so the stdio debug preset would judge the
+  // answer against a contract the problem does not have (mirroring the server, which reports debug
+  // as unsupported in this case).
+  if (kind === 'debug' && fs.existsSync(path.join(problemDir, 'judge.ts'))) {
+    console.error('This problem has a custom judge.ts but no debug.ts; add a debug.ts to support debugging.');
+    return 1;
+  }
+
   // The presets read the answer directory and params from `process.argv`, which holds them at the
   // same positions as when a harness script is invoked directly.
   await (kind === 'judge' ? stdioJudgePreset(problemDir) : stdioDebugPreset(problemDir));

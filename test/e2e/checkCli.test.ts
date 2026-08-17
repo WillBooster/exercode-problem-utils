@@ -50,6 +50,16 @@ test('check rejects a committed copy of the default stdio harness', { timeout: 1
   expect(result.status).toBe(1);
 });
 
+test('check rejects a standard problem without test cases', { timeout: 120_000 }, async () => {
+  const tempRoot = await copyProblemToTempRoot();
+  await fs.promises.rm(path.join(tempRoot, 'a_plus_b_file', 'test_cases'), { recursive: true });
+
+  const result = runCheck(tempRoot);
+
+  expect(result.stderr).toContain('needs at least one test case');
+  expect(result.status).toBe(1);
+});
+
 test('check reports a model answer that fails a test case', { timeout: 120_000 }, async () => {
   const tempRoot = await copyProblemToTempRoot();
   const problemDir = path.join(tempRoot, 'a_plus_b_file');

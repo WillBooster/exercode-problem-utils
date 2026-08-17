@@ -41,7 +41,7 @@ export function isDefaultStdioHarnessSource(source: string, presetName: string):
   );
   const importMatch = importRegex.exec(source);
   if (!importMatch) return false;
-  const localPresetName = importMatch[1] ?? presetName;
+  const localPresetName = (importMatch[1] ?? presetName).replaceAll('$', String.raw`\$`);
   const callRegex = new RegExp(String.raw`^await\s+${localPresetName}\s*\(\s*import\.meta\.dirname\s*\)\s*;?\s*$`);
   return callRegex.test(source.slice(importMatch[0].length));
 }

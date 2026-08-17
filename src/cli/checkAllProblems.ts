@@ -7,6 +7,7 @@ import util from 'node:util';
 import { copyProblemDirToTemporaryRoot } from '../helpers/checkProblemDirIsolation.js';
 import { findDefaultStdioHarnessFiles } from '../helpers/defaultStdioHarness.js';
 import { findFailingModelAnswerDirs, findModelAnswerDirs } from '../helpers/findModelAnswerDirs.js';
+import { readTestCases } from '../helpers/readTestCases.js';
 import { DecisionCode } from '../types/decisionCode.js';
 import { TEST_CASE_RESULT_PREFIX, testCaseResultSchema } from '../types/testCaseResult.js';
 
@@ -51,7 +52,11 @@ export async function checkAllProblems(args: readonly string[]): Promise<number>
     return !options.skip.some((substring) => relativeDir.includes(substring));
   });
   if (problemDirs.length === 0) {
-    console.error(`No problem directories (containing problem.md or <id>.problem.md) found under ${rootDir}.`);
+    console.error(
+      allProblemDirs.length === 0
+        ? `No problem directories (containing problem.md or <id>.problem.md) found under ${rootDir}.`
+        : `All ${allProblemDirs.length} problem directories under ${rootDir} were excluded by --only/--skip.`
+    );
     return 1;
   }
 
@@ -68,6 +73,18 @@ export async function checkAllProblems(args: readonly string[]): Promise<number>
     if (modelAnswerDirs.length === 0) {
       failures.push(`${toRelative(problemDir)}: no model answers found under model_answers/`);
       continue;
+    }
+
+    // Without test cases, stdioJudgePreset prints a single accepted sentinel result, so a standard
+    // problem with an empty or missing test_cases/ would otherwise pass without being judged.
+    if (!(await fileExists(path.join(problemDir, 'judge.ts')))) {
+      const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
+      if (testCases.length === 0) {
+        failures.push(
+          `${toRelative(problemDir)}: a standard stdio problem (without judge.ts) needs at least one test case under test_cases/`
+        );
+        continue;
+      }
     }
 
     const failingModelAnswerDirs = await findFailingModelAnswerDirs(problemDir);
@@ -114,6 +131,7 @@ async function executeCheckRun(run: CheckRun, cliEntryPath: string): Promise<str
   let stdout = '';
   let stderr = '';
   let exitCode: number | undefined = 0;
+  let errorCode: string | undefined;
   let timedOut = false;
   let tempRoot: string;
   let copiedProblemDir: string;
@@ -135,12 +153,17 @@ async function executeCheckRun(run: CheckRun, cliEntryPath: string): Promise<str
     stdout = execError.stdout ?? '';
     stderr = execError.stderr ?? '';
     exitCode = typeof execError.code === 'number' ? execError.code : undefined;
-    timedOut = execError.killed === true;
+    errorCode = typeof execError.code === 'string' ? execError.code : undefined;
+    timedOut = execError.killed === true && errorCode === undefined;
   } finally {
     await fs.rm(tempRoot, { recursive: true, force: true }).catch(() => {});
   }
 
   if (timedOut) return `timed out after ${RUN_TIMEOUT_MS / 1000} seconds`;
+  if (errorCode === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
+    return `the harness printed more than ${MAX_RUN_OUTPUT_BYTES / 1024 / 1024} MB of output`;
+  }
+  if (errorCode !== undefined) return truncate(`failed to run the harness: ${errorCode}`);
   if (exitCode !== 0) {
     return truncate(`harness exited with ${exitCode ?? 'a signal'}${stderr.trim() ? `: ${stderr.trim()}` : ''}`);
   }
@@ -188,7 +211,7 @@ function parseCheckArgs(args: readonly string[]): CheckOptions {
       const value = args[++index];
       if (value === undefined) throw new Error(`${arg} requires a value`);
       if (arg === '--concurrency') {
-        options.concurrency = Number.parseInt(value, 10);
+        options.concurrency = Number(value);
         if (!Number.isInteger(options.concurrency) || options.concurrency <= 0) {
           throw new Error(`--concurrency requires a positive integer, but got ${value}`);
         }
@@ -227,6 +250,15 @@ async function visitDirectory(dir: string, problemDirs: string[]): Promise<void>
   for (const entry of entries) {
     if (!entry.isDirectory() || entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
     await visitDirectory(path.join(dir, entry.name), problemDirs);
+  }
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.stat(filePath);
+    return true;
+  } catch {
+    return false;
   }
 }
 

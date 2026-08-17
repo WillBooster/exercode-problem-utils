@@ -23,6 +23,13 @@ test.each<[string, string, boolean]>([
   ],
   ['with a trailing comma in the import', defaultJudgeSource.replace(' }', ', }'), true],
   [
+    'with a dollar-sign alias',
+    defaultJudgeSource
+      .replace('{ stdioJudgePreset }', '{ stdioJudgePreset as $ }')
+      .replace('await stdioJudgePreset', 'await $'),
+    true,
+  ],
+  [
     'with a relative specifier',
     defaultJudgeSource.replace('@exercode/problem-utils/presets/stdio', './presets/stdio'),
     false,
