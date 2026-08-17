@@ -29,11 +29,16 @@
   "main": "dist/index.cjs",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "exercode-debug": "bin/exercodeDebug.mjs",
+    "exercode-judge": "bin/exercodeJudge.mjs"
+  },
   "files": [
+    "bin/",
     "dist/"
   ],
   "scripts": {
-    "build": "build-ts lib --input src/index.ts src/presets/*.ts",
+    "build": "build-ts lib --input src/index.ts src/presets/*.ts src/cli/*.ts",
     "cleanup": "bun wb lint --fix --format",
     "format": "bun wb lint --format",
     "lint": "bun wb lint",

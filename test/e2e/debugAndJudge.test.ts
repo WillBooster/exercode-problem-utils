@@ -296,10 +296,18 @@ test.each<
     ],
   ],
 
-  ['example/a_plus_b_file', 'judge.ts', 'model_answers/javascript', {}, {}, acceptedTestCaseResultsForAPlusBFile],
+  // a_plus_b_file has no judge.ts, so the exercode-judge CLI applies stdioJudgePreset (like the server).
   [
     'example/a_plus_b_file',
-    'judge.ts',
+    '../../src/cli/exercodeJudge.ts',
+    'model_answers/javascript',
+    {},
+    {},
+    acceptedTestCaseResultsForAPlusBFile,
+  ],
+  [
+    'example/a_plus_b_file',
+    '../../src/cli/exercodeJudge.ts',
     'model_answers.test/javascript_mrofe',
     {},
     {},
@@ -316,7 +324,7 @@ test.each<
   ],
   [
     'example/a_plus_b_file',
-    'judge.ts',
+    '../../src/cli/exercodeJudge.ts',
     'model_answers.test/javascript_wa',
     {},
     {},

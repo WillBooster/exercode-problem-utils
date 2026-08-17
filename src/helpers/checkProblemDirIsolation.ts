@@ -25,15 +25,10 @@ export async function checkProblemDirIsolation(
 ): Promise<ProblemDirIsolationCheckResult> {
   let tempRoot: string | undefined;
   try {
-    tempRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'problem-utils-isolation_'));
+    const copyResult = await copyProblemDirToTemporaryRoot(problemDir);
+    tempRoot = copyResult.tempRoot;
+    const { copiedProblemDir } = copyResult;
     const absoluteProblemDir = path.resolve(problemDir);
-    const copiedProblemDir = path.join(tempRoot, toTempRelativePath(absoluteProblemDir));
-    await fs.promises.mkdir(path.dirname(copiedProblemDir), { recursive: true });
-    await fs.promises.cp(absoluteProblemDir, copiedProblemDir, {
-      recursive: true,
-      filter: isCopiedProblemPath,
-    });
-    await symlinkAllAncestorNodeModules(tempRoot, absoluteProblemDir);
 
     const relativeCwd = path.relative(absoluteProblemDir, path.resolve(resolvedCwd.cwd));
     const copiedCwd = path.join(copiedProblemDir, relativeCwd);
@@ -102,6 +97,25 @@ export async function checkProblemDirIsolation(
       }
     }
   }
+}
+
+/**
+ * Copy a problem directory into a temporary root, symlinking every ancestor `node_modules` so the
+ * copied harness still resolves its imports. Callers must remove the returned `tempRoot`.
+ */
+export async function copyProblemDirToTemporaryRoot(
+  problemDir: string
+): Promise<{ tempRoot: string; copiedProblemDir: string }> {
+  const tempRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'problem-utils-isolation_'));
+  const absoluteProblemDir = path.resolve(problemDir);
+  const copiedProblemDir = path.join(tempRoot, toTempRelativePath(absoluteProblemDir));
+  await fs.promises.mkdir(path.dirname(copiedProblemDir), { recursive: true });
+  await fs.promises.cp(absoluteProblemDir, copiedProblemDir, {
+    recursive: true,
+    filter: isCopiedProblemPath,
+  });
+  await symlinkAllAncestorNodeModules(tempRoot, absoluteProblemDir);
+  return { tempRoot, copiedProblemDir };
 }
 
 function isCopiedProblemPath(src: string): boolean {
