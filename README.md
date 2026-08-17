@@ -18,7 +18,7 @@ bun x exercode-judge model_answers/python '{ "language": "python" }'
 # Debug one answer directory of the problem in the current directory.
 bun x exercode-debug model_answers/python '{ "stdin": "1 2" }'
 
-# Judge all model answers of all problems (directories containing problem.md) under a directory.
+# Judge all model answers of all problems (directories containing problem.md or <id>.problem.md) under a directory.
 # model_answers/* must be fully accepted; model_answers.fails/* must fail at least one test case.
 bun x exercode-judge check                # everything under the current directory
 bun x exercode-judge check courses/foo    # everything under courses/foo

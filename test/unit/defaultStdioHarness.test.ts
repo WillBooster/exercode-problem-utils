@@ -14,6 +14,19 @@ test.each<[string, string, boolean]>([
   ['without semicolons', defaultJudgeSource.replaceAll(';', ''), true],
   ['with a .js specifier suffix', defaultJudgeSource.replace('/stdio', '/stdio.js'), true],
   ['with the legacy judge-utils specifier', defaultJudgeSource.replace('@exercode/problem-utils', 'judge-utils'), true],
+  [
+    'with an aliased import',
+    defaultJudgeSource
+      .replace('{ stdioJudgePreset }', '{ stdioJudgePreset as run }')
+      .replace('await stdioJudgePreset', 'await run'),
+    true,
+  ],
+  ['with a trailing comma in the import', defaultJudgeSource.replace(' }', ', }'), true],
+  [
+    'with a relative specifier',
+    defaultJudgeSource.replace('@exercode/problem-utils/presets/stdio', './presets/stdio'),
+    false,
+  ],
   ['with an explanatory comment', `// This file demonstrates the default harness.\n${defaultJudgeSource}`, false],
   ['with a trailing comment', `${defaultJudgeSource}// custom\n`, false],
   ['with extra logic', `${defaultJudgeSource}console.info('custom');\n`, false],

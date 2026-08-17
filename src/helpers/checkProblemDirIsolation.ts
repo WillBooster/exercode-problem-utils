@@ -107,15 +107,24 @@ export async function copyProblemDirToTemporaryRoot(
   problemDir: string
 ): Promise<{ tempRoot: string; copiedProblemDir: string }> {
   const tempRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'problem-utils-isolation_'));
-  const absoluteProblemDir = path.resolve(problemDir);
-  const copiedProblemDir = path.join(tempRoot, toTempRelativePath(absoluteProblemDir));
-  await fs.promises.mkdir(path.dirname(copiedProblemDir), { recursive: true });
-  await fs.promises.cp(absoluteProblemDir, copiedProblemDir, {
-    recursive: true,
-    filter: isCopiedProblemPath,
-  });
-  await symlinkAllAncestorNodeModules(tempRoot, absoluteProblemDir);
-  return { tempRoot, copiedProblemDir };
+  try {
+    const absoluteProblemDir = path.resolve(problemDir);
+    const copiedProblemDir = path.join(tempRoot, toTempRelativePath(absoluteProblemDir));
+    await fs.promises.mkdir(path.dirname(copiedProblemDir), { recursive: true });
+    await fs.promises.cp(absoluteProblemDir, copiedProblemDir, {
+      recursive: true,
+      filter: isCopiedProblemPath,
+    });
+    await symlinkAllAncestorNodeModules(tempRoot, absoluteProblemDir);
+    return { tempRoot, copiedProblemDir };
+  } catch (error) {
+    try {
+      await fs.promises.rm(tempRoot, { recursive: true, force: true });
+    } catch {
+      // Cleanup errors should not mask the original copy error.
+    }
+    throw error;
+  }
 }
 
 function isCopiedProblemPath(src: string): boolean {

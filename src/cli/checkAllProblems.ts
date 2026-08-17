@@ -35,9 +35,9 @@ interface CheckRun {
 }
 
 /**
- * Judge all model answers of all problems (directories containing `problem.md`) under a root
- * directory: `model_answers/*` must be fully accepted and `model_answers.fails/*` must fail at
- * least one test case. Returns the process exit code.
+ * Judge all model answers of all problems (directories containing `problem.md` or
+ * `<id>.problem.md`) under a root directory: `model_answers/*` must be fully accepted and
+ * `model_answers.fails/*` must fail at least one test case. Returns the process exit code.
  */
 export async function checkAllProblems(args: readonly string[]): Promise<number> {
   const options = parseCheckArgs(args);
@@ -51,7 +51,7 @@ export async function checkAllProblems(args: readonly string[]): Promise<number>
     return !options.skip.some((substring) => relativeDir.includes(substring));
   });
   if (problemDirs.length === 0) {
-    console.error(`No problem directories (containing problem.md) found under ${rootDir}.`);
+    console.error(`No problem directories (containing problem.md or <id>.problem.md) found under ${rootDir}.`);
     return 1;
   }
 
@@ -115,7 +115,15 @@ async function executeCheckRun(run: CheckRun, cliEntryPath: string): Promise<str
   let stderr = '';
   let exitCode: number | undefined = 0;
   let timedOut = false;
-  const { tempRoot, copiedProblemDir } = await copyProblemDirToTemporaryRoot(run.problemDir);
+  let tempRoot: string;
+  let copiedProblemDir: string;
+  try {
+    ({ tempRoot, copiedProblemDir } = await copyProblemDirToTemporaryRoot(run.problemDir));
+  } catch (error) {
+    return truncate(
+      `failed to copy the problem directory to a temporary location: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
   try {
     ({ stdout, stderr } = await execFileAsync(
       'bun',
@@ -137,17 +145,18 @@ async function executeCheckRun(run: CheckRun, cliEntryPath: string): Promise<str
     return truncate(`harness exited with ${exitCode ?? 'a signal'}${stderr.trim() ? `: ${stderr.trim()}` : ''}`);
   }
 
-  const testCaseResults = stdout
-    .split('\n')
-    .filter((line) => line.startsWith(TEST_CASE_RESULT_PREFIX))
-    .flatMap((line) => {
-      try {
-        const parsedResult = testCaseResultSchema.safeParse(JSON.parse(line.slice(TEST_CASE_RESULT_PREFIX.length)));
-        return parsedResult.success ? [parsedResult.data] : [];
-      } catch {
-        return [];
-      }
-    });
+  const resultLines = stdout.split('\n').filter((line) => line.startsWith(TEST_CASE_RESULT_PREFIX));
+  const testCaseResults = [];
+  for (const line of resultLines) {
+    let parsedResult;
+    try {
+      parsedResult = testCaseResultSchema.safeParse(JSON.parse(line.slice(TEST_CASE_RESULT_PREFIX.length)));
+    } catch {
+      parsedResult = undefined;
+    }
+    if (!parsedResult?.success) return truncate(`malformed test case result line: ${line}`);
+    testCaseResults.push(parsedResult.data);
+  }
   if (testCaseResults.length === 0) return 'no test case results were printed';
 
   if (run.expectation === 'accepted') {
@@ -200,7 +209,7 @@ function parseCheckArgs(args: readonly string[]): CheckOptions {
   return options;
 }
 
-/** Find directories containing `problem.md`, without descending into found problems. */
+/** Find directories containing `problem.md` or `<id>.problem.md`, without descending into found problems. */
 async function findProblemDirs(rootDir: string): Promise<string[]> {
   const problemDirs: string[] = [];
   await visitDirectory(rootDir, problemDirs);
@@ -208,13 +217,10 @@ async function findProblemDirs(rootDir: string): Promise<string[]> {
 }
 
 async function visitDirectory(dir: string, problemDirs: string[]): Promise<void> {
-  let entries;
-  try {
-    entries = await fs.readdir(dir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  if (entries.some((entry) => entry.isFile() && entry.name === 'problem.md')) {
+  // Traversal errors (e.g. an unreadable subtree) must fail the check: skipping them silently
+  // could report a green result while covering only part of the repository.
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  if (entries.some((entry) => entry.isFile() && (entry.name === 'problem.md' || entry.name.endsWith('.problem.md')))) {
     problemDirs.push(dir);
     return;
   }
