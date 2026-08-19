@@ -156,7 +156,8 @@ export function forciblyRemoveDirectorySync(dir: string): boolean {
   }
 }
 
-// chmod does not exist on Windows, where POSIX-mode locks cannot occur anyway.
+// chmod does not exist on Windows, where POSIX-mode locks cannot occur anyway. spawnSync reports
+// spawn failures via its return value instead of throwing, so no try/catch is needed.
 function unlockPermissions(dir: string): void {
   if (process.platform !== 'win32') child_process.spawnSync('chmod', ['-R', 'u+rwX', dir]);
 }

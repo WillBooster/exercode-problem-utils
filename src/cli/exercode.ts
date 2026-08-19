@@ -16,6 +16,7 @@ void main();
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   if (args[0] === '--help' || args[0] === '-h') {
+    // console.log would be stripped from the built CLI, so print the usage with console.info.
     console.info(usage);
     return;
   }
