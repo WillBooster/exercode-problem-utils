@@ -140,6 +140,22 @@ export async function forciblyRemoveDirectory(dir: string): Promise<boolean> {
   }
 }
 
+/** Synchronous variant of {@link forciblyRemoveDirectory} for signal handlers. */
+export function forciblyRemoveDirectorySync(dir: string): boolean {
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+    return true;
+  } catch {
+    child_process.spawnSync('chmod', ['-R', 'u+rwX', dir]);
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
 // An absolute symlink is copied verbatim, so judging the copy could write through it into the
 // original tree; reject it instead of silently breaking the isolation guarantee.
 async function rejectAbsoluteSymlinks(src: string): Promise<boolean> {

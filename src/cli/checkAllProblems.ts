@@ -1,9 +1,12 @@
 import child_process from 'node:child_process';
-import fsSync from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { copyProblemDirToTemporaryRoot, forciblyRemoveDirectory } from '../helpers/checkProblemDirIsolation.js';
+import {
+  copyProblemDirToTemporaryRoot,
+  forciblyRemoveDirectory,
+  forciblyRemoveDirectorySync,
+} from '../helpers/checkProblemDirIsolation.js';
 import { findDefaultStdioHarnessFiles } from '../helpers/defaultStdioHarness.js';
 import { findFailingModelAnswerDirs, findModelAnswerDirs } from '../helpers/findModelAnswerDirs.js';
 import { readTestCases } from '../helpers/readTestCases.js';
@@ -284,11 +287,8 @@ function installSignalHandlers(): void {
         } catch {
           // The tree already exited.
         }
-        try {
-          fsSync.rmSync(liveRun.tempRoot, { recursive: true, force: true });
-        } catch {
-          // Best-effort cleanup while exiting.
-        }
+        // Best-effort cleanup while exiting; judged code may have left permission-locked entries.
+        forciblyRemoveDirectorySync(liveRun.tempRoot);
       }
       process.kill(process.pid, signal);
     });
