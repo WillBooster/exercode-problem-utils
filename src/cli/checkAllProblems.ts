@@ -140,13 +140,18 @@ async function executeCheckRun(run: CheckRun, cliEntryPath: string): Promise<str
     );
   }
 
-  const result = await runHarnessProcess(
-    ['run', cliEntryPath, 'judge', path.relative(run.problemDir, run.answerDir)],
-    copiedProblemDir,
-    tempRoot
-  );
-  const removedTempRoot = await forciblyRemoveDirectory(tempRoot);
-  const harnessFailureDetail = summarizeHarnessFailure(run, result);
+  let harnessFailureDetail;
+  let removedTempRoot;
+  try {
+    const result = await runHarnessProcess(
+      ['run', cliEntryPath, 'judge', path.relative(run.problemDir, run.answerDir)],
+      copiedProblemDir,
+      tempRoot
+    );
+    harnessFailureDetail = summarizeHarnessFailure(run, result);
+  } finally {
+    removedTempRoot = await forciblyRemoveDirectory(tempRoot);
+  }
   if (removedTempRoot) return harnessFailureDetail;
   const removalFailureDetail = `failed to remove the temporary copy at ${tempRoot} (judged code may have left permission-locked files)`;
   return harnessFailureDetail === undefined
@@ -235,6 +240,10 @@ function runHarnessProcess(
     const killProcessGroup = (reason: string): void => {
       if (failureReason !== undefined) return;
       failureReason = reason;
+      // Stop buffering immediately: OS pipe buffers can keep emitting data after the kill, and
+      // destroyed streams also let `close` fire even if a stray grandchild inherited the pipes.
+      child.stdout.destroy();
+      child.stderr.destroy();
       try {
         if (child.pid === undefined) {
           child.kill('SIGKILL');
