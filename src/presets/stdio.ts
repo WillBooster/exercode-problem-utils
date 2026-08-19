@@ -35,22 +35,19 @@ const debugParamsSchema = judgeParamsSchema.extend({
 /**
  * A preset judge function using stdin and stdout as test cases.
  *
+ * A standard stdio problem must NOT commit a `judge.ts` that only calls this preset: the Exercode
+ * server applies this preset automatically when `judge.ts` is absent, and committed copies would
+ * drift from the server's defaults.
+ *
  * @example
- * Create `judge.ts`:
- * ```ts
- * import { stdioJudgePreset } from 'judge-utils/presets/stdio';
- *
- * await stdioJudgePreset(import.meta.dirname);
- * ```
- *
- * Run with the required parameters:
+ * Run in a problem directory without `judge.ts`:
  * ```bash
- * bun judge.ts model_answers/java
+ * bun x exercode judge model_answers/java
  * ```
  *
  * Run with the optional parameters:
  * ```bash
- * bun judge.ts model_answers/java '{ "language": "javascript" }'
+ * bun x exercode judge model_answers/java '{ "language": "javascript" }'
  * ```
  */
 export async function stdioJudgePreset(problemDir: string): Promise<void> {
@@ -245,17 +242,14 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
 /**
  * A preset debug function using stdin and stdout as test cases.
  *
+ * A standard stdio problem must NOT commit a `debug.ts` that only calls this preset: the Exercode
+ * server applies this preset automatically when `debug.ts` is absent, and committed copies would
+ * drift from the server's defaults.
+ *
  * @example
- * Create `debug.ts`:
- * ```ts
- * import { stdioDebugPreset } from 'judge-utils/presets/stdio';
- *
- * await stdioDebugPreset(import.meta.dirname);
- * ```
- *
- * Run with the required parameters:
+ * Run in a problem directory without `debug.ts`:
  * ```bash
- * bun debug.ts model_answers/java '{ "stdin": "1 2" }'
+ * bun x exercode debug model_answers/java '{ "stdin": "1 2" }'
  * ```
  */
 export async function stdioDebugPreset(problemDir: string): Promise<void> {

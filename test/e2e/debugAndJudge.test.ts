@@ -296,10 +296,18 @@ test.each<
     ],
   ],
 
-  ['example/a_plus_b_file', 'judge.ts', 'model_answers/javascript', {}, {}, acceptedTestCaseResultsForAPlusBFile],
+  // a_plus_b_file has no judge.ts, so the exercode CLI's judge subcommand applies stdioJudgePreset (like the server).
   [
     'example/a_plus_b_file',
-    'judge.ts',
+    '../../src/cli/exercode.ts judge',
+    'model_answers/javascript',
+    {},
+    {},
+    acceptedTestCaseResultsForAPlusBFile,
+  ],
+  [
+    'example/a_plus_b_file',
+    '../../src/cli/exercode.ts judge',
     'model_answers.test/javascript_mrofe',
     {},
     {},
@@ -316,7 +324,7 @@ test.each<
   ],
   [
     'example/a_plus_b_file',
-    'judge.ts',
+    '../../src/cli/exercode.ts judge',
     'model_answers.test/javascript_wa',
     {},
     {},
@@ -464,11 +472,16 @@ test.each<
     const tempDir = await fs.promises.mkdtemp(path.join('temp', 'judge_'));
     await fs.promises.cp(cwd, tempDir, { recursive: true });
 
-    const spawnResult = child_process.spawnSync('bun', ['run', scriptFilename, argsCwd, JSON.stringify(argsParams)], {
-      cwd: tempDir,
-      encoding: 'utf8',
-      env: { ...process.env, ...env },
-    });
+    // scriptFilename may carry a CLI subcommand (e.g. "../../src/cli/exercode.ts judge").
+    const spawnResult = child_process.spawnSync(
+      'bun',
+      ['run', ...scriptFilename.split(' '), argsCwd, JSON.stringify(argsParams)],
+      {
+        cwd: tempDir,
+        encoding: 'utf8',
+        env: { ...process.env, ...env },
+      }
+    );
 
     if (spawnResult.stderr) console.error(spawnResult.stderr);
 
