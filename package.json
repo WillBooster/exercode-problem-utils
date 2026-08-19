@@ -30,8 +30,7 @@
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "exercode-debug": "bin/exercodeDebug.mjs",
-    "exercode-judge": "bin/exercodeJudge.mjs"
+    "exercode": "bin/exercode.mjs"
   },
   "files": [
     "bin/",

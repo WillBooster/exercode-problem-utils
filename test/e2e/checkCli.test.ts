@@ -4,10 +4,10 @@ import path from 'node:path';
 
 import { expect, test } from 'vitest';
 
-const cliPath = path.resolve('src/cli/exercodeJudge.ts');
+const cliPath = path.resolve('src/cli/exercode.ts');
 
 function runCheck(rootDir: string): child_process.SpawnSyncReturns<string> {
-  return child_process.spawnSync('bun', ['run', cliPath, 'check', rootDir], { encoding: 'utf8' });
+  return child_process.spawnSync('bun', ['run', cliPath, rootDir], { encoding: 'utf8' });
 }
 
 async function copyProblemToTempRoot(): Promise<string> {

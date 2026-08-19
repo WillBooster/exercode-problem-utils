@@ -136,7 +136,7 @@ async function executeCheckRun(run: CheckRun, cliEntryPath: string): Promise<str
   }
 
   const result = await runHarnessProcess(
-    ['run', cliEntryPath, path.relative(run.problemDir, run.answerDir)],
+    ['run', cliEntryPath, 'judge', path.relative(run.problemDir, run.answerDir)],
     copiedProblemDir,
     tempRoot
   );
@@ -191,7 +191,7 @@ interface LiveHarnessRun {
   tempRoot: string;
 }
 
-// Detached harness groups no longer receive the terminal's SIGINT, so an interrupted `check` must
+// Detached harness groups no longer receive the terminal's SIGINT, so an interrupted check run must
 // tear them down (and remove their temp copies) itself before exiting.
 const liveHarnessRuns = new Set<LiveHarnessRun>();
 let signalHandlersInstalled = false;
@@ -289,7 +289,7 @@ function installSignalHandlers(): void {
   }
 }
 
-// `check` runs harnesses concurrently and has no sandbox-delegation contract, while the sandbox
+// The all-problem check runs harnesses concurrently and has no sandbox-delegation contract, while the sandbox
 // helpers assume one harness at a time (their pkill targets every process of the sandbox user), so
 // never forward the sandbox user to judged runs.
 function createHarnessEnv(): NodeJS.ProcessEnv {
