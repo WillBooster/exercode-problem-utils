@@ -9,11 +9,12 @@ import {
 } from '../helpers/checkProblemDirIsolation.js';
 import { findDefaultStdioHarnessFiles } from '../helpers/defaultStdioHarness.js';
 import { findFailingModelAnswerDirs, findModelAnswerDirs } from '../helpers/findModelAnswerDirs.js';
+import { judgesWithoutTestCases, readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases } from '../helpers/readTestCases.js';
 import { DecisionCode } from '../types/decisionCode.js';
 import { TEST_CASE_RESULT_PREFIX, testCaseResultSchema } from '../types/testCaseResult.js';
 
-import { formatDefaultHarnessError } from './runSingleHarness.js';
+import { formatDefaultHarnessError, MISSING_TEST_CASES_ERROR } from './runSingleHarness.js';
 
 const RUN_TIMEOUT_MS = 600_000;
 const MAX_RUN_OUTPUT_BYTES = 64 * 1024 * 1024;
@@ -78,13 +79,12 @@ export async function checkAllProblems(args: readonly string[]): Promise<number>
     }
 
     // Without test cases, stdioJudgePreset prints a single accepted sentinel result, so a standard
-    // problem with an empty or missing test_cases/ would otherwise pass without being judged.
+    // problem with an empty or missing test_cases/ would otherwise pass without being judged —
+    // unless static-analysis rules or manual scoring make the problem judgeable without them.
     if (!(await fileExists(path.join(problemDir, 'judge.ts')))) {
       const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
-      if (testCases.length === 0) {
-        failures.push(
-          `${toRelative(problemDir)}: a standard stdio problem (without judge.ts) needs at least one test case under test_cases/`
-        );
+      if (testCases.length === 0 && !judgesWithoutTestCases(await readProblemMarkdownFrontMatter(problemDir))) {
+        failures.push(`${toRelative(problemDir)}: ${MISSING_TEST_CASES_ERROR}`);
         continue;
       }
     }

@@ -6,6 +6,20 @@ import parseFrontMatter from 'front-matter';
 import type { ProblemMarkdownFrontMatter } from '../types/problem.js';
 import { problemMarkdownFrontMatterSchema } from '../types/problem.js';
 
+/**
+ * Whether a standard stdio problem is judgeable without test cases: static-analysis rules still
+ * judge the submitted code, and manual scoring intentionally accepts every submission.
+ */
+export function judgesWithoutTestCases(frontMatter: ProblemMarkdownFrontMatter): boolean {
+  return (
+    frontMatter.isManualScoringRequired === true ||
+    (frontMatter.requiredRegExpsInCode?.length ?? 0) > 0 ||
+    (frontMatter.forbiddenRegExpsInCode?.length ?? 0) > 0 ||
+    (frontMatter.forbiddenTextsInCode?.length ?? 0) > 0 ||
+    (frontMatter.requiredSubmissionFilePaths?.length ?? 0) > 0
+  );
+}
+
 export async function readProblemMarkdownFrontMatter(problemDir: string): Promise<ProblemMarkdownFrontMatter> {
   for (const dirent of await fs.promises.readdir(problemDir, { withFileTypes: true })) {
     if (!dirent.isFile()) continue;

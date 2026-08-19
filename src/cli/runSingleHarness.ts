@@ -3,8 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { findDefaultStdioHarnessFiles } from '../helpers/defaultStdioHarness.js';
+import { judgesWithoutTestCases, readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases } from '../helpers/readTestCases.js';
 import { stdioDebugPreset, stdioJudgePreset } from '../presets/stdio.js';
+
+export const MISSING_TEST_CASES_ERROR =
+  'a standard stdio problem (without judge.ts) needs at least one test case under test_cases/, static-analysis rules (e.g. requiredRegExpsInCode), or isManualScoringRequired';
 
 /**
  * Run the judge or debug harness of the problem in the current working directory: a custom
@@ -42,11 +46,12 @@ export async function runSingleHarness(kind: 'judge' | 'debug'): Promise<number>
   }
 
   // Without test cases, stdioJudgePreset prints a single accepted sentinel result, so a standard
-  // problem with an empty or missing test_cases/ would otherwise pass without being judged.
+  // problem with an empty or missing test_cases/ would otherwise pass without being judged —
+  // unless static-analysis rules or manual scoring make the problem judgeable without them.
   if (kind === 'judge') {
     const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
-    if (testCases.length === 0) {
-      console.error('a standard stdio problem (without judge.ts) needs at least one test case under test_cases/');
+    if (testCases.length === 0 && !judgesWithoutTestCases(await readProblemMarkdownFrontMatter(problemDir))) {
+      console.error(MISSING_TEST_CASES_ERROR);
       return 1;
     }
   }
