@@ -162,7 +162,7 @@ function summarizeHarnessFailure(run: CheckRun, result: HarnessProcessResult): s
     return truncate(`harness exited with ${result.exitCode ?? 'a signal'}${stderr.trim() ? `: ${stderr.trim()}` : ''}`);
   }
 
-  const resultLines = stdout.split('\n').filter((line) => line.startsWith(TEST_CASE_RESULT_PREFIX));
+  const resultLines = stdout.split(/\r?\n/).filter((line) => line.startsWith(TEST_CASE_RESULT_PREFIX));
   const testCaseResults = [];
   for (const line of resultLines) {
     let parsedResult;
