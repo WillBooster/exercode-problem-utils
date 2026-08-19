@@ -35,7 +35,8 @@ async function main(): Promise<void> {
       process.exitCode = await checkAllProblems(args);
     }
   } catch (error) {
-    console.error(error instanceof Error ? error.message : error);
+    // Print the whole error: harness failures need their stack and `cause`, not just the message.
+    console.error(error);
     process.exitCode = 1;
   }
 }
