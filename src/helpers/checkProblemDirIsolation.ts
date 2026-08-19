@@ -130,7 +130,7 @@ export async function forciblyRemoveDirectory(dir: string): Promise<boolean> {
     await fs.promises.rm(dir, { recursive: true, force: true });
     return true;
   } catch {
-    child_process.spawnSync('chmod', ['-R', 'u+rwX', dir]);
+    unlockPermissions(dir);
     try {
       await fs.promises.rm(dir, { recursive: true, force: true });
       return true;
@@ -146,7 +146,7 @@ export function forciblyRemoveDirectorySync(dir: string): boolean {
     fs.rmSync(dir, { recursive: true, force: true });
     return true;
   } catch {
-    child_process.spawnSync('chmod', ['-R', 'u+rwX', dir]);
+    unlockPermissions(dir);
     try {
       fs.rmSync(dir, { recursive: true, force: true });
       return true;
@@ -154,6 +154,11 @@ export function forciblyRemoveDirectorySync(dir: string): boolean {
       return false;
     }
   }
+}
+
+// chmod does not exist on Windows, where POSIX-mode locks cannot occur anyway.
+function unlockPermissions(dir: string): void {
+  if (process.platform !== 'win32') child_process.spawnSync('chmod', ['-R', 'u+rwX', dir]);
 }
 
 // An absolute symlink is copied verbatim, so judging the copy could write through it into the

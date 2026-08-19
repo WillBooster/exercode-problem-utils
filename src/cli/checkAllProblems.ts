@@ -19,6 +19,7 @@ const RUN_TIMEOUT_MS = 600_000;
 const MAX_RUN_OUTPUT_BYTES = 64 * 1024 * 1024;
 const MAX_FAILURE_DETAIL_LENGTH = 1000;
 
+// DecisionCode is a plain const object (not a TypeScript enum), so it has no reverse mapping.
 const decisionCodeNames = new Map<number, string>(Object.entries(DecisionCode).map(([name, code]) => [code, name]));
 
 interface CheckOptions {
