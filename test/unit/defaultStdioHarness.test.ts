@@ -1,6 +1,10 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
 import { expect, test } from 'vitest';
 
-import { isDefaultStdioHarnessSource } from '../../src/helpers/defaultStdioHarness.js';
+import { findDefaultStdioHarnessFiles, isDefaultStdioHarnessSource } from '../../src/helpers/defaultStdioHarness.js';
 
 const defaultJudgeSource = `import { stdioJudgePreset } from '@exercode/problem-utils/presets/stdio';
 
@@ -41,4 +45,30 @@ test.each<[string, string, boolean]>([
   ['with the debug preset instead', defaultJudgeSource.replaceAll('stdioJudgePreset', 'stdioDebugPreset'), false],
 ])('%s -> %s', (_, source, expected) => {
   expect(isDefaultStdioHarnessSource(source, 'stdioJudgePreset')).toBe(expected);
+});
+
+const defaultDebugSource = defaultJudgeSource.replaceAll('stdioJudgePreset', 'stdioDebugPreset');
+
+test.each<[string, { 'judge.ts'?: string; 'debug.ts'?: string }, string[]]>([
+  ['a standard problem with a default debug.ts', { 'debug.ts': defaultDebugSource }, ['debug.ts']],
+  [
+    'a custom judge.ts with the mandatory default-content debug.ts',
+    { 'judge.ts': `${defaultJudgeSource}console.info('custom');\n`, 'debug.ts': defaultDebugSource },
+    [],
+  ],
+  [
+    'default copies of both harnesses',
+    { 'judge.ts': defaultJudgeSource, 'debug.ts': defaultDebugSource },
+    ['judge.ts', 'debug.ts'],
+  ],
+])('findDefaultStdioHarnessFiles: %s -> %j', async (_, files, expected) => {
+  const problemDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'default_harness_'));
+  try {
+    for (const [fileName, content] of Object.entries(files)) {
+      await fs.promises.writeFile(path.join(problemDir, fileName), content);
+    }
+    expect(await findDefaultStdioHarnessFiles(problemDir)).toEqual(expected);
+  } finally {
+    await fs.promises.rm(problemDir, { recursive: true, force: true });
+  }
 });

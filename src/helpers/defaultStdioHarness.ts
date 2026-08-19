@@ -15,17 +15,29 @@ export type HarnessFileName = keyof typeof HARNESS_FILE_PRESETS;
  * committed copies would drift from the server's defaults.
  */
 export async function findDefaultStdioHarnessFiles(problemDir: string): Promise<HarnessFileName[]> {
+  const judgeContent = await readFileOrUndefined(path.join(problemDir, 'judge.ts'));
   const foundFileNames: HarnessFileName[] = [];
-  for (const [fileName, presetName] of Object.entries(HARNESS_FILE_PRESETS)) {
-    let content;
-    try {
-      content = await fs.readFile(path.join(problemDir, fileName), 'utf8');
-    } catch {
-      continue;
+  if (judgeContent !== undefined && isDefaultStdioHarnessSource(judgeContent, HARNESS_FILE_PRESETS['judge.ts'])) {
+    foundFileNames.push('judge.ts');
+  }
+  // A problem with a custom judge.ts gets no stdioDebugPreset fallback, so it must commit its own
+  // debug.ts — even one whose content matches the default stdio debug harness.
+  const hasCustomJudge = judgeContent !== undefined && foundFileNames.length === 0;
+  if (!hasCustomJudge) {
+    const debugContent = await readFileOrUndefined(path.join(problemDir, 'debug.ts'));
+    if (debugContent !== undefined && isDefaultStdioHarnessSource(debugContent, HARNESS_FILE_PRESETS['debug.ts'])) {
+      foundFileNames.push('debug.ts');
     }
-    if (isDefaultStdioHarnessSource(content, presetName)) foundFileNames.push(fileName as HarnessFileName);
   }
   return foundFileNames;
+}
+
+async function readFileOrUndefined(filePath: string): Promise<string | undefined> {
+  try {
+    return await fs.readFile(filePath, 'utf8');
+  } catch {
+    return undefined;
+  }
 }
 
 /**

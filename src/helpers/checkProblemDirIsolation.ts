@@ -108,7 +108,7 @@ export async function copyProblemDirToTemporaryRoot(
     await fs.promises.mkdir(path.dirname(copiedProblemDir), { recursive: true });
     await fs.promises.cp(absoluteProblemDir, copiedProblemDir, {
       recursive: true,
-      filter: isCopiedProblemPath,
+      filter: rejectAbsoluteSymlinks,
       // Keep relative symlinks relative: the default rewrites them to absolute paths into the
       // source tree, so judging the copy could write through them into the checked repository.
       verbatimSymlinks: true,
@@ -138,6 +138,17 @@ export async function forciblyRemoveDirectory(dir: string): Promise<boolean> {
       return false;
     }
   }
+}
+
+// An absolute symlink is copied verbatim, so judging the copy could write through it into the
+// original tree; reject it instead of silently breaking the isolation guarantee.
+async function rejectAbsoluteSymlinks(src: string): Promise<boolean> {
+  if (!isCopiedProblemPath(src)) return false;
+  const stats = await fs.promises.lstat(src);
+  if (stats.isSymbolicLink() && path.isAbsolute(await fs.promises.readlink(src))) {
+    throw new Error(`${src} is an absolute symlink, which would escape the temporary copy; use a relative symlink`);
+  }
+  return true;
 }
 
 function isCopiedProblemPath(src: string): boolean {

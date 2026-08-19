@@ -7,7 +7,9 @@ import { expect, test } from 'vitest';
 const cliPath = path.resolve('src/cli/exercode.ts');
 
 function runCheck(rootDir: string): child_process.SpawnSyncReturns<string> {
-  return child_process.spawnSync('bun', ['run', cliPath, rootDir], { encoding: 'utf8' });
+  // The synchronous spawn blocks Vitest's timers, so enforce the deadline on the child itself;
+  // SIGTERM lets the CLI's signal handlers tear down harness process groups and temp copies.
+  return child_process.spawnSync('bun', ['run', cliPath, rootDir], { encoding: 'utf8', timeout: 110_000 });
 }
 
 async function copyProblemToTempRoot(): Promise<string> {

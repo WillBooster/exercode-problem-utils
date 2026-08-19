@@ -141,14 +141,20 @@ async function executeCheckRun(run: CheckRun, cliEntryPath: string): Promise<str
     tempRoot
   );
   const removedTempRoot = await forciblyRemoveDirectory(tempRoot);
+  const harnessFailureDetail = summarizeHarnessFailure(run, result);
+  if (removedTempRoot) return harnessFailureDetail;
+  const removalFailureDetail = `failed to remove the temporary copy at ${tempRoot} (judged code may have left permission-locked files)`;
+  return harnessFailureDetail === undefined
+    ? removalFailureDetail
+    : truncate(`${harnessFailureDetail}; ${removalFailureDetail}`);
+}
 
+/** Return why the harness run failed the check, or `undefined` when it passed. */
+function summarizeHarnessFailure(run: CheckRun, result: HarnessProcessResult): string | undefined {
   const { stdout, stderr } = result;
   if (result.failureReason !== undefined) return truncate(result.failureReason);
   if (result.exitCode !== 0) {
     return truncate(`harness exited with ${result.exitCode ?? 'a signal'}${stderr.trim() ? `: ${stderr.trim()}` : ''}`);
-  }
-  if (!removedTempRoot) {
-    return `failed to remove the temporary copy at ${tempRoot} (judged code may have left permission-locked files)`;
   }
 
   const resultLines = stdout.split('\n').filter((line) => line.startsWith(TEST_CASE_RESULT_PREFIX));
@@ -225,10 +231,10 @@ function runHarnessProcess(
       if (failureReason !== undefined) return;
       failureReason = reason;
       try {
-        if (process.platform !== 'win32' && child.pid !== undefined) {
-          process.kill(-child.pid, 'SIGKILL');
-        } else {
+        if (child.pid === undefined) {
           child.kill('SIGKILL');
+        } else {
+          killHarnessTree(child.pid);
         }
       } catch {
         child.kill('SIGKILL');
@@ -268,15 +274,15 @@ function runHarnessProcess(
 }
 
 function installSignalHandlers(): void {
-  if (signalHandlersInstalled || process.platform === 'win32') return;
+  if (signalHandlersInstalled) return;
   signalHandlersInstalled = true;
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.once(signal, () => {
       for (const liveRun of liveHarnessRuns) {
         try {
-          process.kill(-liveRun.pid, 'SIGKILL');
+          killHarnessTree(liveRun.pid);
         } catch {
-          // The group already exited.
+          // The tree already exited.
         }
         try {
           fsSync.rmSync(liveRun.tempRoot, { recursive: true, force: true });
@@ -286,6 +292,16 @@ function installSignalHandlers(): void {
       }
       process.kill(process.pid, signal);
     });
+  }
+}
+
+// On Windows the harness is not detached (process groups are unavailable), so killing only the
+// direct child would leave submission grandchildren running; taskkill terminates the whole tree.
+function killHarnessTree(pid: number): void {
+  if (process.platform === 'win32') {
+    child_process.spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+  } else {
+    process.kill(-pid, 'SIGKILL');
   }
 }
 
