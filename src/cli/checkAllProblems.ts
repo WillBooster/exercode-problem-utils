@@ -160,6 +160,10 @@ async function executeCheckRun(run: CheckRun, cliEntryPath: string): Promise<str
       tempRoot
     );
     harnessFailureDetail = summarizeHarnessFailure(run, result);
+  } catch (error) {
+    harnessFailureDetail = truncate(
+      `harness execution failed: ${error instanceof Error ? error.message : String(error)}`
+    );
   } finally {
     removedTempRoot = await forciblyRemoveDirectory(tempRoot);
   }
@@ -234,7 +238,8 @@ function runHarnessProcess(
 ): Promise<HarnessProcessResult> {
   installSignalHandlers();
   return new Promise((resolve) => {
-    const child = child_process.spawn('bun', commandArgs, {
+    // process.execPath keeps the harness on the same bun executable regardless of PATH.
+    const child = child_process.spawn(process.execPath, commandArgs, {
       cwd,
       detached: process.platform !== 'win32',
       env: createHarnessEnv(),

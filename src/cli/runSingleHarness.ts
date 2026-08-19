@@ -26,7 +26,8 @@ export async function runSingleHarness(kind: 'judge' | 'debug'): Promise<number>
 
   const harnessFileName = kind === 'judge' ? 'judge.ts' : 'debug.ts';
   if (fs.existsSync(path.join(problemDir, harnessFileName))) {
-    const spawnResult = child_process.spawnSync('bun', ['run', harnessFileName, ...process.argv.slice(2)], {
+    // process.execPath keeps the harness on the same bun executable regardless of PATH.
+    const spawnResult = child_process.spawnSync(process.execPath, ['run', harnessFileName, ...process.argv.slice(2)], {
       cwd: problemDir,
       stdio: 'inherit',
     });
