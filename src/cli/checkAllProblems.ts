@@ -253,8 +253,8 @@ function runHarnessProcess(
       failureReason = reason;
       // Stop buffering immediately: OS pipe buffers can keep emitting data after the kill, and
       // destroyed streams also let `close` fire even if a stray grandchild inherited the pipes.
-      child.stdout.destroy();
-      child.stderr.destroy();
+      child.stdout?.destroy();
+      child.stderr?.destroy();
       try {
         if (child.pid === undefined) {
           child.kill('SIGKILL');
@@ -278,8 +278,8 @@ function runHarnessProcess(
       }
       chunks.push(chunk);
     };
-    child.stdout.on('data', (chunk: Buffer) => appendOutput(chunk, stdoutChunks));
-    child.stderr.on('data', (chunk: Buffer) => appendOutput(chunk, stderrChunks));
+    child.stdout?.on('data', (chunk: Buffer) => appendOutput(chunk, stdoutChunks));
+    child.stderr?.on('data', (chunk: Buffer) => appendOutput(chunk, stderrChunks));
 
     const settle = (exitCode: number | undefined, spawnError?: Error): void => {
       if (settled) return;
