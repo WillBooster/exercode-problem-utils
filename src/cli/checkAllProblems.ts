@@ -43,7 +43,8 @@ interface CheckRun {
 export async function checkAllProblems(args: readonly string[]): Promise<number> {
   const options = parseCheckArgs(args);
   const rootDir = path.resolve(options.rootDir);
-  const toRelative = (dir: string): string => path.relative(rootDir, dir) || '.';
+  // Normalize to forward slashes so --only / --skip substrings like courses/foo match on Windows.
+  const toRelative = (dir: string): string => (path.relative(rootDir, dir) || '.').replaceAll(path.sep, '/');
 
   const allProblemDirs = await findProblemDirs(rootDir);
   const problemDirs = allProblemDirs.filter((problemDir) => {
@@ -103,7 +104,7 @@ export async function checkAllProblems(args: readonly string[]): Promise<number>
       while (nextRunIndex < runs.length) {
         const run = runs[nextRunIndex++];
         if (!run) return;
-        const label = `${toRelative(run.problemDir)} ${path.relative(run.problemDir, run.answerDir)}`;
+        const label = `${toRelative(run.problemDir)} ${path.relative(run.problemDir, run.answerDir).replaceAll(path.sep, '/')}`;
         const failureDetail = await executeCheckRun(run, cliEntryPath);
         if (failureDetail === undefined) {
           passedCount++;

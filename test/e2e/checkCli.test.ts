@@ -34,7 +34,7 @@ test('check judges model_answers and model_answers.fails of all problems', { tim
 
   if (result.stderr) console.error(result.stderr);
   expect(result.stdout).toContain('✓ a_plus_b_file model_answers/javascript');
-  expect(result.stdout).toContain(`✓ a_plus_b_file ${path.join('model_answers.fails', 'javascript_wa')}`);
+  expect(result.stdout).toContain('✓ a_plus_b_file model_answers.fails/javascript_wa');
   expect(result.stdout).toContain('2 passed, 0 failed (2 runs, 1 problems)');
   expect(result.status).toBe(0);
 });

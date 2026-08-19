@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { findDefaultStdioHarnessFiles } from '../helpers/defaultStdioHarness.js';
+import { readTestCases } from '../helpers/readTestCases.js';
 import { stdioDebugPreset, stdioJudgePreset } from '../presets/stdio.js';
 
 /**
@@ -38,6 +39,16 @@ export async function runSingleHarness(kind: 'judge' | 'debug'): Promise<number>
   if (kind === 'debug' && fs.existsSync(path.join(problemDir, 'judge.ts'))) {
     console.error('This problem has a custom judge.ts but no debug.ts; add a debug.ts to support debugging.');
     return 1;
+  }
+
+  // Without test cases, stdioJudgePreset prints a single accepted sentinel result, so a standard
+  // problem with an empty or missing test_cases/ would otherwise pass without being judged.
+  if (kind === 'judge') {
+    const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
+    if (testCases.length === 0) {
+      console.error('a standard stdio problem (without judge.ts) needs at least one test case under test_cases/');
+      return 1;
+    }
   }
 
   // The presets read the answer directory and params from `process.argv`, which holds them at the
