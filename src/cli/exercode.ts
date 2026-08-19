@@ -16,7 +16,6 @@ void main();
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   if (args[0] === '--help' || args[0] === '-h') {
-    // console.info instead of console.log: the build strips console.log from dist outputs.
     console.info(usage);
     return;
   }

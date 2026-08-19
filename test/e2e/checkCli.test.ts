@@ -2,9 +2,14 @@ import child_process from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { expect, test } from 'vitest';
+import { afterAll, expect, test } from 'vitest';
 
 const cliPath = path.resolve('src/cli/exercode.ts');
+
+const tempRoots: string[] = [];
+afterAll(async () => {
+  await Promise.all(tempRoots.map((tempRoot) => fs.promises.rm(tempRoot, { recursive: true, force: true })));
+});
 
 function runCheck(rootDir: string): child_process.SpawnSyncReturns<string> {
   // The synchronous spawn blocks Vitest's timers, so enforce the deadline on the child itself;
@@ -15,6 +20,7 @@ function runCheck(rootDir: string): child_process.SpawnSyncReturns<string> {
 async function copyProblemToTempRoot(): Promise<string> {
   await fs.promises.mkdir('temp', { recursive: true });
   const tempRoot = await fs.promises.mkdtemp(path.join('temp', 'check_'));
+  tempRoots.push(tempRoot);
   const problemDir = path.join(tempRoot, 'a_plus_b_file');
   await fs.promises.cp('example/a_plus_b_file', problemDir, { recursive: true });
   return tempRoot;

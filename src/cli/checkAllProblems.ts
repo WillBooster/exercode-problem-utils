@@ -83,9 +83,20 @@ export async function checkAllProblems(args: readonly string[]): Promise<number>
     // unless static-analysis rules or manual scoring make the problem judgeable without them.
     if (!(await fileExists(path.join(problemDir, 'judge.ts')))) {
       const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
-      if (testCases.length === 0 && !judgesWithoutTestCases(await readProblemMarkdownFrontMatter(problemDir))) {
-        failures.push(`${toRelative(problemDir)}: ${MISSING_TEST_CASES_ERROR}`);
-        continue;
+      if (testCases.length === 0) {
+        let frontMatter;
+        try {
+          frontMatter = await readProblemMarkdownFrontMatter(problemDir);
+        } catch (error) {
+          failures.push(
+            `${toRelative(problemDir)}: failed to read the problem markdown front matter: ${error instanceof Error ? error.message : String(error)}`
+          );
+          continue;
+        }
+        if (!judgesWithoutTestCases(frontMatter)) {
+          failures.push(`${toRelative(problemDir)}: ${MISSING_TEST_CASES_ERROR}`);
+          continue;
+        }
       }
     }
 
