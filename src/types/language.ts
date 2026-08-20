@@ -19,7 +19,7 @@ export interface LanguageDefinition {
 
   /** Grammer definition for static analysis. */
   grammer?: {
-    strings?: readonly { open: RegExp; close: RegExp }[];
+    strings?: readonly { open: RegExp; close: RegExp; templateSyntax?: 'kotlin' }[];
     comments?: readonly { open: RegExp; close?: RegExp }[];
   };
 }
@@ -121,7 +121,11 @@ export const languageIdToDefinition: Readonly<Record<string, Readonly<LanguageDe
     buildCommand: (filePath) => ['kotlinc', filePath, '-include-runtime', '-d', 'main.jar'],
     command: () => ['java', '-Xmx1024m', '-jar', 'main.jar'],
     grammer: {
-      strings: [{ open: /"""/, close: /"""/ }, ...cLikeGrammer.strings],
+      strings: [
+        { open: /"""/, close: /"""/, templateSyntax: 'kotlin' },
+        { open: /'/, close: /(?<!\\)(?:\\{2})*'/ },
+        { open: /"/, close: /(?<!\\)(?:\\{2})*"/, templateSyntax: 'kotlin' },
+      ],
       comments: cLikeGrammer.comments,
     },
   },
