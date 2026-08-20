@@ -16,6 +16,13 @@ interface CommentOrStringGrammar {
   closeRegExp: RegExp;
   isComment: boolean;
   openRegExp: RegExp;
+  templateSyntax?: 'kotlin';
+}
+
+interface BalancedExpressionOptions {
+  slashStartsComments?: boolean;
+  slashStartsRegExp: boolean;
+  supportsKotlinStrings?: boolean;
 }
 
 function removeCommentsAndMaybeStringsInSourceCode(
@@ -59,6 +66,7 @@ function removeCommentsAndMaybeStringsInSourceCode(
             preserveStringInterpolationExpressions(
               grammar,
               commentOrStringGrammars,
+              first.grammar,
               sourceCode,
               first.match.index,
               stringLiteral
@@ -95,6 +103,7 @@ function compileCommentOrStringGrammars(grammar: SourceCodeGrammar): readonly Co
       closeRegExp: makeGlobalRegExp(v.close),
       isComment: false,
       openRegExp: makeGlobalRegExp(v.open),
+      templateSyntax: v.templateSyntax,
     })) ?? []),
   ] satisfies CommentOrStringGrammar[];
 }
@@ -116,6 +125,7 @@ function makeGlobalRegExp(regExp: RegExp): RegExp {
 }
 
 function findStringEndIndex(sourceCode: string, stringStartIndex: number, grammar: CommentOrStringGrammar): number {
+  if (grammar.templateSyntax === 'kotlin') return findKotlinStringEndIndex(sourceCode, stringStartIndex);
   if (sourceCode[stringStartIndex] === '`') return findJavaScriptTemplateEndIndex(sourceCode, stringStartIndex);
   if (hasPythonFStringPrefix(sourceCode, stringStartIndex))
     return findPythonFStringEndIndex(sourceCode, stringStartIndex);
@@ -124,6 +134,32 @@ function findStringEndIndex(sourceCode: string, stringStartIndex: number, gramma
   closeRegExp.lastIndex = stringStartIndex + 1;
   const match = closeRegExp.exec(sourceCode);
   return match ? match.index + match[0].length : sourceCode.length;
+}
+
+function findKotlinStringEndIndex(sourceCode: string, stringStartIndex: number): number {
+  const quote = getStringQuote(sourceCode, stringStartIndex);
+  const isRawString = quote.length === 3;
+  let index = stringStartIndex + quote.length;
+
+  while (index < sourceCode.length) {
+    if (sourceCode.startsWith(quote, index)) return index + quote.length;
+    if (!isRawString && sourceCode[index] === '\\') {
+      index += 2;
+      continue;
+    }
+    if (sourceCode[index] === '$' && sourceCode[index + 1] === '{') {
+      index =
+        readBalancedExpression(sourceCode, index + 2, '}', {
+          slashStartsComments: true,
+          slashStartsRegExp: false,
+          supportsKotlinStrings: true,
+        }).endIndex + 1;
+      continue;
+    }
+    index += 1;
+  }
+
+  return sourceCode.length;
 }
 
 function findJavaScriptTemplateEndIndex(sourceCode: string, stringStartIndex: number): number {
@@ -191,15 +227,75 @@ function getPythonStringPrefix(sourceCode: string, stringStartIndex: number): st
 function preserveStringInterpolationExpressions(
   grammar: SourceCodeGrammar,
   commentOrStringGrammars: readonly CommentOrStringGrammar[],
+  stringGrammar: CommentOrStringGrammar,
   sourceCode: string,
   stringStartIndex: number,
   stringLiteral: string
 ): string {
+  if (stringGrammar.templateSyntax === 'kotlin')
+    return preserveKotlinStringTemplateExpressions(grammar, commentOrStringGrammars, stringLiteral);
   if (stringLiteral.startsWith('`'))
     return preserveJavaScriptTemplateExpressions(grammar, commentOrStringGrammars, stringLiteral);
   if (hasPythonFStringPrefix(sourceCode, stringStartIndex))
     return preservePythonFStringExpressions(grammar, commentOrStringGrammars, stringLiteral);
   return '';
+}
+
+function preserveKotlinStringTemplateExpressions(
+  grammar: SourceCodeGrammar,
+  commentOrStringGrammars: readonly CommentOrStringGrammar[],
+  stringLiteral: string
+): string {
+  const quoteLength = getStringQuote(stringLiteral, 0).length;
+  const isRawString = quoteLength === 3;
+  const expressions: string[] = [];
+  let index = quoteLength;
+
+  while (index < stringLiteral.length - quoteLength) {
+    if (!isRawString && stringLiteral[index] === '\\') {
+      index += 2;
+      continue;
+    }
+    if (stringLiteral[index] !== '$') {
+      index += 1;
+      continue;
+    }
+    if (stringLiteral[index + 1] === '{') {
+      const expression = readBalancedExpression(stringLiteral, index + 2, '}', {
+        slashStartsComments: true,
+        slashStartsRegExp: false,
+        supportsKotlinStrings: true,
+      });
+      expressions.push(
+        removeCommentsAndMaybeStringsInSourceCode(
+          grammar,
+          expression.content,
+          { removeStrings: true },
+          commentOrStringGrammars
+        )
+      );
+      index = expression.endIndex + 1;
+      continue;
+    }
+    if (isKotlinIdentifierStart(stringLiteral[index + 1])) {
+      let endIndex = index + 2;
+      while (isKotlinIdentifierPart(stringLiteral[endIndex])) endIndex += 1;
+      expressions.push(stringLiteral.slice(index + 1, endIndex));
+      index = endIndex;
+      continue;
+    }
+    index += 1;
+  }
+
+  return expressions.join('\n');
+}
+
+function isKotlinIdentifierStart(character: string | undefined): boolean {
+  return character !== undefined && /[\p{L}_]/u.test(character);
+}
+
+function isKotlinIdentifierPart(character: string | undefined): boolean {
+  return character !== undefined && /[\p{L}\p{N}_]/u.test(character);
 }
 
 function hasPythonFStringPrefix(sourceCode: string, stringStartIndex: number): boolean {
@@ -275,22 +371,34 @@ function readBalancedExpression(
   sourceCode: string,
   startIndex: number,
   closeChar: string,
-  options: { slashStartsRegExp: boolean }
+  options: BalancedExpressionOptions
 ): { content: string; endIndex: number } {
   let depth = 1;
   let index = startIndex;
 
   while (index < sourceCode.length) {
     const char = sourceCode[index];
+    if (char === '"' && options.supportsKotlinStrings) {
+      index = findKotlinStringEndIndex(sourceCode, index);
+      continue;
+    }
     if (char === '"' || char === "'" || char === '`') {
       index = skipQuotedSpan(sourceCode, index);
       continue;
     }
-    if (options.slashStartsRegExp && sourceCode[index] === '/' && sourceCode[index + 1] === '/') {
+    if (
+      (options.slashStartsComments || options.slashStartsRegExp) &&
+      sourceCode[index] === '/' &&
+      sourceCode[index + 1] === '/'
+    ) {
       index = skipJavaScriptSingleLineComment(sourceCode, index);
       continue;
     }
-    if (options.slashStartsRegExp && sourceCode[index] === '/' && sourceCode[index + 1] === '*') {
+    if (
+      (options.slashStartsComments || options.slashStartsRegExp) &&
+      sourceCode[index] === '/' &&
+      sourceCode[index + 1] === '*'
+    ) {
       index = skipJavaScriptBlockComment(sourceCode, index);
       continue;
     }

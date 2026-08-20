@@ -32,6 +32,21 @@ public class Main {
 `,
   ],
   [
+    'kotlin',
+    `fun main() {
+  val values = mapOf("/*" to "safe")
+  val message = "Value: ${'${values["/*"]}'}" // Remove this comment
+  println(message)
+}
+`,
+    `fun main() {
+  val values = mapOf("/*" to "safe")
+  val message = "Value: ${'${values["/*"]}'}"
+  println(message)
+}
+`,
+  ],
+  [
     'python',
     `#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
@@ -367,6 +382,23 @@ test('remove comments and strings preserves JavaScript nested template expressio
       'const value = `outer ${`inner` && dangerousCall("x")}`;\n'
     )
   ).toEqual('const value =  && dangerousCall();\n');
+});
+
+test('remove comments and strings preserves Kotlin string template expressions', () => {
+  assert(languageIdToSourceCodeGrammar.kotlin);
+
+  expect(
+    removeCommentsAndStringsInSourceCode(
+      languageIdToSourceCodeGrammar.kotlin,
+      `val regular = "Hello ${'${dangerousCall("/*")}'}"
+val raw = """Hello ${'${otherCall("//")}'}"""
+val short = "Hello $user"
+`
+    )
+  ).toEqual(`val regular = dangerousCall()
+val raw = otherCall()
+val short = user
+`);
 });
 
 test('remove comments and strings preserves Python f-string expressions', () => {

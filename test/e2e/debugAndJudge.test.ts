@@ -166,6 +166,7 @@ test.each<
 
   // stdioJudgePreset
   ['example/a_plus_b', 'judge.ts', 'model_answers/java', {}, {}, acceptedTestCaseResultsForAPlusB],
+  ['example/a_plus_b', 'judge.ts', 'model_answers/kotlin', {}, {}, acceptedTestCaseResultsForAPlusB],
   ['example/a_plus_b', 'judge.ts', 'model_answers/python', {}, {}, acceptedTestCaseResultsForAPlusB],
   ['example/a_plus_b', 'judge.ts', 'model_answers.test/java_rename', {}, {}, acceptedTestCaseResultsForAPlusB],
   [
