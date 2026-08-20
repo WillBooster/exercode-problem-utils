@@ -116,6 +116,16 @@ export const languageIdToDefinition: Readonly<Record<string, Readonly<LanguageDe
     grammer: cLikeGrammer,
   },
 
+  kotlin: {
+    fileExtensions: ['.kt'],
+    buildCommand: (filePath) => ['kotlinc', filePath, '-include-runtime', '-d', 'main.jar'],
+    command: () => ['java', '-Xmx1024m', '-jar', 'main.jar'],
+    grammer: {
+      strings: [{ open: /"""/, close: /"""/ }, ...cLikeGrammer.strings],
+      comments: cLikeGrammer.comments,
+    },
+  },
+
   javascript: {
     fileExtensions: ['.js', '.cjs', '.mjs'],
     command: (fileName) => ['bun', fileName],
