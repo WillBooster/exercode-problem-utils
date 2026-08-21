@@ -42,12 +42,12 @@ const debugParamsSchema = judgeParamsSchema.extend({
  * @example
  * Run in a problem directory without `judge.ts`:
  * ```bash
- * bun x exercode judge model_answers/java
+ * bun x exercode-problem judge model_answers/java
  * ```
  *
  * Run with the optional parameters:
  * ```bash
- * bun x exercode judge model_answers/java '{ "language": "javascript" }'
+ * bun x exercode-problem judge model_answers/java '{ "language": "javascript" }'
  * ```
  */
 export async function stdioJudgePreset(problemDir: string): Promise<void> {
@@ -249,7 +249,7 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
  * @example
  * Run in a problem directory without `debug.ts`:
  * ```bash
- * bun x exercode debug model_answers/java '{ "stdin": "1 2" }'
+ * bun x exercode-problem debug model_answers/java '{ "stdin": "1 2" }'
  * ```
  */
 export async function stdioDebugPreset(problemDir: string): Promise<void> {

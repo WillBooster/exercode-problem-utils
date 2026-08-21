@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import { afterAll, expect, test } from 'vitest';
 
-const cliPath = path.resolve('src/cli/exercode.ts');
+const cliPath = path.resolve('src/cli/exercodeProblem.ts');
 
 const tempRoots: string[] = [];
 afterAll(async () => {
