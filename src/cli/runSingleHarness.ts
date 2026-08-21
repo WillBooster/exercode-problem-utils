@@ -67,6 +67,6 @@ export function formatDefaultHarnessError(defaultHarnessFileNames: readonly stri
   const fileNames = defaultHarnessFileNames.join(' and ');
   return `${fileNames} must not be committed because the content is identical to the default stdio harness.
 A problem without judge.ts is automatically judged with stdioJudgePreset and debugged with stdioDebugPreset,
-so delete ${fileNames} and run the problem with \`bun x exercode judge <answerDir>\` or \`bun x exercode debug <answerDir>\`.
+so delete ${fileNames} and run the problem with \`bun x exercode-problem judge <answerDir>\` or \`bun x exercode-problem debug <answerDir>\`.
 If the file intentionally demonstrates the default harness, add an explanatory comment to mark it as custom.`;
 }

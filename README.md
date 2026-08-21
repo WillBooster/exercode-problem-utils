@@ -8,24 +8,24 @@
 
 ## CLI
 
-The package ships an `exercode` command for problem authors (run it with `bun x` in a repository that depends on `@exercode/problem-utils`):
+The package ships an `exercode-problem` command for problem authors (run it with `bun x` in a repository that depends on `@exercode/problem-utils`):
 
 ```bash
 # Judge all model answers of all problems (directories containing problem.md or <id>.problem.md) under a directory.
 # model_answers/* must be fully accepted; model_answers.fails/* must fail at least one test case.
-bun x exercode                # everything under the current directory
-bun x exercode courses/foo    # everything under courses/foo
-bun x exercode --only a_plus --skip gui_ --concurrency 2
+bun x exercode-problem                # everything under the current directory
+bun x exercode-problem courses/foo    # everything under courses/foo
+bun x exercode-problem --only a_plus --skip gui_ --concurrency 2
 
 # Judge one answer directory of the problem in the current directory.
-bun x exercode judge model_answers/python
-bun x exercode judge model_answers/python '{ "language": "python" }'
+bun x exercode-problem judge model_answers/python
+bun x exercode-problem judge model_answers/python '{ "language": "python" }'
 
 # Debug one answer directory of the problem in the current directory.
-bun x exercode debug model_answers/python '{ "stdin": "1 2" }'
+bun x exercode-problem debug model_answers/python '{ "stdin": "1 2" }'
 ```
 
-`judge` and `debug` run a custom `judge.ts` / `debug.ts` when the problem has one, and apply `stdioJudgePreset` / `stdioDebugPreset` otherwise, mirroring the Exercode server. The debug fallback applies only to standard problems: a problem with a custom `judge.ts` needs its own `debug.ts`, and `exercode debug` fails with a message otherwise (the server likewise reports debug as unsupported there).
+`judge` and `debug` run a custom `judge.ts` / `debug.ts` when the problem has one, and apply `stdioJudgePreset` / `stdioDebugPreset` otherwise, mirroring the Exercode server. The debug fallback applies only to standard problems: a problem with a custom `judge.ts` needs its own `debug.ts`, and `exercode-problem debug` fails with a message otherwise (the server likewise reports debug as unsupported there).
 
 The all-problem check judges serially by default because time limits are measured in wall-clock time; pass `--concurrency <n>` to parallelize when the checked problems are not timing-sensitive.
 

@@ -1,14 +1,14 @@
 import { checkAllProblems } from './checkAllProblems.js';
 import { runSingleHarness } from './runSingleHarness.js';
 
-const usage = `Usage: exercode [rootDir] [--only <substring>]... [--skip <substring>]... [--concurrency <n>]
-       exercode judge <answerDir> [paramsJson]
-       exercode debug <answerDir> [paramsJson]
+const usage = `Usage: exercode-problem [rootDir] [--only <substring>]... [--skip <substring>]... [--concurrency <n>]
+       exercode-problem judge <answerDir> [paramsJson]
+       exercode-problem debug <answerDir> [paramsJson]
 
 Without a subcommand, judge all model answers of all problems under rootDir
 (default: the current directory). Use \`judge\` or \`debug\` in a problem
 directory to run one answer directory, e.g.:
-  exercode debug model_answers/python '{ "stdin": "1 2" }'`;
+  exercode-problem debug model_answers/python '{ "stdin": "1 2" }'`;
 
 // oxlint-disable-next-line unicorn/prefer-top-level-await -- the CJS build output does not support top-level await
 void main();
