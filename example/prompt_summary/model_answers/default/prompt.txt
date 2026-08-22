@@ -1,3 +1,3 @@
-Please summarize the following text in its original language.
+Please summarize the following text in its original language. Output only the summary without a preamble or explanation.
 
 {input}
