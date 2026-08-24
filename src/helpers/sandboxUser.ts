@@ -190,19 +190,38 @@ export function killSandboxUserProcesses(signals: readonly ('TERM' | 'KILL')[] =
   if (!sandboxUserName) return;
   // One direct call per signal instead of one `sh -c 'pkill ...; pkill ...'`: the wrapping shell
   // would run as the sandbox user too, so the first pkill would kill it before the second ran.
+  // Failures are collected instead of thrown mid-loop so a failed SIGTERM sweep never skips the
+  // unconditional SIGKILL sweep.
+  const failures: string[] = [];
   for (const signal of signals) {
-    const result = runAsSandboxUser(['pkill', `-${signal}`, '-u', sandboxUserName]);
-    // Fail closed: a submission can exhaust the PID cgroup so this `sudo` cannot even be spawned,
-    // and a spawned `sudo` can still fail to run `pkill` (e.g. fork failure inside sudo).
-    // Reporting success would leave its processes alive for the next request on this instance.
-    // `pkill` exits with 1 when no process matched, which is a success here.
-    if (result.error) {
-      throw new Error(`failed to terminate ${sandboxUserName} processes: ${result.error.message}`);
-    }
-    if (result.status !== 0 && result.status !== 1) {
-      throw new Error(`failed to terminate ${sandboxUserName} processes: exit status ${String(result.status)}`);
-    }
+    const firstFailure = sweepSandboxUserProcessesOnce(signal);
+    const failure = firstFailure ? sweepSandboxUserProcessesOnce(signal) : undefined;
+    if (failure) failures.push(`pkill -${signal}: ${failure}`);
   }
+  // Fail closed: a submission can exhaust the PID cgroup so this `sudo` cannot even be spawned,
+  // and a spawned `sudo` can still fail to run `pkill` (e.g. fork failure inside sudo).
+  // Reporting success would leave its processes alive for the next request on this instance.
+  if (failures.length > 0) {
+    throw new Error(`failed to terminate ${sandboxUserName} processes: ${failures.join('; ')}`);
+  }
+}
+
+/**
+ * Runs one `pkill` sweep and returns a failure description, or `undefined` on success. Retried once
+ * by the caller because a sweep can itself be killed by a concurrent watchdog sweep
+ * ({@link startSandboxTimeoutWatchdog}'s `pkill -KILL` matches it).
+ */
+function sweepSandboxUserProcessesOnce(signal: 'TERM' | 'KILL'): string | undefined {
+  const result = runAsSandboxUser(['pkill', `-${signal}`, '-u', sandboxUserName as string]);
+  if (result.error) return result.error.message;
+  if (result.status === null) return `terminated by ${result.signal ?? 'an unknown signal'}`;
+  if (result.status === 0) return undefined;
+  // `sudo` exits with 1 both when `pkill` matched no process (a success, silent on stderr) and on
+  // its own failures (auth/permission problems, fork/exec failure — all reported on stderr), so
+  // status alone cannot distinguish them.
+  const stderr = result.stderr.toString().trim();
+  if (result.status === 1 && !stderr) return undefined;
+  return `exit status ${result.status}${stderr ? ` (${stderr})` : ''}`;
 }
 
 /**
