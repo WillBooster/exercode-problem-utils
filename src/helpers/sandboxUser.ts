@@ -186,9 +186,10 @@ export function makeAccessibleToSandboxUser(targetPath: string): void {
  * sends SIGTERM immediately followed by SIGKILL (final cleanup); callers that want a grace period
  * send `['TERM']`, wait, and then send `['KILL']`.
  *
- * Fails closed: after SIGKILL, throws when a sandbox process is still alive (e.g. a submission
- * exhausted the PID cgroup so `sudo` cannot spawn). Reporting success would leave that process
- * running next to the next request on this instance.
+ * Fails closed: a `['TERM']`-only sweep throws when its `sudo` could not be spawned (e.g. a
+ * submission exhausted the PID cgroup); a sweep including SIGKILL throws when a sandbox process is
+ * still alive, or cannot be listed, afterwards. Reporting success would leave that process running
+ * next to the next request on this instance.
  */
 export function killSandboxUserProcesses(signals: readonly ('TERM' | 'KILL')[] = ['TERM', 'KILL']): void {
   if (!sandboxUserName) return;
