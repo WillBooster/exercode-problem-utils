@@ -185,19 +185,67 @@ export function makeAccessibleToSandboxUser(targetPath: string): void {
  * sandbox process is safe because the judge server handles one request at a time. The default
  * sends SIGTERM immediately followed by SIGKILL (final cleanup); callers that want a grace period
  * send `['TERM']`, wait, and then send `['KILL']`.
+ *
+ * Fails closed: a `['TERM']`-only sweep throws when its `sudo` could not be spawned (e.g. a
+ * submission exhausted the PID cgroup); a sweep including SIGKILL throws when a sandbox process is
+ * still alive, or cannot be listed, afterwards. Reporting success would leave that process running
+ * next to the next request on this instance.
  */
 export function killSandboxUserProcesses(signals: readonly ('TERM' | 'KILL')[] = ['TERM', 'KILL']): void {
   if (!sandboxUserName) return;
   // One direct call per signal instead of one `sh -c 'pkill ...; pkill ...'`: the wrapping shell
   // would run as the sandbox user too, so the first pkill would kill it before the second ran.
-  // Each `pkill` exits with 1 when no process matches, so ignore the exit status.
+  // Exit statuses are not inspected: `sudo` exits with 1 both when `pkill` matched nothing and on
+  // its own failures, and a sweep can itself be killed by a concurrent watchdog sweep
+  // ({@link startSandboxTimeoutWatchdog}'s `pkill -KILL` matches it). What matters is the outcome.
+  const spawnErrors: string[] = [];
   for (const signal of signals) {
     const result = runAsSandboxUser(['pkill', `-${signal}`, '-u', sandboxUserName]);
-    // Fail closed: a submission can exhaust the PID cgroup so this `sudo` cannot even be spawned.
-    // Reporting success would leave its processes alive for the next request on this instance.
-    if (result.error) {
-      throw new Error(`failed to terminate ${sandboxUserName} processes: ${result.error.message}`);
+    if (result.error) spawnErrors.push(`pkill -${signal}: ${result.error.message}`);
+  }
+  if (!signals.includes('KILL')) {
+    // Survivors are expected during the caller's grace period, so only a sweep that never started
+    // is a failure here.
+    if (spawnErrors.length > 0) {
+      throw new Error(`failed to signal ${sandboxUserName} processes: ${spawnErrors.join('; ')}`);
     }
+    return;
+  }
+  const survivors = findSurvivingSandboxUserProcesses();
+  if (survivors) throw new Error(`failed to terminate ${sandboxUserName} processes: ${survivors}`);
+}
+
+/**
+ * Lists the sandbox user's live processes as the harness user (listing needs no privilege), or
+ * `undefined` when none remain. SIGKILL is re-sent between attempts: a child forked after `pkill`
+ * scanned `/proc` was never signalled, and a process in uninterruptible sleep dies only once its
+ * I/O completes. Just-killed processes linger as zombies until reaped; a zombie row is ignored only
+ * when it has a single thread, because a thread-group leader that exited via `pthread_exit` shows
+ * as a zombie while its other threads keep running.
+ */
+function findSurvivingSandboxUserProcesses(): string | undefined {
+  for (let attempt = 0; ; attempt++) {
+    if (attempt > 0) {
+      runAsSandboxUser(['pkill', '-KILL', '-u', sandboxUserName as string]);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+    }
+    const result = child_process.spawnSync('ps', ['-o', 'pid=,stat=,nlwp=,comm=', '-u', sandboxUserName as string], {
+      env: MINIMAL_ENV,
+      encoding: 'utf8',
+    });
+    // `ps` exits with 1 both when no process matched and on its own errors, which it reports on
+    // stderr; anything else is a failure to list, which must count as a failure to verify.
+    const stderr = result.stderr?.trim();
+    if (result.error) return `cannot list processes: ${result.error.message}`;
+    if (result.signal || (result.status !== 0 && (result.status !== 1 || stderr))) {
+      return `cannot list processes: ${stderr || `ps exited with ${result.status ?? result.signal}`}`;
+    }
+    const survivors = result.stdout
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !/^\d+\s+Z\S*\s+1\s/.test(line));
+    if (survivors.length === 0) return undefined;
+    if (attempt >= 10) return survivors.join(', ');
   }
 }
 
