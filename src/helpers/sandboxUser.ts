@@ -190,13 +190,17 @@ export function killSandboxUserProcesses(signals: readonly ('TERM' | 'KILL')[] =
   if (!sandboxUserName) return;
   // One direct call per signal instead of one `sh -c 'pkill ...; pkill ...'`: the wrapping shell
   // would run as the sandbox user too, so the first pkill would kill it before the second ran.
-  // Each `pkill` exits with 1 when no process matches, so ignore the exit status.
   for (const signal of signals) {
     const result = runAsSandboxUser(['pkill', `-${signal}`, '-u', sandboxUserName]);
-    // Fail closed: a submission can exhaust the PID cgroup so this `sudo` cannot even be spawned.
+    // Fail closed: a submission can exhaust the PID cgroup so this `sudo` cannot even be spawned,
+    // and a spawned `sudo` can still fail to run `pkill` (e.g. fork failure inside sudo).
     // Reporting success would leave its processes alive for the next request on this instance.
+    // `pkill` exits with 1 when no process matched, which is a success here.
     if (result.error) {
       throw new Error(`failed to terminate ${sandboxUserName} processes: ${result.error.message}`);
+    }
+    if (result.status !== 0 && result.status !== 1) {
+      throw new Error(`failed to terminate ${sandboxUserName} processes: exit status ${String(result.status)}`);
     }
   }
 }
