@@ -74,6 +74,11 @@ export interface CommandJudgePresetOptions<
   TTestCase extends BaseCommandTestCase = BaseCommandTestCase,
   TRunResult extends CommandRunResult = CommandRunResult,
 > {
+  /**
+   * Set to false when the custom runner builds the submitted source itself.
+   * Defaults to true.
+   */
+  buildSubmission?: boolean;
   limits?: CommandJudgeLimits;
   runTimeoutSeconds?: number;
   readTestCases?: (problemDir: string) => Promise<readonly TTestCase[]>;
@@ -231,32 +236,34 @@ async function runCommandJudgeForCwd<
   const env = { ...process.env, CI: '', FORCE_COLOR: '0' };
 
   let mainFilePath = originalMainFilePath;
-  if (languageDefinition.prebuild) {
-    try {
-      await languageDefinition.prebuild(cwd);
-      const prebuiltMainFilePath = await findEntryPointFile(cwd, params.language);
-      if (prebuiltMainFilePath) mainFilePath = prebuiltMainFilePath;
-    } catch (error) {
-      printTestCaseResult({
-        testCaseId: prebuildTestCaseId,
-        decisionCode: DecisionCode.BUILD_ERROR,
-        stderr: error instanceof Error ? error.message : String(error),
-      });
-      return { allAccepted: false };
+  if (options.buildSubmission !== false) {
+    if (languageDefinition.prebuild) {
+      try {
+        await languageDefinition.prebuild(cwd);
+        const prebuiltMainFilePath = await findEntryPointFile(cwd, params.language);
+        if (prebuiltMainFilePath) mainFilePath = prebuiltMainFilePath;
+      } catch (error) {
+        printTestCaseResult({
+          testCaseId: prebuildTestCaseId,
+          decisionCode: DecisionCode.BUILD_ERROR,
+          stderr: error instanceof Error ? error.message : String(error),
+        });
+        return { allAccepted: false };
+      }
     }
-  }
 
-  const buildCommand = languageDefinition.buildCommand?.(mainFilePath);
-  if (buildCommand) {
-    const buildResult = runBuild(buildCommand, {
-      cwd,
-      env,
-      testCaseId: prebuildTestCaseId,
-      limits,
-    });
-    if (buildResult) {
-      printTestCaseResult(buildResult);
-      return { allAccepted: false };
+    const buildCommand = languageDefinition.buildCommand?.(mainFilePath);
+    if (buildCommand) {
+      const buildResult = runBuild(buildCommand, {
+        cwd,
+        env,
+        testCaseId: prebuildTestCaseId,
+        limits,
+      });
+      if (buildResult) {
+        printTestCaseResult(buildResult);
+        return { allAccepted: false };
+      }
     }
   }
 

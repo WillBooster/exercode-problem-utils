@@ -457,6 +457,24 @@ test.each<
     ],
   ],
   [
+    'example/external_build',
+    'judge.ts',
+    'model_answers/default',
+    {},
+    {},
+    [
+      {
+        testCaseId: 'external_build',
+        decisionCode: 2000,
+        exitStatus: 0,
+        stdin: '',
+        stdout: 'built externally\n',
+        timeSeconds: expect.any(Number),
+        memoryBytes: expect.any(Number),
+      },
+    ],
+  ],
+  [
     'example/gui_python_window',
     'judge.ts',
     'model_answers/default',
