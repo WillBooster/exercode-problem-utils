@@ -37,6 +37,11 @@ export interface RunCommandInTemporaryPackageManagerProjectOptions {
   projectDir: string;
   packageManager: PackageManager;
   command: readonly [string, ...string[]] | ((context: { runDir: string }) => readonly [string, ...string[]]);
+  /**
+   * Set to false when `command` prepares the dependencies it needs.
+   * Defaults to true.
+   */
+  prepareDependencies?: boolean;
   stdin?: string;
   env?: NodeJS.ProcessEnv;
   timeLimitSeconds: number;
@@ -113,7 +118,8 @@ export async function runCommandInTemporaryPackageManagerProject(
     makeAccessibleToSandboxUser(runDir);
 
     const env = options.env ? { ...process.env, ...options.env } : process.env;
-    const installCommand = await resolveInstallCommand(options.packageManager, runDir);
+    const installCommand =
+      options.prepareDependencies === false ? undefined : await resolveInstallCommand(options.packageManager, runDir);
     const command = typeof options.command === 'function' ? options.command({ runDir }) : options.command;
     const startedAt = Date.now();
     const outputLimitBytes = options.outputLimitBytes ?? defaultOutputLimitBytes;
