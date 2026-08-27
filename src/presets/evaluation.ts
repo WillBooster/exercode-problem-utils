@@ -206,30 +206,34 @@ function buildScoreMarkdown(
   options: EvaluationJudgePresetOptions
 ): string {
   const { label, isHigherBetter } = options.metric;
+  const precision = findDistinguishingPrecision(score, options.acceptableScore);
   const acceptanceLine =
     options.acceptableScore === undefined
       ? ''
-      : `\n合格基準: ${label} ${isHigherBetter ? '≧' : '≦'} ${formatScore(options.acceptableScore)}（${isAccepted ? '達成' : '未達成'}）`;
+      : `\n合格基準: ${label} ${isHigherBetter ? '≧' : '≦'} ${formatScore(options.acceptableScore, precision)}（${isAccepted ? '達成' : '未達成'}）`;
   return `| 指標 | スコア |
 | ---- | ------ |
-| ${label} | ${formatScoreAgainst(score, options.acceptableScore)} |
+| ${label} | ${formatScore(score, precision)} |
 
 評価件数: ${rowCount.toLocaleString('en-US')}件${acceptanceLine}
 `;
 }
 
-function formatScore(score: number): string {
-  return Number(score.toPrecision(6)).toString();
+function formatScore(score: number, precision: number): string {
+  return Number(score.toPrecision(precision)).toString();
 }
 
-/** Formats the score with enough digits that it does not read as equal to a threshold it differs from. */
-function formatScoreAgainst(score: number, threshold: number | undefined): string {
-  if (threshold === undefined || score === threshold) return formatScore(score);
-  for (let precision = 6; precision <= 17; precision++) {
-    const formatted = Number(score.toPrecision(precision)).toString();
-    if (formatted !== Number(threshold.toPrecision(precision)).toString()) return formatted;
+/**
+ * Finds the number of significant digits at which the score and the threshold render differently
+ * (or stop changing), so the feedback never shows a pair that contradicts the decision.
+ */
+function findDistinguishingPrecision(score: number, threshold: number | undefined): number {
+  const minimumPrecision = 6;
+  if (threshold === undefined || score === threshold) return minimumPrecision;
+  for (let precision = minimumPrecision; precision < 17; precision++) {
+    if (formatScore(score, precision) !== formatScore(threshold, precision)) return precision;
   }
-  return score.toString();
+  return 17;
 }
 
 function readPredictions(
@@ -304,13 +308,13 @@ function isBlankRow(row: readonly string[]): boolean {
 }
 
 function clip(value: string): string {
-  // Control characters would break the markdown list item and inline code the value is echoed in.
-  const printable = value.replaceAll(/[\p{Cc}]/gu, ' ');
+  // Control characters and backticks would break the markdown list item and inline code the value is echoed in.
+  const printable = value.replaceAll(/[\p{Cc}]/gu, ' ').replaceAll('`', "'");
   return printable.length > MAX_ECHOED_CELL_LENGTH ? `${printable.slice(0, MAX_ECHOED_CELL_LENGTH)}…` : printable;
 }
 
 function listIds(ids: readonly string[]): string {
-  const listed = ids.slice(0, MAX_LISTED_IDS).map((id) => `\`${id}\``);
+  const listed = ids.slice(0, MAX_LISTED_IDS).map((id) => `\`${clip(id)}\``);
   return ids.length > MAX_LISTED_IDS ? `${listed.join(', ')}, ...` : listed.join(', ');
 }
 
