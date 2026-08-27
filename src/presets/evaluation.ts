@@ -293,6 +293,28 @@ ${problems.map((problem) => `- ${problem}`).join('\n')}${problemCount > problems
   return predictions;
 }
 
+async function readAnswer(answerFilePath: string, options: EvaluationJudgePresetOptions): Promise<Map<string, string>> {
+  const rows = parseCsv(await fs.readFile(answerFilePath, 'utf8'));
+  const columns = findColumns(rows[0] ?? [], options);
+  if (!columns) {
+    throw new Error(`answer file must have ${options.idColumn} and ${options.targetColumn} columns: ${answerFilePath}`);
+  }
+  const answer = new Map<string, string>();
+  for (const row of rows.slice(1)) {
+    if (isBlankRow(row)) continue;
+    const id = row[columns.idIndex]?.trim() ?? '';
+    const value = row[columns.targetIndex] ?? '';
+    if (!id) throw new Error(`empty ${options.idColumn} in answer file: ${answerFilePath}`);
+    if (answer.has(id)) throw new Error(`duplicate ${options.idColumn} in answer file: ${id}`);
+    const validationError = options.metric.validatePrediction?.(value);
+    if (validationError)
+      throw new Error(`invalid ${options.targetColumn} in answer file for ${id}: ${validationError}`);
+    answer.set(id, value);
+  }
+  if (answer.size === 0) throw new Error(`answer file has no rows: ${answerFilePath}`);
+  return answer;
+}
+
 function findColumns(
   header: readonly string[],
   options: EvaluationJudgePresetOptions
@@ -317,28 +339,6 @@ function clip(value: string): string {
   const printable = value.replaceAll(/[\p{Cc}]/gu, ' ').replaceAll('`', "'");
   if (printable.trim() === '') return '（空）';
   return printable.length > MAX_ECHOED_CELL_LENGTH ? `${printable.slice(0, MAX_ECHOED_CELL_LENGTH)}…` : printable;
-}
-
-async function readAnswer(answerFilePath: string, options: EvaluationJudgePresetOptions): Promise<Map<string, string>> {
-  const rows = parseCsv(await fs.readFile(answerFilePath, 'utf8'));
-  const columns = findColumns(rows[0] ?? [], options);
-  if (!columns) {
-    throw new Error(`answer file must have ${options.idColumn} and ${options.targetColumn} columns: ${answerFilePath}`);
-  }
-  const answer = new Map<string, string>();
-  for (const row of rows.slice(1)) {
-    if (isBlankRow(row)) continue;
-    const id = row[columns.idIndex]?.trim() ?? '';
-    const value = row[columns.targetIndex] ?? '';
-    if (!id) throw new Error(`empty ${options.idColumn} in answer file: ${answerFilePath}`);
-    if (answer.has(id)) throw new Error(`duplicate ${options.idColumn} in answer file: ${id}`);
-    const validationError = options.metric.validatePrediction?.(value);
-    if (validationError)
-      throw new Error(`invalid ${options.targetColumn} in answer file for ${id}: ${validationError}`);
-    answer.set(id, value);
-  }
-  if (answer.size === 0) throw new Error(`answer file has no rows: ${answerFilePath}`);
-  return answer;
 }
 
 function matchesExpectedResult(resolvedCwd: ResolvedCwd, result: Pick<TestCaseResult, 'decisionCode'>): boolean {
