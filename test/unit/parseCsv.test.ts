@@ -83,6 +83,10 @@ describe('parseCsvRecords', () => {
     ]);
   });
 
+  test('counts a CR-only line break inside a quoted field', () => {
+    expect(parseCsvRecords('h\n"1\r2"\nx').map((record) => record.lineNumber)).toEqual([1, 2, 4]);
+  });
+
   test('names the record of an unterminated quote', () => {
     expect(() => parseCsvRecords('a\n"b')).toThrow('line 2');
   });
