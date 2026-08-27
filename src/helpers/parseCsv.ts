@@ -2,7 +2,7 @@ export type CsvParseErrorReason = 'unterminated_quote' | 'unexpected_quote' | 't
 
 export class CsvParseError extends Error {
   readonly reason: CsvParseErrorReason;
-  /** 1-based physical line of the record in which the error was found. */
+  /** 1-based physical line where the error was detected (the record's start line for an unterminated quote). */
   readonly lineNumber: number;
 
   constructor(reason: CsvParseErrorReason, lineNumber: number) {
