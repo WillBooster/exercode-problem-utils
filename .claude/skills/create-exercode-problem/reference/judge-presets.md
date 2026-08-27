@@ -68,6 +68,28 @@ cwd を省くと `model_answers/*` と `model_answers.fails/*` を列挙し、�
 bun judge.ts model_answers/default '{"model":"openai/gpt-5.4-nano"}'
 ```
 
+## モデル性能評価（Kaggle 形式）: `evaluationJudgePreset`
+
+学習者が隠しテストデータに対する予測値の CSV を提出し、judge が正解データと突き合わせて指標（RMSLE など）を計算する問題に使う。
+正解 CSV は問題ディレクトリ内に置く（学習者には配布されない）。結果は `score` / `scoreLabel` として Exercode に表示される。
+
+```ts
+import { evaluationJudgePreset, evaluationMetrics } from '@exercode/problem-utils/presets/evaluation';
+
+await evaluationJudgePreset(import.meta.dirname, {
+  answerFilePath: 'evaluation/answer.csv', // 問題ディレクトリからの相対パス
+  idColumn: 'Id',
+  targetColumn: 'TradePrice',
+  metric: evaluationMetrics.rmsle, // rmsle / rmse / mae / accuracy、または独自の EvaluationMetric
+  acceptableScore: 0.5, // 省略すると形式が正しい提出を全て受理する
+});
+```
+
+- 提出ファイル名は既定で `submission.csv`（`submissionFilePath` で変更可）。frontmatter の `requiredSubmissionFilePaths` にも書く。
+- 提出 CSV に必要なのは `idColumn` と `targetColumn` の列で、正解の全 id が過不足なく 1 回ずつ現れること。不足・重複、および指標の `validatePrediction` が拒む値（RMSE・MAE では数値でない値、RMSLE ではさらに負の値、accuracy では空の値。独自指標では任意）は `WRONG_ANSWER` として理由を `feedbackMarkdown` に出す。
+- `model_answers/<id>/submission.csv` に正解に十分近い予測を置き、`model_answers.fails/` に行不足や精度不足の提出を置いて `bun judge.ts` で確認する。
+- 標準入出力は使わないので `test_cases/` は不要。`templates/_default/submission.csv` にヘッダーだけのひな形を置ける。
+
 ## judge を自作するとき
 
 プリセットで足りない場合は `parseArgs`, `printTestCaseResult`, `DecisionCode`, `startHttpServer` などのヘルパを使う。結果は必ず `printTestCaseResult` かプリセット経由で `TEST_CASE_RESULT {...}` として出す。
