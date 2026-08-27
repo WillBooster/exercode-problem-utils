@@ -23,7 +23,7 @@ Exercode の問題一式を、機械採点可能で、教材コースに登録�
 1. 学習目標、対象コース/講義、対象言語、使ってよい既習範囲、採点方式を確認する。
 2. 既存コースに追加する場合は、近い問題の配置と命名を真似る。
 3. 問題ファイルを作る。一般例や `@exercode/problem-utils` の example では `problem.md`、コース内では `<problem_id>.problem.md` も有効。
-4. 採点方式を決める。標準入出力で済むなら `stdioJudgePreset`、構造化 JSON・SDK 利用・ソース検査・動的入力なら `commandJudgePreset` を使う。
+4. 採点方式を決める。標準入出力で済むなら `stdioJudgePreset`、構造化 JSON・SDK 利用・ソース検査・動的入力なら `commandJudgePreset`、予測値 CSV を指標で採点するモデル性能評価問題なら `evaluationJudgePreset` を使う。
 5. テストケースと model answer を作る。誤答例を想定し、可能なら `model_answers.fails/` も置く。
 6. 特定構文や API の習得問題では、その構文/API を使わずに正しい出力を出す抜け道解答を `model_answers.fails/` に置く。
 7. judge を実行して、正解が全て `DecisionCode.ACCEPTED`、失敗解答が棄却されるまで直す。

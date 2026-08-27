@@ -18,6 +18,10 @@ export const testCaseResultSchema = z.object({
   timeSeconds: z.number().optional(),
   memoryBytes: z.number().optional(),
   feedbackMarkdown: z.string().optional(),
+  /** Numeric score of a model-evaluation submission (e.g. an RMSLE value). */
+  score: z.number().optional(),
+  /** Label of `score` shown to learners (e.g. `RMSLE`). */
+  scoreLabel: z.string().optional(),
   outputFiles: z.array(testCaseResultOutputFileSchema).optional(),
 });
 

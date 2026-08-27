@@ -1,5 +1,6 @@
 export * from './helpers/defaultStdioHarness.js';
 export * from './helpers/parseArgs.js';
+export * from './helpers/parseCsv.js';
 export * from './helpers/printTestCaseResult.js';
 export * from './helpers/removeCommentsInSourceCode.js';
 export * from './helpers/runCommandInTemporaryPackageManagerProject.js';

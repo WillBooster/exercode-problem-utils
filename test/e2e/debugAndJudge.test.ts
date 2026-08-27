@@ -475,6 +475,54 @@ test.each<
     ],
   ],
   [
+    'example/model_evaluation_rmsle',
+    'judge.ts',
+    'model_answers/default',
+    {},
+    {},
+    [
+      {
+        testCaseId: 'evaluation',
+        decisionCode: 2000,
+        score: 0,
+        scoreLabel: 'RMSLE',
+        feedbackMarkdown:
+          '| 指標 | スコア |\n| ---- | ------ |\n| RMSLE | 0 |\n\n評価件数: 5件\n合格基準: RMSLE ≦ 0.5（達成）\n',
+      },
+    ],
+  ],
+  [
+    'example/model_evaluation_rmsle',
+    'judge.ts',
+    'model_answers.fails/missing_rows',
+    {},
+    {},
+    [
+      {
+        testCaseId: 'evaluation',
+        decisionCode: 1000,
+        feedbackMarkdown: '`submission.csv`の内容に問題があります。\n\n- `Id`が`4`, `5`の行がありません（不足 2件）\n',
+      },
+    ],
+  ],
+  [
+    'example/model_evaluation_rmsle',
+    'judge.ts',
+    'model_answers.fails/wrong_scale',
+    {},
+    {},
+    [
+      {
+        testCaseId: 'evaluation',
+        decisionCode: 1000,
+        score: expect.closeTo(2.2985, 4),
+        scoreLabel: 'RMSLE',
+        feedbackMarkdown:
+          '| 指標 | スコア |\n| ---- | ------ |\n| RMSLE | 2.29849 |\n\n評価件数: 5件\n合格基準: RMSLE ≦ 0.5（未達成）\n',
+      },
+    ],
+  ],
+  [
     'example/gui_python_window',
     'judge.ts',
     'model_answers/default',
