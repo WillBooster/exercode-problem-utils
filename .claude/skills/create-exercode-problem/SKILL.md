@@ -16,7 +16,7 @@ Exercode の問題一式を、機械採点可能で、教材コースに登録�
 
 - `reference/authoring-guide.md`: 学習目標、問題文、テスト設計の作問判断。新規作問・大きな修正では読む。
 - `reference/problem-spec.md`: ファイル構成、frontmatter、`test_cases`、`model_answers`、`templates`、`solution`。ファイルを作る前に読む。
-- `reference/judge-presets.md`: `stdioJudgePreset` / `commandJudgePreset` / `llmJudgePreset` と検証方法。`judge.ts` を書く前に読む。
+- `reference/judge-presets.md`: `stdioJudgePreset` / `commandJudgePreset` / `llmJudgePreset` / `evaluationJudgePreset` と検証方法。`judge.ts` を書く前に読む。
 
 ## ワークフロー
 
@@ -76,7 +76,7 @@ bun judge.ts model_answers/typescript '{"language":"typescript"}'
 bun judge.ts model_answers/python '{"language":"python"}'
 ```
 
-`commandJudgePreset` は cwd 省略で `model_answers/*` と `model_answers.fails/*` をまとめて確認できる。デバッグモードでは問題ディレクトリ隔離チェックも走る。
+`commandJudgePreset` と `evaluationJudgePreset` は cwd 省略で `model_answers/*` と `model_answers.fails/*` をまとめて確認できる。デバッグモードでは問題ディレクトリ隔離チェックも走る。
 
 ```bash
 bun judge.ts
