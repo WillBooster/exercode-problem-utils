@@ -20,6 +20,8 @@ import type { TestCaseResult } from '../types/testCaseResult.js';
 const DEFAULT_SUBMISSION_FILE_PATH = 'submission.csv';
 const TEST_CASE_ID = 'evaluation';
 const MAX_LISTED_IDS = 10;
+// Learner-controlled cells are echoed into the feedback, so clip them to keep the result line small.
+const MAX_ECHOED_CELL_LENGTH = 50;
 
 export interface EvaluationMetric {
   /** Label shown with the score, e.g. `RMSLE`. */
@@ -27,7 +29,8 @@ export interface EvaluationMetric {
   isHigherBetter: boolean;
   /**
    * Returns an error message when a predicted value cannot be scored (e.g. it is not a number).
-   * The message is shown to the learner together with the row's id.
+   * The message is appended to the row's line number and the offending value, so phrase it as a
+   * predicate such as `数値ではありません`. It also validates the ground truth when it is loaded.
    */
   validatePrediction?: (prediction: string) => string | undefined;
   /** Computes the score from predictions and answers aligned by id. Both are raw CSV cell strings. */
@@ -57,7 +60,7 @@ export const evaluationMetrics = {
     label: 'RMSLE',
     isHigherBetter: false,
     validatePrediction: (prediction: string) =>
-      validateFiniteNumber(prediction) ?? (Number(prediction) <= -1 ? '-1以下のため対数を取れません' : undefined),
+      validateFiniteNumber(prediction) ?? (Number(prediction) < 0 ? '負の値です' : undefined),
     compute: (predictions: readonly string[], answers: readonly string[]) =>
       Math.sqrt(
         mean(
@@ -84,6 +87,7 @@ export const evaluationMetrics = {
   accuracy: {
     label: 'Accuracy',
     isHigherBetter: true,
+    validatePrediction: (prediction: string) => (prediction.trim() === '' ? '空です' : undefined),
     compute: (predictions: readonly string[], answers: readonly string[]) =>
       mean(predictions.map((prediction, index) => (prediction.trim() === answers[index]?.trim() ? 1 : 0))),
   },
@@ -174,6 +178,12 @@ async function judgeSubmission(
     [...answer.keys()].map((id) => predictions.get(id) as string),
     answerValues
   );
+  if (!Number.isFinite(score)) {
+    return {
+      decisionCode: DecisionCode.WRONG_ANSWER,
+      feedbackMarkdown: `予測値が極端なため、${options.metric.label}を計算できませんでした。予測値を見直してください。`,
+    };
+  }
   const isAccepted =
     options.acceptableScore === undefined ||
     (options.metric.isHigherBetter ? score >= options.acceptableScore : score <= options.acceptableScore);
@@ -214,51 +224,72 @@ function readPredictions(
   answer: ReadonlyMap<string, string>,
   options: EvaluationJudgePresetOptions
 ): Map<string, string> | string {
-  const rows = parseCsv(submissionText);
-  const header = rows[0];
-  const idIndex = header?.indexOf(options.idColumn) ?? -1;
-  const targetIndex = header?.indexOf(options.targetColumn) ?? -1;
-  if (!header || idIndex === -1 || targetIndex === -1) {
+  let rows: string[][];
+  try {
+    rows = parseCsv(submissionText);
+  } catch {
+    return `\`${submissionFilePath}\`をCSVとして読み込めませんでした。引用符（\`"\`）が閉じているか確認してください。`;
+  }
+  const columns = findColumns(rows[0] ?? [], options);
+  if (!columns) {
     return `\`${submissionFilePath}\`の1行目には\`${options.idColumn}\`列と\`${options.targetColumn}\`列のヘッダーが必要です。`;
   }
 
   const predictions = new Map<string, string>();
   const problems: string[] = [];
+  let problemCount = 0;
+  const reportProblem = (problem: string): void => {
+    problemCount++;
+    if (problems.length < MAX_LISTED_IDS) problems.push(problem);
+  };
   for (const [rowIndex, row] of rows.slice(1).entries()) {
-    if (row.length === 1 && row[0] === '') continue;
-    const id = row[idIndex]?.trim() ?? '';
-    const prediction = row[targetIndex] ?? '';
+    if (isBlankRow(row)) continue;
+    const id = row[columns.idIndex]?.trim() ?? '';
+    const prediction = row[columns.targetIndex] ?? '';
     const lineNumber = rowIndex + 2;
     if (!answer.has(id)) {
-      problems.push(`${lineNumber}行目: \`${options.idColumn}\`が\`${id}\`の行は評価対象ではありません`);
+      reportProblem(`${lineNumber}行目: \`${options.idColumn}\`が\`${clip(id)}\`の行は評価対象ではありません`);
     } else if (predictions.has(id)) {
-      problems.push(`${lineNumber}行目: \`${options.idColumn}\`が\`${id}\`の行が重複しています`);
+      reportProblem(`${lineNumber}行目: \`${options.idColumn}\`が\`${clip(id)}\`の行が重複しています`);
     } else {
       const validationError = options.metric.validatePrediction?.(prediction);
       if (validationError) {
-        problems.push(`${lineNumber}行目: \`${options.targetColumn}\`の値\`${prediction}\`は${validationError}`);
+        reportProblem(`${lineNumber}行目: \`${options.targetColumn}\`の値\`${clip(prediction)}\`は${validationError}`);
       }
       predictions.set(id, prediction);
     }
   }
   const missingIds = [...answer.keys()].filter((id) => !predictions.has(id));
   if (missingIds.length > 0) {
-    problems.push(
+    reportProblem(
       `\`${options.idColumn}\`が${listIds(missingIds)}の行がありません（不足 ${missingIds.length.toLocaleString('en-US')}件）`
     );
   }
-  if (problems.length > 0) {
+  if (problemCount > 0) {
     return `\`${submissionFilePath}\`の内容に問題があります。
 
-${problems
-  .slice(0, MAX_LISTED_IDS)
-  .map((problem) => `- ${problem}`)
-  .join(
-    '\n'
-  )}${problems.length > MAX_LISTED_IDS ? `\n- ほか${(problems.length - MAX_LISTED_IDS).toLocaleString('en-US')}件` : ''}
+${problems.map((problem) => `- ${problem}`).join('\n')}${problemCount > problems.length ? `\n- ほか${(problemCount - problems.length).toLocaleString('en-US')}件` : ''}
 `;
   }
   return predictions;
+}
+
+function findColumns(
+  header: readonly string[],
+  options: EvaluationJudgePresetOptions
+): { idIndex: number; targetIndex: number } | undefined {
+  const names = header.map((name) => name.trim());
+  const idIndex = names.indexOf(options.idColumn);
+  const targetIndex = names.indexOf(options.targetColumn);
+  return idIndex === -1 || targetIndex === -1 ? undefined : { idIndex, targetIndex };
+}
+
+function isBlankRow(row: readonly string[]): boolean {
+  return row.every((cell) => cell.trim() === '');
+}
+
+function clip(value: string): string {
+  return value.length > MAX_ECHOED_CELL_LENGTH ? `${value.slice(0, MAX_ECHOED_CELL_LENGTH)}…` : value;
 }
 
 function listIds(ids: readonly string[]): string {
@@ -268,18 +299,20 @@ function listIds(ids: readonly string[]): string {
 
 async function readAnswer(answerFilePath: string, options: EvaluationJudgePresetOptions): Promise<Map<string, string>> {
   const rows = parseCsv(await fs.readFile(answerFilePath, 'utf8'));
-  const header = rows[0] ?? [];
-  const idIndex = header.indexOf(options.idColumn);
-  const targetIndex = header.indexOf(options.targetColumn);
-  if (idIndex === -1 || targetIndex === -1) {
+  const columns = findColumns(rows[0] ?? [], options);
+  if (!columns) {
     throw new Error(`answer file must have ${options.idColumn} and ${options.targetColumn} columns: ${answerFilePath}`);
   }
   const answer = new Map<string, string>();
   for (const row of rows.slice(1)) {
-    if (row.length === 1 && row[0] === '') continue;
-    const id = row[idIndex]?.trim() ?? '';
+    if (isBlankRow(row)) continue;
+    const id = row[columns.idIndex]?.trim() ?? '';
+    const value = row[columns.targetIndex] ?? '';
     if (answer.has(id)) throw new Error(`duplicate ${options.idColumn} in answer file: ${id}`);
-    answer.set(id, row[targetIndex] ?? '');
+    const validationError = options.metric.validatePrediction?.(value);
+    if (validationError)
+      throw new Error(`invalid ${options.targetColumn} in answer file for ${id}: ${validationError}`);
+    answer.set(id, value);
   }
   if (answer.size === 0) throw new Error(`answer file has no rows: ${answerFilePath}`);
   return answer;

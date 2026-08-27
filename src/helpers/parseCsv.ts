@@ -1,14 +1,17 @@
 /**
  * Parse RFC 4180 style CSV text (double-quoted fields, `""` escapes, LF or CRLF line ends) into rows.
  * A trailing line end does not produce an extra row.
+ *
+ * @throws when a quoted field is not closed before the end of the text.
  */
 export function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = '';
+  let hasField = false;
   let isQuoted = false;
   let index = 0;
-  const content = text.startsWith('\uFEFF') ? text.slice(1) : text;
+  const content = text.startsWith('﻿') ? text.slice(1) : text;
 
   while (index < content.length) {
     const char = content[index] as string;
@@ -27,6 +30,7 @@ export function parseCsv(text: string): string[][] {
       continue;
     }
 
+    hasField = true;
     if (char === '"') {
       isQuoted = true;
     } else if (char === ',') {
@@ -37,6 +41,7 @@ export function parseCsv(text: string): string[][] {
       rows.push(row);
       row = [];
       field = '';
+      hasField = false;
       if (char === '\r' && content[index + 1] === '\n') index++;
     } else {
       field += char;
@@ -44,7 +49,8 @@ export function parseCsv(text: string): string[][] {
     index++;
   }
 
-  if (field.length > 0 || row.length > 0) {
+  if (isQuoted) throw new Error('unterminated quoted field');
+  if (hasField) {
     row.push(field);
     rows.push(row);
   }

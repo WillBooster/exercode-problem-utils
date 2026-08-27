@@ -484,10 +484,10 @@ test.each<
       {
         testCaseId: 'evaluation',
         decisionCode: 2000,
-        score: 0,
+        score: expect.closeTo(0.0558, 4),
         scoreLabel: 'RMSLE',
         feedbackMarkdown:
-          '| 指標 | スコア |\n| ---- | ------ |\n| RMSLE | 0 |\n\n評価件数: 5件\n合格基準: RMSLE ≦ 0.5（達成）\n',
+          '| 指標 | スコア |\n| ---- | ------ |\n| RMSLE | 0.0557601 |\n\n評価件数: 5件\n合格基準: RMSLE ≦ 0.5（達成）\n',
       },
     ],
   ],

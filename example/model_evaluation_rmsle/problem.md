@@ -28,9 +28,9 @@ requiredSubmissionFilePaths: ['submission.csv']
 
 ```text
 Id,Price
-1,100
-2,200
-3,300
-4,400
-5,500
+1,120
+2,180
+3,330
+4,390
+5,510
 ```
