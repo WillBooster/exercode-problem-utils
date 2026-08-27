@@ -1,3 +1,18 @@
+export type CsvParseErrorReason = 'unterminated_quote' | 'unexpected_quote' | 'text_after_quoted_field';
+
+export class CsvParseError extends Error {
+  readonly reason: CsvParseErrorReason;
+  /** 1-based physical line of the record in which the error was found. */
+  readonly lineNumber: number;
+
+  constructor(reason: CsvParseErrorReason, lineNumber: number) {
+    super(`${reason.replaceAll('_', ' ')} on line ${lineNumber}`);
+    this.name = 'CsvParseError';
+    this.reason = reason;
+    this.lineNumber = lineNumber;
+  }
+}
+
 export interface CsvRecord {
   cells: string[];
   /** 1-based physical line on which the record starts (quoted fields may span several lines). */
@@ -8,7 +23,7 @@ export interface CsvRecord {
  * Parse RFC 4180 style CSV text (double-quoted fields, `""` escapes, LF, CRLF, or CR line ends) into rows.
  * A trailing line end does not produce an extra row.
  *
- * @throws when a quoted field is not closed, or a quote appears anywhere but around a whole field.
+ * @throws {CsvParseError} when a quoted field is not closed, or a quote appears anywhere but around a whole field.
  */
 export function parseCsv(text: string): string[][] {
   return parseCsvRecords(text).map((record) => record.cells);
@@ -62,10 +77,10 @@ export function parseCsvRecords(text: string): CsvRecord[] {
         recordLineNumber = lineNumber;
       }
     } else if (char === '"') {
-      if (fieldState !== 'start') throw new Error(`unexpected quote on line ${lineNumber}`);
+      if (fieldState !== 'start') throw new CsvParseError('unexpected_quote', lineNumber);
       fieldState = 'quoted';
     } else if (fieldState === 'closed') {
-      throw new Error(`unexpected character after a quoted field on line ${lineNumber}`);
+      throw new CsvParseError('text_after_quoted_field', lineNumber);
     } else {
       fieldState = 'unquoted';
       field += char;
@@ -73,8 +88,7 @@ export function parseCsvRecords(text: string): CsvRecord[] {
     index++;
   }
 
-  if (fieldState === 'quoted')
-    throw new Error(`unterminated quoted field in the record starting on line ${recordLineNumber}`);
+  if (fieldState === 'quoted') throw new CsvParseError('unterminated_quote', recordLineNumber);
   if (hasField) {
     endField();
     records.push({ cells, lineNumber: recordLineNumber });

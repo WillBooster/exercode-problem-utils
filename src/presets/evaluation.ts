@@ -4,7 +4,7 @@ import path from 'node:path';
 import { checkProblemDirIsolation } from '../helpers/checkProblemDirIsolation.js';
 import { judgeByStaticAnalysis } from '../helpers/judgeByStaticAnalysis.js';
 import { parseArgs } from '../helpers/parseArgs.js';
-import { parseCsv, parseCsvRecords } from '../helpers/parseCsv.js';
+import { CsvParseError, type CsvParseErrorReason, parseCsv, parseCsvRecords } from '../helpers/parseCsv.js';
 import { printDebugBanner } from '../helpers/printDebugBanner.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { isSafeSubmissionOutputPath } from '../helpers/readOutputFiles.js';
@@ -23,6 +23,11 @@ const TEST_CASE_ID = 'evaluation';
 const MAX_LISTED_IDS = 10;
 // Learner-controlled cells are echoed into the feedback, so clip them to keep the result line small.
 const MAX_ECHOED_CELL_LENGTH = 50;
+const CSV_PARSE_ERROR_MESSAGES: Record<CsvParseErrorReason, string> = {
+  unterminated_quote: '引用符（`"`）が閉じられていません',
+  unexpected_quote: '引用符（`"`）は値全体を囲む位置にしか書けません',
+  text_after_quoted_field: '閉じ引用符の後に区切り文字以外の文字があります',
+};
 
 export interface EvaluationMetric {
   /** Label shown with the score, e.g. `RMSLE`. */
@@ -246,8 +251,9 @@ function readPredictions(
   try {
     records = parseCsvRecords(submissionText);
   } catch (error) {
-    const detail = error instanceof Error ? `（${error.message}）` : '';
-    return `\`${submissionFilePath}\`をCSVとして読み込めませんでした。引用符（\`"\`）の使い方を確認してください。${detail}`;
+    const detail =
+      error instanceof CsvParseError ? `${error.lineNumber}行目付近: ${CSV_PARSE_ERROR_MESSAGES[error.reason]}` : '';
+    return `\`${submissionFilePath}\`をCSVとして読み込めませんでした。${detail}`;
   }
   const columns = findColumns(records[0]?.cells ?? [], options);
   if (!columns) {

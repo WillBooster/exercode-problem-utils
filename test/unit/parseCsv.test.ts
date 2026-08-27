@@ -88,6 +88,8 @@ describe('parseCsvRecords', () => {
   });
 
   test('names the record of an unterminated quote', () => {
-    expect(() => parseCsvRecords('a\n"b')).toThrow('line 2');
+    expect(() => parseCsvRecords('a\n"b')).toThrow(
+      expect.objectContaining({ reason: 'unterminated_quote', lineNumber: 2 })
+    );
   });
 });
