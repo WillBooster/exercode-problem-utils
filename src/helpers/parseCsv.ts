@@ -24,7 +24,7 @@ export function parseCsvRecords(text: string): CsvRecord[] {
   let lineNumber = 1;
   let recordLineNumber = 1;
   let index = 0;
-  const content = text.startsWith('﻿') ? text.slice(1) : text;
+  const content = text.startsWith('\uFEFF') ? text.slice(1) : text;
 
   const endField = (): void => {
     cells.push(field);
