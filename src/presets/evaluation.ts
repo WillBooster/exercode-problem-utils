@@ -219,10 +219,6 @@ function buildScoreMarkdown(
 `;
 }
 
-function formatScore(score: number, precision: number): string {
-  return Number(score.toPrecision(precision)).toString();
-}
-
 /**
  * Finds the number of significant digits at which the score and the threshold render differently
  * (or stop changing), so the feedback never shows a pair that contradicts the decision.
@@ -234,6 +230,10 @@ function findDistinguishingPrecision(score: number, threshold: number | undefine
     if (formatScore(score, precision) !== formatScore(threshold, precision)) return precision;
   }
   return 17;
+}
+
+function formatScore(score: number, precision: number): string {
+  return Number(score.toPrecision(precision)).toString();
 }
 
 function readPredictions(
