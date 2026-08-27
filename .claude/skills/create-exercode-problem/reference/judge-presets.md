@@ -86,7 +86,7 @@ await evaluationJudgePreset(import.meta.dirname, {
 ```
 
 - 提出ファイル名は既定で `submission.csv`（`submissionFilePath` で変更可）。frontmatter の `requiredSubmissionFilePaths` にも書く。
-- 提出 CSV に必要なのは `idColumn` と `targetColumn` の列で、正解の全 id が過不足なく 1 回ずつ現れること。不足・重複、および指標の `validatePrediction` が拒む値（数値系の指標では数値でない値や負の値、accuracy では空の値。独自指標では任意）は `WRONG_ANSWER` として理由を `feedbackMarkdown` に出す。
+- 提出 CSV に必要なのは `idColumn` と `targetColumn` の列で、正解の全 id が過不足なく 1 回ずつ現れること。不足・重複、および指標の `validatePrediction` が拒む値（RMSE・MAE では数値でない値、RMSLE ではさらに負の値、accuracy では空の値。独自指標では任意）は `WRONG_ANSWER` として理由を `feedbackMarkdown` に出す。
 - `model_answers/<id>/submission.csv` に正解に十分近い予測を置き、`model_answers.fails/` に行不足や精度不足の提出を置いて `bun judge.ts` で確認する。
 - 標準入出力は使わないので `test_cases/` は不要。`templates/_default/submission.csv` にヘッダーだけのひな形を置ける。
 
