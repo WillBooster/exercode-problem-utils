@@ -307,16 +307,16 @@ function isBlankRow(row: readonly string[]): boolean {
   return row.every((cell) => cell.trim() === '');
 }
 
+function listIds(ids: readonly string[]): string {
+  const listed = ids.slice(0, MAX_LISTED_IDS).map((id) => `\`${clip(id)}\``);
+  return ids.length > MAX_LISTED_IDS ? `${listed.join(', ')}, ...` : listed.join(', ');
+}
+
 function clip(value: string): string {
   // Control characters and backticks would break the markdown list item and inline code the value is echoed in.
   const printable = value.replaceAll(/[\p{Cc}]/gu, ' ').replaceAll('`', "'");
   if (printable.trim() === '') return '（空）';
   return printable.length > MAX_ECHOED_CELL_LENGTH ? `${printable.slice(0, MAX_ECHOED_CELL_LENGTH)}…` : printable;
-}
-
-function listIds(ids: readonly string[]): string {
-  const listed = ids.slice(0, MAX_LISTED_IDS).map((id) => `\`${clip(id)}\``);
-  return ids.length > MAX_LISTED_IDS ? `${listed.join(', ')}, ...` : listed.join(', ');
 }
 
 async function readAnswer(answerFilePath: string, options: EvaluationJudgePresetOptions): Promise<Map<string, string>> {
