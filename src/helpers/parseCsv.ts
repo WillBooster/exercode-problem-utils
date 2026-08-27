@@ -5,7 +5,7 @@ export interface CsvRecord {
 }
 
 /**
- * Parse RFC 4180 style CSV text (double-quoted fields, `""` escapes, LF or CRLF line ends) into rows.
+ * Parse RFC 4180 style CSV text (double-quoted fields, `""` escapes, LF, CRLF, or CR line ends) into rows.
  * A trailing line end does not produce an extra row.
  *
  * @throws when a quoted field is not closed, or a quote appears anywhere but around a whole field.

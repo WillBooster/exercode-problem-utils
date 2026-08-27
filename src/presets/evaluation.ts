@@ -245,8 +245,9 @@ function readPredictions(
   let records: ReturnType<typeof parseCsvRecords>;
   try {
     records = parseCsvRecords(submissionText);
-  } catch {
-    return `\`${submissionFilePath}\`をCSVとして読み込めませんでした。引用符（\`"\`）の使い方を確認してください。`;
+  } catch (error) {
+    const detail = error instanceof Error ? `（${error.message}）` : '';
+    return `\`${submissionFilePath}\`をCSVとして読み込めませんでした。引用符（\`"\`）の使い方を確認してください。${detail}`;
   }
   const columns = findColumns(records[0]?.cells ?? [], options);
   if (!columns) {
