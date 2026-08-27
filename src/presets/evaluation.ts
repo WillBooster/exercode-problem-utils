@@ -330,6 +330,7 @@ async function readAnswer(answerFilePath: string, options: EvaluationJudgePreset
     if (isBlankRow(row)) continue;
     const id = row[columns.idIndex]?.trim() ?? '';
     const value = row[columns.targetIndex] ?? '';
+    if (!id) throw new Error(`empty ${options.idColumn} in answer file: ${answerFilePath}`);
     if (answer.has(id)) throw new Error(`duplicate ${options.idColumn} in answer file: ${id}`);
     const validationError = options.metric.validatePrediction?.(value);
     if (validationError)
