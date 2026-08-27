@@ -43,7 +43,7 @@ export function parseCsvRecords(text: string): CsvRecord[] {
         }
         fieldState = 'closed';
       } else {
-        if (char === '\n') lineNumber++;
+        if (char === '\n' || (char === '\r' && content[index + 1] !== '\n')) lineNumber++;
         field += char;
       }
       index++;
@@ -73,7 +73,8 @@ export function parseCsvRecords(text: string): CsvRecord[] {
     index++;
   }
 
-  if (fieldState === 'quoted') throw new Error('unterminated quoted field');
+  if (fieldState === 'quoted')
+    throw new Error(`unterminated quoted field in the record starting on line ${recordLineNumber}`);
   if (hasField) {
     endField();
     records.push({ cells, lineNumber: recordLineNumber });

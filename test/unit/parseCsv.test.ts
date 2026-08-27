@@ -72,13 +72,18 @@ describe('parseCsv', () => {
 
 describe('parseCsvRecords', () => {
   test('reports the physical line each record starts on', () => {
-    const records = parseCsvRecords('h\n"1\n2"\n\n3\r\n4');
+    const records = parseCsvRecords('h\n"1\n2"\n\n3\r\n4\r"5\r6"');
     expect(records.map((record) => [record.cells, record.lineNumber])).toEqual([
       [['h'], 1],
       [['1\n2'], 2],
       [[''], 4],
       [['3'], 5],
       [['4'], 6],
+      [['5\r6'], 7],
     ]);
+  });
+
+  test('names the record of an unterminated quote', () => {
+    expect(() => parseCsvRecords('a\n"b')).toThrow('line 2');
   });
 });
