@@ -4,9 +4,10 @@ import path from 'node:path';
 import { checkProblemDirIsolation } from '../helpers/checkProblemDirIsolation.js';
 import { judgeByStaticAnalysis } from '../helpers/judgeByStaticAnalysis.js';
 import { parseArgs } from '../helpers/parseArgs.js';
-import { parseCsv } from '../helpers/parseCsv.js';
+import { parseCsv, parseCsvRecords } from '../helpers/parseCsv.js';
 import { printDebugBanner } from '../helpers/printDebugBanner.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
+import { isSafeSubmissionOutputPath } from '../helpers/readOutputFiles.js';
 import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import {
   printDebugCwdBanner,
@@ -160,7 +161,10 @@ async function judgeSubmission(
   const submissionFilePath = options.submissionFilePath ?? DEFAULT_SUBMISSION_FILE_PATH;
   let submissionText: string;
   try {
-    submissionText = await fs.readFile(path.join(cwd, submissionFilePath), 'utf8');
+    const resolvedPath = path.join(cwd, submissionFilePath);
+    // The harness reads the file as the trusted user, so refuse symlinks escaping the submission.
+    if (!(await isSafeSubmissionOutputPath(cwd, resolvedPath))) throw new Error('unsafe path');
+    submissionText = await fs.readFile(resolvedPath, 'utf8');
   } catch {
     return {
       decisionCode: DecisionCode.MISSING_REQUIRED_SUBMISSION_FILE_ERROR,
@@ -208,7 +212,7 @@ function buildScoreMarkdown(
       : `\n合格基準: ${label} ${isHigherBetter ? '≧' : '≦'} ${formatScore(options.acceptableScore)}（${isAccepted ? '達成' : '未達成'}）`;
   return `| 指標 | スコア |
 | ---- | ------ |
-| ${label} | ${formatScore(score)} |
+| ${label} | ${formatScoreAgainst(score, options.acceptableScore)} |
 
 評価件数: ${rowCount.toLocaleString('en-US')}件${acceptanceLine}
 `;
@@ -218,19 +222,29 @@ function formatScore(score: number): string {
   return Number(score.toPrecision(6)).toString();
 }
 
+/** Formats the score with enough digits that it does not read as equal to a threshold it differs from. */
+function formatScoreAgainst(score: number, threshold: number | undefined): string {
+  if (threshold === undefined || score === threshold) return formatScore(score);
+  for (let precision = 6; precision <= 17; precision++) {
+    const formatted = Number(score.toPrecision(precision)).toString();
+    if (formatted !== Number(threshold.toPrecision(precision)).toString()) return formatted;
+  }
+  return score.toString();
+}
+
 function readPredictions(
   submissionText: string,
   submissionFilePath: string,
   answer: ReadonlyMap<string, string>,
   options: EvaluationJudgePresetOptions
 ): Map<string, string> | string {
-  let rows: string[][];
+  let records: ReturnType<typeof parseCsvRecords>;
   try {
-    rows = parseCsv(submissionText);
+    records = parseCsvRecords(submissionText);
   } catch {
-    return `\`${submissionFilePath}\`をCSVとして読み込めませんでした。引用符（\`"\`）が閉じているか確認してください。`;
+    return `\`${submissionFilePath}\`をCSVとして読み込めませんでした。引用符（\`"\`）の使い方を確認してください。`;
   }
-  const columns = findColumns(rows[0] ?? [], options);
+  const columns = findColumns(records[0]?.cells ?? [], options);
   if (!columns) {
     return `\`${submissionFilePath}\`の1行目には\`${options.idColumn}\`列と\`${options.targetColumn}\`列のヘッダーが必要です。`;
   }
@@ -242,11 +256,10 @@ function readPredictions(
     problemCount++;
     if (problems.length < MAX_LISTED_IDS) problems.push(problem);
   };
-  for (const [rowIndex, row] of rows.slice(1).entries()) {
+  for (const { cells: row, lineNumber } of records.slice(1)) {
     if (isBlankRow(row)) continue;
     const id = row[columns.idIndex]?.trim() ?? '';
     const prediction = row[columns.targetIndex] ?? '';
-    const lineNumber = rowIndex + 2;
     if (!answer.has(id)) {
       reportProblem(`${lineNumber}行目: \`${options.idColumn}\`が\`${clip(id)}\`の行は評価対象ではありません`);
     } else if (predictions.has(id)) {
@@ -261,7 +274,9 @@ function readPredictions(
   }
   const missingIds = [...answer.keys()].filter((id) => !predictions.has(id));
   if (missingIds.length > 0) {
-    reportProblem(
+    // Missing rows are the most actionable problem, so they must survive the listing cap.
+    problemCount++;
+    problems.unshift(
       `\`${options.idColumn}\`が${listIds(missingIds)}の行がありません（不足 ${missingIds.length.toLocaleString('en-US')}件）`
     );
   }
@@ -289,7 +304,9 @@ function isBlankRow(row: readonly string[]): boolean {
 }
 
 function clip(value: string): string {
-  return value.length > MAX_ECHOED_CELL_LENGTH ? `${value.slice(0, MAX_ECHOED_CELL_LENGTH)}…` : value;
+  // Control characters would break the markdown list item and inline code the value is echoed in.
+  const printable = value.replaceAll(/[\p{Cc}]/gu, ' ');
+  return printable.length > MAX_ECHOED_CELL_LENGTH ? `${printable.slice(0, MAX_ECHOED_CELL_LENGTH)}…` : printable;
 }
 
 function listIds(ids: readonly string[]): string {
