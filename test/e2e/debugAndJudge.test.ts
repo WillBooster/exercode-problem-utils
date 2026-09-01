@@ -197,11 +197,10 @@ test.each<
         feedbackMarkdown: `ソースコード中に禁止された文字列が含まれています。
 ソースコードを修正してから再度提出してください。
 
-| ファイル | 禁止パターン | 文字列 |
-| -------- | ------------ | ------ |
-| \`main.py\` | \`/\\bsum\\s*\\(/g\` | \`sum(\` |
-| \`main.py\` | \`some_forbidden_name\` | \`some_forbidden_name\` |
-| \`main.py\` | \`some_forbidden_name\` | \`some_forbidden_name\` |
+- 組み込みの \`sum()\` は使わないでください
+  - \`main.py\`: \`sum(\`
+- 禁止文字列 \`some_forbidden_name\`
+  - \`main.py\`: \`some_forbidden_name\`
 `,
       },
     ],
@@ -219,7 +218,7 @@ test.each<
         feedbackMarkdown: `ソースコード中に必要な文字列が含まれていません。
 ソースコードを修正してから再度提出してください。
 
-- \`/\\+/\`
+- \`+\` 演算子で2つの整数を足してください
 `,
       },
     ],
