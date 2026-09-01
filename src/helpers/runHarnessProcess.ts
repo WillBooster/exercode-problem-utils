@@ -28,7 +28,9 @@ interface LiveHarnessRun {
 }
 
 // Detached harness groups no longer receive the terminal's SIGINT, so an interrupted run must
-// tear them down (and remove their temp copies) itself before exiting.
+// tear them down (and remove their temp copies) itself before exiting. The handlers stay installed
+// for the process lifetime: once the last run has settled they only iterate an empty set and re-raise
+// the signal, so removing them would change nothing observable.
 const liveHarnessRuns = new Set<LiveHarnessRun>();
 let signalHandlersInstalled = false;
 
