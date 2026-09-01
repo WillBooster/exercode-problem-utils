@@ -3,10 +3,17 @@ import path from 'node:path';
 
 import { DecisionCode } from '../types/decisionCode.js';
 import type { ProblemMarkdownFrontMatter } from '../types/problem.js';
+import { normalizeCodeRule } from '../types/problem.js';
 import type { TestCaseResult } from '../types/testCaseResult.js';
 
 import { findLanguageDefinitionByPath } from './findLanguageDefinitionByPath.js';
 import { removeCommentsInSourceCode } from './removeCommentsInSourceCode.js';
+
+interface ForbiddenRuleViolation {
+  /** Learner-facing description of the rule; the raw pattern when the problem declares no message. */
+  label: string;
+  matches: { path: string; match: string }[];
+}
 
 export async function judgeByStaticAnalysis(
   cwd: string,
@@ -32,7 +39,7 @@ export async function judgeByStaticAnalysis(
     if (!languageDefinition) continue;
 
     sourceCodeWithoutCommentFiles.push({
-      path: dirent.name,
+      path: relativePath,
       data: languageDefinition.grammer ? removeCommentsInSourceCode(languageDefinition.grammer, text) : text,
     });
   }
@@ -54,56 +61,59 @@ ${missingFilePaths.map((p) => `- \`${p}\``).join('\n')}
     }
   }
 
-  const forbiddenFounds: { pattern: string; path: string; match: string }[] = [];
+  const violations: ForbiddenRuleViolation[] = [];
 
-  for (const file of sourceCodeWithoutCommentFiles) {
-    for (const pattern of problemMarkdownFrontMatterLike.forbiddenRegExpsInCode ?? []) {
-      const re = new RegExp(pattern, 'g');
-      const mathces = file.data.matchAll(re);
-      for (const match of mathces) forbiddenFounds.push({ pattern: re.toString(), path: file.path, match: match[0] });
-    }
-    for (const pattern of problemMarkdownFrontMatterLike.forbiddenTextsInCode ?? []) {
-      let p = 0;
-      while (p < file.data.length) {
-        const index = file.data.indexOf(pattern, p);
-        if (index === -1) break;
-        forbiddenFounds.push({ pattern, path: file.path, match: pattern });
-        p = index + pattern.length;
-      }
-    }
+  for (const rule of problemMarkdownFrontMatterLike.forbiddenRegExpsInCode ?? []) {
+    const { pattern, message } = normalizeCodeRule(rule);
+    const re = new RegExp(pattern, 'g');
+    const matches = sourceCodeWithoutCommentFiles.flatMap((file) =>
+      [...file.data.matchAll(re)].map((match) => ({ path: file.path, match: match[0] }))
+    );
+    if (matches.length > 0) violations.push({ label: message ?? `禁止パターン \`${re.toString()}\``, matches });
+  }
+  for (const rule of problemMarkdownFrontMatterLike.forbiddenTextsInCode ?? []) {
+    const { pattern, message } = normalizeCodeRule(rule);
+    const matches = sourceCodeWithoutCommentFiles
+      .filter((file) => file.data.includes(pattern))
+      .map((file) => ({ path: file.path, match: pattern }));
+    if (matches.length > 0) violations.push({ label: message ?? `禁止文字列 \`${pattern}\``, matches });
   }
 
-  if (forbiddenFounds.length > 0) {
+  if (violations.length > 0) {
     return {
       decisionCode: DecisionCode.FORBIDDEN_PATTERNS_IN_CODE_ERROR,
       feedbackMarkdown: `ソースコード中に禁止された文字列が含まれています。
 ソースコードを修正してから再度提出してください。
 
-| ファイル | 禁止パターン | 文字列 |
-| -------- | ------------ | ------ |
-${forbiddenFounds.map((f) => `| \`${f.path}\` | \`${f.pattern}\` | \`${f.match}\` |`).join('\n')}
+${violations.map(formatForbiddenRuleViolation).join('\n')}
 `,
     };
   }
 
-  const missingRequiredPatterns: string[] = [];
+  const missingRequiredLabels: string[] = [];
 
-  for (const pattern of problemMarkdownFrontMatterLike.requiredRegExpsInCode ?? []) {
+  for (const rule of problemMarkdownFrontMatterLike.requiredRegExpsInCode ?? []) {
+    const { pattern, message } = normalizeCodeRule(rule);
     const re = new RegExp(pattern);
     const isFound = sourceCodeWithoutCommentFiles.some((f) => re.test(f.data));
-    if (!isFound) missingRequiredPatterns.push(re.toString());
+    if (!isFound) missingRequiredLabels.push(message ?? `\`${re.toString()}\``);
   }
 
-  if (missingRequiredPatterns.length > 0) {
+  if (missingRequiredLabels.length > 0) {
     return {
       decisionCode: DecisionCode.REQUIRED_PATTERNS_IN_CODE_ERROR,
       feedbackMarkdown: `ソースコード中に必要な文字列が含まれていません。
 ソースコードを修正してから再度提出してください。
 
-${missingRequiredPatterns.map((p) => `- \`${p}\``).join('\n')}
+${missingRequiredLabels.map((label) => `- ${label}`).join('\n')}
 `,
     };
   }
 
   return;
+}
+
+function formatForbiddenRuleViolation(violation: ForbiddenRuleViolation): string {
+  const locations = [...new Set(violation.matches.map(({ path, match }) => `  - \`${path}\`: \`${match}\``))];
+  return `- ${violation.label}\n${locations.join('\n')}`;
 }

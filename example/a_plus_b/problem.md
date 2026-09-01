@@ -2,8 +2,9 @@
 name: A + B
 timeLimitMs: 2000
 requiredSubmissionFilePaths: ['required.txt']
-requiredRegExpsInCode: ['\+']
-forbiddenRegExpsInCode: ['\bsum\s*\(']
+requiredRegExpsInCode: [{ pattern: '\+', message: '`+` 演算子で2つの整数を足してください' }, '\bprint(?:ln)?\s*\(']
+forbiddenRegExpsInCode:
+  [{ pattern: '\bsum\s*\(', message: '組み込みの `sum()` は使わないでください' }, '\bprint\s*\(\s*sum\b']
 forbiddenTextsInCode: ['some_forbidden_name']
 ---
 
