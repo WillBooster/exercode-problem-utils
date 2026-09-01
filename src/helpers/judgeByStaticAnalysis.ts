@@ -39,7 +39,7 @@ export async function judgeByStaticAnalysis(
     if (!languageDefinition) continue;
 
     sourceCodeWithoutCommentFiles.push({
-      path: dirent.name,
+      path: relativePath,
       data: languageDefinition.grammer ? removeCommentsInSourceCode(languageDefinition.grammer, text) : text,
     });
   }

@@ -199,6 +199,8 @@ test.each<
 
 - 組み込みの \`sum()\` は使わないでください
   - \`main.py\`: \`sum(\`
+- 禁止パターン \`/\\bprint\\s*\\(\\s*sum\\b/g\`
+  - \`main.py\`: \`print(sum\`
 - 禁止文字列 \`some_forbidden_name\`
   - \`main.py\`: \`some_forbidden_name\`
 `,
@@ -219,6 +221,7 @@ test.each<
 ソースコードを修正してから再度提出してください。
 
 - \`+\` 演算子で2つの整数を足してください
+- \`/\\ba\\s*\\+\\s*b\\b/\`
 `,
       },
     ],
