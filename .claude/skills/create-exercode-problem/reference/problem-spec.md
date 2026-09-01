@@ -38,7 +38,7 @@ judge サーバが追加で読む主な項目:
 | `isGui` | boolean | GUI 判定を明示する。 |
 | `isVotable` | boolean | 投票機能を有効にする。 |
 
-正規表現は YAML のシングルクォートで書くと扱いやすい。違反時のフィードバックには `message` が表示され、`message` がない項目はパターンそのものが表示されるので、学習者向けの問題では `{ pattern, message }` 形式で意図を書く:
+正規表現は YAML のシングルクォートで書くと扱いやすい。違反時のフィードバックには `message` が表示され、`message` がない項目はパターンそのものが表示される（`message` は1行で書く）ので、学習者向けの問題では `{ pattern, message }` 形式で意図を書く:
 
 ```yaml
 requiredRegExpsInCode:

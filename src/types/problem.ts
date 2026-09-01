@@ -3,10 +3,17 @@ import { z } from 'zod';
 /**
  * A static-analysis rule on submitted code: either a bare pattern (its regular expression or text
  * is shown to learners on violation) or a pattern with a learner-facing message that replaces it.
+ * The message is rendered as one Markdown list item, so it must be a single line.
  */
 export const codeRuleSchema = z.union([
   z.string().min(1),
-  z.object({ pattern: z.string().min(1), message: z.string().min(1) }),
+  z.object({
+    pattern: z.string().min(1),
+    message: z
+      .string()
+      .min(1)
+      .refine((message) => !/[\r\n]/.test(message), 'message must be a single line'),
+  }),
 ]);
 
 export type CodeRule = z.infer<typeof codeRuleSchema>;
