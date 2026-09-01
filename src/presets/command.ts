@@ -2,17 +2,16 @@ import path from 'node:path';
 
 import { z } from 'zod';
 
-import { checkProblemDirIsolation } from '../helpers/checkProblemDirIsolation.js';
 import { cleanWorkingDirectory, snapshotWorkingDirectory } from '../helpers/cleanWorkingDirectory.js';
 import { copyTestCaseFileInput } from '../helpers/copyTestCaseFileInput.js';
 import { findEntryPointFile } from '../helpers/findEntryPointFile.js';
 import { findLanguageDefinitionByPath } from '../helpers/findLanguageDefinitionByPath.js';
 import { judgeByStaticAnalysis } from '../helpers/judgeByStaticAnalysis.js';
 import { parseArgs } from '../helpers/parseArgs.js';
-import { printDebugBanner } from '../helpers/printDebugBanner.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readOutputFiles } from '../helpers/readOutputFiles.js';
 import { runCustomRunner } from '../helpers/runCustomRunner.js';
+import { passesIsolationCheckInDebugMode } from '../helpers/runIsolationCheckInDebugMode.js';
 import {
   getSandboxUserEnvOverrides,
   makeAccessibleToSandboxUser,
@@ -68,6 +67,13 @@ interface CommandJudgeContext {
 export interface CommandJudgeLimits {
   buildTimeoutSeconds: number;
   maxOutputLength: number;
+}
+
+interface ResolvedCommandProblem<TTestCase extends BaseCommandTestCase> {
+  problemMarkdownFrontMatter: ProblemMarkdownFrontMatter;
+  testCases: readonly TTestCase[];
+  limits: CommandJudgeLimits;
+  timeLimitSeconds: number;
 }
 
 export interface CommandJudgePresetOptions<
@@ -157,27 +163,34 @@ export async function commandJudgePreset<
   const params = judgeParamsSchema.parse(args.params);
 
   const { cwds, isDebugMode } = await resolveCwds(problemDir, args.cwd);
+  const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
+  const testCases = await (options.readTestCases ?? readCommandTestCases)(problemDir);
+  const limits = {
+    buildTimeoutSeconds: options.limits?.buildTimeoutSeconds ?? BUILD_TIMEOUT_SECONDS,
+    maxOutputLength: options.limits?.maxOutputLength ?? MAX_STDOUT_LENGTH,
+  };
+  const timeLimitSeconds =
+    typeof problemMarkdownFrontMatter.timeLimitMs === 'number'
+      ? problemMarkdownFrontMatter.timeLimitMs / 1000
+      : (options.runTimeoutSeconds ?? JUDGE_DEFAULT_TIMEOUT_SECONDS);
+  const problem: ResolvedCommandProblem<TTestCase> = {
+    problemMarkdownFrontMatter,
+    testCases,
+    limits,
+    timeLimitSeconds,
+  };
 
   if (isDebugMode) {
-    const acceptedCwd = cwds.find((cwd) => cwd.expectedResult === 'accepted');
-    if (acceptedCwd) {
-      const isolationCheckResult = await checkProblemDirIsolation(problemDir, acceptedCwd, params);
-      if (!isolationCheckResult.passed) {
-        process.exitCode = 1;
-        return;
-      }
-    } else {
-      printDebugBanner([
-        '[DEBUG MODE] isolated problem directory check skipped',
-        '',
-        'No accepted model answer is available for checking that the copied judge still accepts a valid submission.',
-      ]);
+    const expectedMaxDurationMs = (limits.buildTimeoutSeconds + testCases.length * timeLimitSeconds) * 1000;
+    if (!(await passesIsolationCheckInDebugMode(problemDir, cwds, params, { expectedMaxDurationMs }))) {
+      process.exitCode = 1;
+      return;
     }
   }
 
   for (const resolvedCwd of cwds) {
     if (isDebugMode) printDebugCwdBanner(problemDir, resolvedCwd);
-    const result = await runCommandJudgeForCwd<TTestCase, TRunResult>(problemDir, resolvedCwd.cwd, params, options);
+    const result = await runCommandJudgeForCwd<TTestCase, TRunResult>(resolvedCwd.cwd, params, problem, options);
     if (isDebugMode && !matchesExpectedResult(resolvedCwd, result)) {
       process.exitCode = 1;
       printDebugExpectationFailureBanner(problemDir, resolvedCwd);
@@ -189,22 +202,16 @@ async function runCommandJudgeForCwd<
   TTestCase extends BaseCommandTestCase,
   TRunResult extends CommandRunResult = CommandRunResult,
 >(
-  problemDir: string,
   cwd: string,
   params: JudgeParams,
+  problem: ResolvedCommandProblem<TTestCase>,
   options: CommandJudgePresetOptions<TTestCase, TRunResult>
 ): Promise<{ allAccepted: boolean }> {
   // The sandboxed submission must read its sources and write build/run outputs in its directory.
   makeAccessibleToSandboxUser(cwd);
 
-  const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
-  const testCases = await (options.readTestCases ?? readCommandTestCases)(problemDir);
+  const { problemMarkdownFrontMatter, testCases, limits, timeLimitSeconds } = problem;
   const prebuildTestCaseId = testCases[0]?.id ?? 'prebuild';
-  const limits = {
-    buildTimeoutSeconds: options.limits?.buildTimeoutSeconds ?? BUILD_TIMEOUT_SECONDS,
-    maxOutputLength: options.limits?.maxOutputLength ?? MAX_STDOUT_LENGTH,
-  };
-  const runTimeoutSeconds = options.runTimeoutSeconds ?? JUDGE_DEFAULT_TIMEOUT_SECONDS;
 
   const staticAnalysisResult = await judgeByStaticAnalysis(cwd, problemMarkdownFrontMatter);
   if (staticAnalysisResult) {
@@ -279,11 +286,6 @@ async function runCommandJudgeForCwd<
   for (const testCase of testCases) {
     if (sharedFileInputPath) await copyTestCaseFileInput(sharedFileInputPath, cwd);
     if (testCase.fileInputPath) await copyTestCaseFileInput(testCase.fileInputPath, cwd);
-
-    const timeLimitSeconds =
-      typeof problemMarkdownFrontMatter.timeLimitMs === 'number'
-        ? problemMarkdownFrontMatter.timeLimitMs / 1000
-        : runTimeoutSeconds;
 
     const command = languageDefinition.command(mainFilePath);
     let stdin = testCase.input ?? '';

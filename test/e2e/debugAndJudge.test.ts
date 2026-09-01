@@ -560,3 +560,19 @@ test.each<
     expect(testCaseResults).toEqual(expectedTestCaseResults);
   }
 );
+
+test('debug mode derives the isolation check budget from timeLimitMs', { timeout: 150_000 }, async () => {
+  await fs.promises.mkdir('temp', { recursive: true });
+  const tempDir = await fs.promises.mkdtemp(path.join('temp', 'judge_'));
+  await fs.promises.cp('example/long_running', tempDir, { recursive: true });
+  // The isolation check copies the problem directory elsewhere and links only `node_modules`
+  // directories, so this package must be reachable through one instead of by self-reference.
+  await fs.promises.mkdir(path.join(tempDir, 'node_modules', '@exercode'), { recursive: true });
+  await fs.promises.symlink(path.resolve('.'), path.join(tempDir, 'node_modules', '@exercode', 'problem-utils'));
+
+  // No cwd argument: debug mode runs the isolation check, then judges every model answer.
+  const spawnResult = child_process.spawnSync('bun', ['run', 'judge.ts'], { cwd: tempDir, encoding: 'utf8' });
+
+  expect(spawnResult.stderr).toContain('[DEBUG MODE] isolated problem directory check passed');
+  expect(spawnResult.status).toBe(0);
+});

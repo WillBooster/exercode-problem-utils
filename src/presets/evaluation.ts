@@ -1,14 +1,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { checkProblemDirIsolation } from '../helpers/checkProblemDirIsolation.js';
 import { judgeByStaticAnalysis } from '../helpers/judgeByStaticAnalysis.js';
 import { parseArgs } from '../helpers/parseArgs.js';
 import { CsvParseError, type CsvParseErrorReason, parseCsv, parseCsvRecords } from '../helpers/parseCsv.js';
-import { printDebugBanner } from '../helpers/printDebugBanner.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { isSafeSubmissionOutputPath } from '../helpers/readOutputFiles.js';
 import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
+import { passesIsolationCheckInDebugMode } from '../helpers/runIsolationCheckInDebugMode.js';
 import {
   printDebugCwdBanner,
   printDebugExpectationFailureBanner,
@@ -125,21 +124,9 @@ export async function evaluationJudgePreset(problemDir: string, options: Evaluat
   const args = parseArgs(process.argv);
   const { cwds, isDebugMode } = await resolveCwds(problemDir, args.cwd);
 
-  if (isDebugMode) {
-    const acceptedCwd = cwds.find((cwd) => cwd.expectedResult === 'accepted');
-    if (acceptedCwd) {
-      const isolationCheckResult = await checkProblemDirIsolation(problemDir, acceptedCwd, args.params);
-      if (!isolationCheckResult.passed) {
-        process.exitCode = 1;
-        return;
-      }
-    } else {
-      printDebugBanner([
-        '[DEBUG MODE] isolated problem directory check skipped',
-        '',
-        'No accepted model answer is available for checking that the copied judge still accepts a valid submission.',
-      ]);
-    }
+  if (isDebugMode && !(await passesIsolationCheckInDebugMode(problemDir, cwds, args.params))) {
+    process.exitCode = 1;
+    return;
   }
 
   const answer = await readAnswer(path.join(problemDir, options.answerFilePath), options);
