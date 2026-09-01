@@ -15,6 +15,8 @@ export interface HarnessProcessResult {
   stdout: string;
   stderr: string;
   exitCode: number | undefined;
+  /** The signal that terminated the harness when it did not exit on its own. */
+  signal: NodeJS.Signals | undefined;
   /** Set when the run was killed by this helper (timeout or output cap) or could not be spawned. */
   failureReason: string | undefined;
   timedOut: boolean;
@@ -57,8 +59,9 @@ export function runHarnessProcess(
     let timedOut = false;
     let settled = false;
 
-    const killProcessGroup = (reason: string): void => {
-      if (failureReason !== undefined) return;
+    // Returns false when an earlier kill already recorded its reason, so callers can tell whether theirs won.
+    const killProcessGroup = (reason: string): boolean => {
+      if (failureReason !== undefined) return false;
       failureReason = reason;
       // Stop buffering immediately: OS pipe buffers can keep emitting data after the kill, and
       // destroyed streams also let `close` fire even if a stray grandchild inherited the pipes.
@@ -73,10 +76,10 @@ export function runHarnessProcess(
       } catch {
         child.kill('SIGKILL');
       }
+      return true;
     };
     const timeoutId = setTimeout(() => {
-      timedOut = true;
-      killProcessGroup(`timed out after ${options.timeoutMs / 1000} seconds`);
+      timedOut = killProcessGroup(`timed out after ${options.timeoutMs / 1000} seconds`);
     }, options.timeoutMs);
 
     const appendOutput = (chunk: Buffer, chunks: Buffer[]): void => {
@@ -90,7 +93,7 @@ export function runHarnessProcess(
     child.stdout?.on('data', (chunk: Buffer) => appendOutput(chunk, stdoutChunks));
     child.stderr?.on('data', (chunk: Buffer) => appendOutput(chunk, stderrChunks));
 
-    const settle = (exitCode: number | undefined, spawnError?: Error): void => {
+    const settle = (exitCode: number | undefined, signal: NodeJS.Signals | undefined, spawnError?: Error): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timeoutId);
@@ -99,12 +102,13 @@ export function runHarnessProcess(
         stdout: Buffer.concat(stdoutChunks).toString('utf8'),
         stderr: Buffer.concat(stderrChunks).toString('utf8'),
         exitCode,
+        signal,
         failureReason: failureReason ?? (spawnError ? `failed to run the harness: ${spawnError.message}` : undefined),
         timedOut,
       });
     };
-    child.on('error', (error) => settle(undefined, error));
-    child.on('close', (exitCode) => settle(exitCode ?? undefined));
+    child.on('error', (error) => settle(undefined, undefined, error));
+    child.on('close', (exitCode, signal) => settle(exitCode ?? undefined, signal ?? undefined));
   });
 }
 

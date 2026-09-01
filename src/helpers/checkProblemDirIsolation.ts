@@ -5,7 +5,7 @@ import { TEST_CASE_RESULT_PREFIX, testCaseResultSchema } from '../types/testCase
 
 import { printDebugBanner } from './printDebugBanner.js';
 import type { ResolvedCwd } from './resolveCwds.js';
-import { runHarnessProcess } from './runHarnessProcess.js';
+import { type HarnessProcessResult, runHarnessProcess } from './runHarnessProcess.js';
 import { copyProblemDirToTemporaryRoot, forciblyRemoveDirectory } from './temporaryProblemDirCopy.js';
 
 const ISOLATION_CHECK_MIN_TIMEOUT_MS = 30_000;
@@ -81,20 +81,11 @@ export async function checkProblemDirIsolation(
     printDebugBanner([
       '[DEBUG MODE] isolated problem directory check failed',
       '',
-      ...(result.timedOut
-        ? [
-            `The judge did not finish within ${timeoutMs / 1000} seconds after copying only the problem directory to a temporary location.`,
-            'The budget is the build timeout plus the time limit of every test case, plus a fixed overhead.',
-            'Check timeLimitMs, the number of test cases, and one-off startup costs such as cold caches.',
-          ]
-        : [
-            'The judge did not complete successfully after copying only the problem directory to a temporary location.',
-            'Make sure judge.ts imports only files included in the problem directory.',
-          ]),
+      ...describeFailure(result, timeoutMs, options),
       '',
       `Copied problem dir : ${copiedProblemDir}`,
       `Checked cwd        : ${relativeCwd}`,
-      `Exit status        : ${result.exitCode ?? 'killed'}`,
+      `Exit status        : ${result.exitCode ?? result.signal ?? 'unknown'}`,
       `Failure reason     : ${result.failureReason ?? '<none>'}`,
       '',
       'stdout:',
@@ -115,6 +106,38 @@ export async function checkProblemDirIsolation(
     // Cleanup failures must not mask the primary isolation check result.
     if (tempRoot) await forciblyRemoveDirectory(tempRoot);
   }
+}
+
+function describeFailure(
+  result: HarnessProcessResult,
+  timeoutMs: number,
+  options: ProblemDirIsolationCheckOptions
+): string[] {
+  if (result.timedOut) {
+    return [
+      `The judge did not finish within ${timeoutMs / 1000} seconds after copying only the problem directory to a temporary location.`,
+      ...(options.expectedMaxDurationMs === undefined
+        ? [
+            `This judge declares no run time, so the check uses its fixed ${ISOLATION_CHECK_MIN_TIMEOUT_MS / 1000}-second budget.`,
+          ]
+        : [
+            `The budget is the larger of ${ISOLATION_CHECK_MIN_TIMEOUT_MS / 1000} seconds and the build timeout plus the time limit of every test case plus a ${ISOLATION_CHECK_OVERHEAD_MS / 1000}-second overhead.`,
+            'Check timeLimitMs, the number of test cases, and one-off startup costs such as cold caches.',
+          ]),
+    ];
+  }
+  if (result.failureReason !== undefined) {
+    return ['The judge was stopped before it finished; see the failure reason below.'];
+  }
+  if (result.exitCode === undefined) {
+    return [
+      `The judge was terminated by ${result.signal ?? 'an unknown signal'} (e.g. an out-of-memory kill or a cancelled job).`,
+    ];
+  }
+  return [
+    'The judge did not complete successfully after copying only the problem directory to a temporary location.',
+    'Make sure judge.ts imports only files included in the problem directory.',
+  ];
 }
 
 function isIsolationExecArg(arg: string): boolean {

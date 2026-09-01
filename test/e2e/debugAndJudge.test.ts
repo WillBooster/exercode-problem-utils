@@ -565,10 +565,20 @@ test('debug mode derives the isolation check budget from timeLimitMs', { timeout
   await fs.promises.mkdir('temp', { recursive: true });
   const tempDir = await fs.promises.mkdtemp(path.join('temp', 'judge_'));
   await fs.promises.cp('example/long_running', tempDir, { recursive: true });
-  // The isolation check copies the problem directory elsewhere and links only `node_modules`
-  // directories, so this package must be reachable through one instead of by self-reference.
-  await fs.promises.mkdir(path.join(tempDir, 'node_modules', '@exercode'), { recursive: true });
-  await fs.promises.symlink(path.resolve('.'), path.join(tempDir, 'node_modules', '@exercode', 'problem-utils'));
+  // The isolation check copies the problem directory outside the repository and links only
+  // `node_modules` directories, so neither the root tsconfig `paths` nor self-reference resolves
+  // this package there. Stage a shim package that maps the package entry points to `src/`.
+  const shimDir = path.join(tempDir, 'node_modules', '@exercode', 'problem-utils');
+  await fs.promises.mkdir(shimDir, { recursive: true });
+  await fs.promises.symlink(path.resolve('src'), path.join(shimDir, 'src'));
+  await fs.promises.writeFile(
+    path.join(shimDir, 'package.json'),
+    JSON.stringify({
+      name: '@exercode/problem-utils',
+      type: 'module',
+      exports: { '.': './src/index.ts', './presets/*': './src/presets/*.ts' },
+    })
+  );
 
   // No cwd argument: debug mode runs the isolation check, then judges every model answer.
   const spawnResult = child_process.spawnSync('bun', ['run', 'judge.ts'], { cwd: tempDir, encoding: 'utf8' });
