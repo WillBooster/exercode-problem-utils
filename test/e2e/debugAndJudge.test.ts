@@ -572,7 +572,11 @@ test('debug mode derives the isolation check budget from timeLimitMs', { timeout
   // this package there. Stage a shim package that maps the package entry points to `src/`.
   const shimDir = path.join(tempDir, 'node_modules', '@exercode', 'problem-utils');
   await fs.promises.mkdir(shimDir, { recursive: true });
-  await fs.promises.symlink(path.resolve('src'), path.join(shimDir, 'src'));
+  await fs.promises.symlink(
+    path.resolve('src'),
+    path.join(shimDir, 'src'),
+    process.platform === 'win32' ? 'junction' : 'dir'
+  );
   await fs.promises.writeFile(
     path.join(shimDir, 'package.json'),
     JSON.stringify({
