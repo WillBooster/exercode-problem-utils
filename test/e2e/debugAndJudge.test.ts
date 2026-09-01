@@ -562,3 +562,38 @@ test.each<
     expect(testCaseResults).toEqual(expectedTestCaseResults);
   }
 );
+
+test('debug mode derives the isolation check budget from timeLimitMs', { timeout: 150_000 }, async () => {
+  await fs.promises.mkdir('temp', { recursive: true });
+  const tempDir = await fs.promises.mkdtemp(path.join('temp', 'judge_'));
+  await fs.promises.cp('example/long_running', tempDir, { recursive: true });
+  // The isolation check copies the problem directory outside the repository and links only
+  // `node_modules` directories, so neither the root tsconfig `paths` nor self-reference resolves
+  // this package there. Stage a shim package that maps the package entry points to `src/`.
+  const shimDir = path.join(tempDir, 'node_modules', '@exercode', 'problem-utils');
+  await fs.promises.mkdir(shimDir, { recursive: true });
+  await fs.promises.symlink(
+    path.resolve('src'),
+    path.join(shimDir, 'src'),
+    process.platform === 'win32' ? 'junction' : 'dir'
+  );
+  await fs.promises.writeFile(
+    path.join(shimDir, 'package.json'),
+    JSON.stringify({
+      name: '@exercode/problem-utils',
+      type: 'module',
+      exports: { '.': './src/index.ts', './presets/*': './src/presets/*.ts' },
+    })
+  );
+
+  // No cwd argument: debug mode runs the isolation check, then judges every model answer.
+  // The synchronous spawn blocks Vitest's timers, so enforce the deadline on the child itself.
+  const spawnResult = child_process.spawnSync('bun', ['run', 'judge.ts'], {
+    cwd: tempDir,
+    encoding: 'utf8',
+    timeout: 140_000,
+  });
+
+  expect(spawnResult.stderr).toContain('[DEBUG MODE] isolated problem directory check passed');
+  expect(spawnResult.status).toBe(0);
+});

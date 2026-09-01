@@ -1,16 +1,12 @@
-import child_process from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import {
-  copyProblemDirToTemporaryRoot,
-  forciblyRemoveDirectory,
-  forciblyRemoveDirectorySync,
-} from '../helpers/checkProblemDirIsolation.js';
 import { findDefaultStdioHarnessFiles } from '../helpers/defaultStdioHarness.js';
 import { findFailingModelAnswerDirs, findModelAnswerDirs } from '../helpers/findModelAnswerDirs.js';
 import { judgesWithoutTestCases, readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases } from '../helpers/readTestCases.js';
+import { type HarnessProcessResult, runHarnessProcess } from '../helpers/runHarnessProcess.js';
+import { copyProblemDirToTemporaryRoot, forciblyRemoveDirectory } from '../helpers/temporaryProblemDirCopy.js';
 import { DecisionCode } from '../types/decisionCode.js';
 import { TEST_CASE_RESULT_PREFIX, testCaseResultSchema } from '../types/testCaseResult.js';
 
@@ -156,8 +152,13 @@ async function executeCheckRun(run: CheckRun, cliEntryPath: string): Promise<str
   try {
     const result = await runHarnessProcess(
       ['run', cliEntryPath, 'judge', path.relative(run.problemDir, run.answerDir)],
-      copiedProblemDir,
-      tempRoot
+      {
+        cwd: copiedProblemDir,
+        env: createHarnessEnv(),
+        timeoutMs: RUN_TIMEOUT_MS,
+        maxOutputBytes: MAX_RUN_OUTPUT_BYTES,
+        tempRoot,
+      }
     );
     harnessFailureDetail = summarizeHarnessFailure(run, result);
   } catch (error) {
@@ -208,128 +209,6 @@ function summarizeHarnessFailure(run: CheckRun, result: HarnessProcessResult): s
   return testCaseResults.every((result) => result.decisionCode === DecisionCode.ACCEPTED)
     ? 'expected at least one failing test case, but all test cases were accepted'
     : undefined;
-}
-
-interface HarnessProcessResult {
-  stdout: string;
-  stderr: string;
-  exitCode: number | undefined;
-  failureReason: string | undefined;
-}
-
-interface LiveHarnessRun {
-  pid: number;
-  tempRoot: string;
-}
-
-// Detached harness groups no longer receive the terminal's SIGINT, so an interrupted check run must
-// tear them down (and remove their temp copies) itself before exiting.
-const liveHarnessRuns = new Set<LiveHarnessRun>();
-let signalHandlersInstalled = false;
-
-/**
- * Run the harness in its own process group, killing the whole group on timeout or when the output
- * cap is exceeded so grandchild submission processes cannot outlive the run.
- */
-function runHarnessProcess(
-  commandArgs: readonly string[],
-  cwd: string,
-  tempRoot: string
-): Promise<HarnessProcessResult> {
-  installSignalHandlers();
-  return new Promise((resolve) => {
-    // process.execPath keeps the harness on the same bun executable regardless of PATH.
-    const child = child_process.spawn(process.execPath, commandArgs, {
-      cwd,
-      detached: process.platform !== 'win32',
-      env: createHarnessEnv(),
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    const liveRun: LiveHarnessRun | undefined = child.pid === undefined ? undefined : { pid: child.pid, tempRoot };
-    if (liveRun) liveHarnessRuns.add(liveRun);
-    const stdoutChunks: Buffer[] = [];
-    const stderrChunks: Buffer[] = [];
-    let totalOutputBytes = 0;
-    let failureReason: string | undefined;
-    let settled = false;
-
-    const killProcessGroup = (reason: string): void => {
-      if (failureReason !== undefined) return;
-      failureReason = reason;
-      // Stop buffering immediately: OS pipe buffers can keep emitting data after the kill, and
-      // destroyed streams also let `close` fire even if a stray grandchild inherited the pipes.
-      child.stdout?.destroy();
-      child.stderr?.destroy();
-      try {
-        if (child.pid === undefined) {
-          child.kill('SIGKILL');
-        } else {
-          killHarnessTree(child.pid);
-        }
-      } catch {
-        child.kill('SIGKILL');
-      }
-    };
-    const timeoutId = setTimeout(
-      () => killProcessGroup(`timed out after ${RUN_TIMEOUT_MS / 1000} seconds`),
-      RUN_TIMEOUT_MS
-    );
-
-    const appendOutput = (chunk: Buffer, chunks: Buffer[]): void => {
-      totalOutputBytes += chunk.byteLength;
-      if (totalOutputBytes > MAX_RUN_OUTPUT_BYTES) {
-        killProcessGroup(`the harness printed more than ${MAX_RUN_OUTPUT_BYTES / 1024 / 1024} MB of output`);
-        return;
-      }
-      chunks.push(chunk);
-    };
-    child.stdout?.on('data', (chunk: Buffer) => appendOutput(chunk, stdoutChunks));
-    child.stderr?.on('data', (chunk: Buffer) => appendOutput(chunk, stderrChunks));
-
-    const settle = (exitCode: number | undefined, spawnError?: Error): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeoutId);
-      if (liveRun) liveHarnessRuns.delete(liveRun);
-      resolve({
-        stdout: Buffer.concat(stdoutChunks).toString('utf8'),
-        stderr: Buffer.concat(stderrChunks).toString('utf8'),
-        exitCode,
-        failureReason: failureReason ?? (spawnError ? `failed to run the harness: ${spawnError.message}` : undefined),
-      });
-    };
-    child.on('error', (error) => settle(undefined, error));
-    child.on('close', (exitCode) => settle(exitCode ?? undefined));
-  });
-}
-
-function installSignalHandlers(): void {
-  if (signalHandlersInstalled) return;
-  signalHandlersInstalled = true;
-  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-    process.once(signal, () => {
-      for (const liveRun of liveHarnessRuns) {
-        try {
-          killHarnessTree(liveRun.pid);
-        } catch {
-          // The tree already exited.
-        }
-        // Best-effort cleanup while exiting; judged code may have left permission-locked entries.
-        forciblyRemoveDirectorySync(liveRun.tempRoot);
-      }
-      process.kill(process.pid, signal);
-    });
-  }
-}
-
-// On Windows the harness is not detached (process groups are unavailable), so killing only the
-// direct child would leave submission grandchildren running; taskkill terminates the whole tree.
-function killHarnessTree(pid: number): void {
-  if (process.platform === 'win32') {
-    child_process.spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
-  } else {
-    process.kill(-pid, 'SIGKILL');
-  }
 }
 
 // The all-problem check runs harnesses concurrently and has no sandbox-delegation contract, while the sandbox

@@ -1,6 +1,3 @@
-import child_process from 'node:child_process';
-import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 
 import { DecisionCode } from '../types/decisionCode.js';
@@ -8,8 +5,22 @@ import { TEST_CASE_RESULT_PREFIX, testCaseResultSchema } from '../types/testCase
 
 import { printDebugBanner } from './printDebugBanner.js';
 import type { ResolvedCwd } from './resolveCwds.js';
+import { type HarnessProcessResult, runHarnessProcess } from './runHarnessProcess.js';
+import { copyProblemDirToTemporaryRoot, forciblyRemoveDirectory } from './temporaryProblemDirCopy.js';
 
-const ISOLATION_CHECK_TIMEOUT_MS = 30_000;
+const ISOLATION_CHECK_MIN_TIMEOUT_MS = 30_000;
+// Starting bun and printing results are not covered by the judge's own limits.
+const ISOLATION_CHECK_OVERHEAD_MS = 10_000;
+const ISOLATION_CHECK_MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
+
+export interface ProblemDirIsolationCheckOptions {
+  /**
+   * The judge's declared worst-case duration for one accepted submission (build timeout plus the
+   * time limit of every test case). The check allows at least that plus a fixed overhead; per-case
+   * process startup and custom judge callbacks are not budgeted separately.
+   */
+  expectedMaxDurationMs?: number;
+}
 
 export interface ProblemDirIsolationCheckResult {
   passed: boolean;
@@ -21,8 +32,13 @@ export interface ProblemDirIsolationCheckResult {
 export async function checkProblemDirIsolation(
   problemDir: string,
   resolvedCwd: ResolvedCwd,
-  params: unknown
+  params: unknown,
+  options: ProblemDirIsolationCheckOptions = {}
 ): Promise<ProblemDirIsolationCheckResult> {
+  const timeoutMs = Math.max(
+    ISOLATION_CHECK_MIN_TIMEOUT_MS,
+    (options.expectedMaxDurationMs ?? 0) + ISOLATION_CHECK_OVERHEAD_MS
+  );
   let tempRoot: string | undefined;
   try {
     const copyResult = await copyProblemDirToTemporaryRoot(problemDir);
@@ -44,16 +60,15 @@ export async function checkProblemDirIsolation(
     }
     const execArgv = process.execArgv.filter(isIsolationExecArg);
     const paramsJson = JSON.stringify(isJudgeParamsObject(params) ? params : {});
-    const spawnResult = child_process.spawnSync(process.execPath, [...execArgv, scriptPath, copiedCwd, paramsJson], {
+    const result = await runHarnessProcess([...execArgv, scriptPath, copiedCwd, paramsJson], {
       cwd: copiedProblemDir,
-      encoding: 'utf8',
       env: process.env,
-      timeout: ISOLATION_CHECK_TIMEOUT_MS,
+      timeoutMs,
+      maxOutputBytes: ISOLATION_CHECK_MAX_OUTPUT_BYTES,
+      tempRoot,
     });
-    const stdout = spawnResult.stdout ?? '';
-    const stderr = spawnResult.stderr ?? '';
 
-    if (spawnResult.status === 0 && isAcceptedJudgeOutput(stdout)) {
+    if (result.exitCode === 0 && isAcceptedJudgeOutput(result.stdout)) {
       printDebugBanner([
         '[DEBUG MODE] isolated problem directory check passed',
         '',
@@ -66,19 +81,18 @@ export async function checkProblemDirIsolation(
     printDebugBanner([
       '[DEBUG MODE] isolated problem directory check failed',
       '',
-      'The judge did not complete successfully after copying only the problem directory to a temporary location.',
-      'Make sure judge.ts imports only files included in the problem directory.',
+      ...describeFailure(result, timeoutMs, options),
       '',
       `Copied problem dir : ${copiedProblemDir}`,
       `Checked cwd        : ${relativeCwd}`,
-      `Exit status        : ${spawnResult.status ?? spawnResult.signal ?? 'unknown'}`,
-      `Spawn error        : ${spawnResult.error?.message ?? '<none>'}`,
+      `Exit status        : ${result.exitCode ?? result.signal ?? 'unknown'}`,
+      `Failure reason     : ${result.failureReason ?? '<none>'}`,
       '',
       'stdout:',
-      stdout.trimEnd() || '<empty>',
+      result.stdout.trimEnd() || '<empty>',
       '',
       'stderr:',
-      stderr.trimEnd() || '<empty>',
+      result.stderr.trimEnd() || '<empty>',
     ]);
     return { passed: false };
   } catch (error) {
@@ -94,88 +108,36 @@ export async function checkProblemDirIsolation(
   }
 }
 
-/**
- * Copy a problem directory into a temporary root, symlinking every ancestor `node_modules` so the
- * copied harness still resolves its imports. Callers must remove the returned `tempRoot`.
- */
-export async function copyProblemDirToTemporaryRoot(
-  problemDir: string
-): Promise<{ tempRoot: string; copiedProblemDir: string }> {
-  const tempRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'problem-utils-isolation_'));
-  try {
-    const absoluteProblemDir = path.resolve(problemDir);
-    const copiedProblemDir = path.join(tempRoot, toTempRelativePath(absoluteProblemDir));
-    await fs.promises.mkdir(path.dirname(copiedProblemDir), { recursive: true });
-    await fs.promises.cp(absoluteProblemDir, copiedProblemDir, {
-      recursive: true,
-      filter: rejectAbsoluteSymlinks,
-      // Keep relative symlinks relative: the default rewrites them to absolute paths into the
-      // source tree, so judging the copy could write through them into the checked repository.
-      verbatimSymlinks: true,
-    });
-    await symlinkAllAncestorNodeModules(tempRoot, absoluteProblemDir);
-    return { tempRoot, copiedProblemDir };
-  } catch (error) {
-    await forciblyRemoveDirectory(tempRoot);
-    throw error;
+function describeFailure(
+  result: HarnessProcessResult,
+  timeoutMs: number,
+  options: ProblemDirIsolationCheckOptions
+): string[] {
+  if (result.timedOut) {
+    return [
+      `The judge did not finish within ${timeoutMs / 1000} seconds after copying only the problem directory to a temporary location.`,
+      ...(options.expectedMaxDurationMs === undefined
+        ? [
+            `This judge declares no run time, so the check uses its fixed ${ISOLATION_CHECK_MIN_TIMEOUT_MS / 1000}-second budget.`,
+          ]
+        : [
+            `The budget is the larger of ${ISOLATION_CHECK_MIN_TIMEOUT_MS / 1000} seconds and the build timeout plus the time limit of every test case plus a ${ISOLATION_CHECK_OVERHEAD_MS / 1000}-second overhead.`,
+            'Check timeLimitMs, the number of test cases, and one-off startup costs such as cold caches.',
+          ]),
+    ];
   }
-}
-
-/**
- * Remove a temporary directory even when judged code left permission-locked entries in it (e.g. a
- * mode-000 directory makes a plain `fs.rm` fail with EACCES). Returns whether removal succeeded.
- */
-export async function forciblyRemoveDirectory(dir: string): Promise<boolean> {
-  try {
-    await fs.promises.rm(dir, { recursive: true, force: true });
-    return true;
-  } catch {
-    unlockPermissions(dir);
-    try {
-      await fs.promises.rm(dir, { recursive: true, force: true });
-      return true;
-    } catch {
-      return false;
-    }
+  if (result.failureReason !== undefined) {
+    return ['The judge was stopped before it finished; see the failure reason below.'];
   }
-}
-
-/** Synchronous variant of {@link forciblyRemoveDirectory} for signal handlers. */
-export function forciblyRemoveDirectorySync(dir: string): boolean {
-  try {
-    fs.rmSync(dir, { recursive: true, force: true });
-    return true;
-  } catch {
-    unlockPermissions(dir);
-    try {
-      fs.rmSync(dir, { recursive: true, force: true });
-      return true;
-    } catch {
-      return false;
-    }
+  if (result.exitCode === undefined) {
+    return [
+      `The judge was terminated by ${result.signal ?? 'an unknown signal'} (e.g. an out-of-memory kill or a cancelled job).`,
+    ];
   }
-}
-
-// chmod does not exist on Windows, where POSIX-mode locks cannot occur anyway. spawnSync reports
-// spawn failures via its return value instead of throwing, so no try/catch is needed.
-function unlockPermissions(dir: string): void {
-  if (process.platform !== 'win32') child_process.spawnSync('chmod', ['-R', 'u+rwX', dir]);
-}
-
-// An absolute symlink is copied verbatim, so judging the copy could write through it into the
-// original tree; reject it instead of silently breaking the isolation guarantee.
-async function rejectAbsoluteSymlinks(src: string): Promise<boolean> {
-  if (!isCopiedProblemPath(src)) return false;
-  const stats = await fs.promises.lstat(src);
-  if (stats.isSymbolicLink() && path.isAbsolute(await fs.promises.readlink(src))) {
-    throw new Error(`${src} is an absolute symlink, which would escape the temporary copy; use a relative symlink`);
-  }
-  return true;
-}
-
-function isCopiedProblemPath(src: string): boolean {
-  const name = path.basename(src);
-  return name !== 'node_modules' && name !== '.git';
+  return [
+    'The judge did not complete successfully after copying only the problem directory to a temporary location.',
+    'Make sure judge.ts imports only files included in the problem directory.',
+  ];
 }
 
 function isIsolationExecArg(arg: string): boolean {
@@ -184,34 +146,6 @@ function isIsolationExecArg(arg: string): boolean {
 
 function isJudgeParamsObject(params: unknown): params is object {
   return params !== undefined && params !== null && typeof params === 'object' && !Array.isArray(params);
-}
-
-async function symlinkAllAncestorNodeModules(tempRoot: string, problemDir: string): Promise<void> {
-  let currentDir = path.resolve(problemDir);
-  while (true) {
-    const nodeModulesPath = path.join(currentDir, 'node_modules');
-    if (fs.existsSync(nodeModulesPath)) {
-      const targetSymlinkPath = path.join(tempRoot, toTempRelativePath(currentDir), 'node_modules');
-      try {
-        await fs.promises.symlink(
-          nodeModulesPath,
-          targetSymlinkPath,
-          process.platform === 'win32' ? 'junction' : 'dir'
-        );
-      } catch {
-        // Package resolution is best-effort; the isolation check still reports a clear spawn failure if imports break.
-      }
-    }
-
-    const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir) break;
-    currentDir = parentDir;
-  }
-}
-
-function toTempRelativePath(absolutePath: string): string {
-  const { root } = path.parse(absolutePath);
-  return path.relative(root, absolutePath);
 }
 
 function getInvokedScriptPath(problemDir: string): string {
