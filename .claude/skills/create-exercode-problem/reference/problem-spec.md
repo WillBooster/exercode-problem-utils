@@ -15,9 +15,9 @@ frontmatter は YAML、本文は Markdown。
 | --- | --- | --- |
 | `timeLimitMs` | int >= 0 | 実行時間制限。未指定時は通常 2000ms、GUI は 5000ms。 |
 | `memoryLimitByte` | int >= 0 | メモリ制限。judge サーバ未指定時は 256MiB。 |
-| `requiredRegExpsInCode` | string[] | 提出コードに必要な正規表現。 |
-| `forbiddenRegExpsInCode` | string[] | 提出コードで禁止する正規表現。 |
-| `forbiddenTextsInCode` | string[] | 提出コードで禁止する文字列。 |
+| `requiredRegExpsInCode` | (string \| { pattern, message })[] | 提出コードに必要な正規表現。 |
+| `forbiddenRegExpsInCode` | (string \| { pattern, message })[] | 提出コードで禁止する正規表現。 |
+| `forbiddenTextsInCode` | (string \| { pattern, message })[] | 提出コードで禁止する文字列。 |
 | `requiredSubmissionFilePaths` | string[] | 提出に必須のファイル。 |
 | `requiredOutputFilePaths` | string[] | 実行後に生成されるべきファイル。 |
 | `requiredEnvironmentVariables` | string[] | 実行時に必要な環境変数名。 |
@@ -38,10 +38,11 @@ judge サーバが追加で読む主な項目:
 | `isGui` | boolean | GUI 判定を明示する。 |
 | `isVotable` | boolean | 投票機能を有効にする。 |
 
-正規表現は YAML のシングルクォートで書くと扱いやすい:
+正規表現は YAML のシングルクォートで書くと扱いやすい。違反時のフィードバックには `message` が表示され、`message` がない項目はパターンそのものが表示される（`message` は1行で書く）ので、学習者向けの問題では `{ pattern, message }` 形式で意図を書く:
 
 ```yaml
-requiredRegExpsInCode: ['\+']
+requiredRegExpsInCode:
+  - { pattern: '\+', message: '`+` 演算子で2つの整数を足してください' }
 forbiddenRegExpsInCode: ['\bsum\s*\(']
 ```
 
