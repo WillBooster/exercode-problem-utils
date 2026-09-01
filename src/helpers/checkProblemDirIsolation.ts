@@ -9,7 +9,7 @@ import { type HarnessProcessResult, runHarnessProcess } from './runHarnessProces
 import { copyProblemDirToTemporaryRoot, forciblyRemoveDirectory } from './temporaryProblemDirCopy.js';
 
 const ISOLATION_CHECK_MIN_TIMEOUT_MS = 30_000;
-// Copying the problem directory, starting bun, and printing results are not covered by the judge's own limits.
+// Starting bun and printing results are not covered by the judge's own limits.
 const ISOLATION_CHECK_OVERHEAD_MS = 10_000;
 const ISOLATION_CHECK_MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
 

@@ -581,7 +581,12 @@ test('debug mode derives the isolation check budget from timeLimitMs', { timeout
   );
 
   // No cwd argument: debug mode runs the isolation check, then judges every model answer.
-  const spawnResult = child_process.spawnSync('bun', ['run', 'judge.ts'], { cwd: tempDir, encoding: 'utf8' });
+  // The synchronous spawn blocks Vitest's timers, so enforce the deadline on the child itself.
+  const spawnResult = child_process.spawnSync('bun', ['run', 'judge.ts'], {
+    cwd: tempDir,
+    encoding: 'utf8',
+    timeout: 140_000,
+  });
 
   expect(spawnResult.stderr).toContain('[DEBUG MODE] isolated problem directory check passed');
   expect(spawnResult.status).toBe(0);
