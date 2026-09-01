@@ -15,9 +15,9 @@ const ISOLATION_CHECK_MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
 
 export interface ProblemDirIsolationCheckOptions {
   /**
-   * The judge's own worst-case duration for one accepted submission (build timeout plus the time
-   * limit of every test case). The check never allows less than that, so a judge that respects its
-   * declared limits is never killed here.
+   * The judge's declared worst-case duration for one accepted submission (build timeout plus the
+   * time limit of every test case). The check allows at least that plus a fixed overhead; per-case
+   * process startup and custom judge callbacks are not budgeted separately.
    */
   expectedMaxDurationMs?: number;
 }
