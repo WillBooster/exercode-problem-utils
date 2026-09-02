@@ -85,7 +85,7 @@ const acceptedTestCaseResultsForAPlusB = [
 
 const acceptedTestCaseResultsForAPlusBFile = [
   {
-    testCaseId: '01_small_00',
+    testCaseId: 'example_1',
     decisionCode: 2000,
     exitStatus: 0,
     timeSeconds: expect.any(Number),
@@ -93,7 +93,7 @@ const acceptedTestCaseResultsForAPlusBFile = [
     outputFiles: [{ path: 'c.txt', data: '2\n' }],
   },
   {
-    testCaseId: '02_large_00',
+    testCaseId: 'test_1',
     decisionCode: 2000,
     exitStatus: 0,
     timeSeconds: expect.any(Number),
@@ -101,7 +101,7 @@ const acceptedTestCaseResultsForAPlusBFile = [
     outputFiles: [{ path: 'c.txt', data: '1442807128\n' }],
   },
   {
-    testCaseId: '03_edge_00',
+    testCaseId: 'test_2',
     decisionCode: 2000,
     exitStatus: 0,
     timeSeconds: expect.any(Number),
@@ -316,7 +316,7 @@ test.each<
     {},
     [
       {
-        testCaseId: '01_small_00',
+        testCaseId: 'example_1',
         decisionCode: 1202,
         exitStatus: 0,
         stdout: '2\n',
@@ -334,7 +334,7 @@ test.each<
     [
       ...acceptedTestCaseResultsForAPlusBFile.slice(0, 1),
       {
-        testCaseId: '02_large_00',
+        testCaseId: 'test_1',
         decisionCode: 1000,
         exitStatus: 0,
         timeSeconds: expect.any(Number),

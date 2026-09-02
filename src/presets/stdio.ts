@@ -16,7 +16,11 @@ import { makeAccessibleToSandboxUser } from '../helpers/sandboxUser.js';
 import { judgesWithoutTestCases, readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases } from '../helpers/readTestCases.js';
 import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
-import { copyProblemDirToTemporaryRoot, forciblyRemoveDirectory } from '../helpers/temporaryProblemDirCopy.js';
+import {
+  copyProblemDirToTemporaryRoot,
+  forciblyRemoveDirectory,
+  forciblyRemoveDirectorySync,
+} from '../helpers/temporaryProblemDirCopy.js';
 import { DecisionCode } from '../types/decisionCode.js';
 
 const BUILD_TIMEOUT_SECONDS = 10;
@@ -25,7 +29,7 @@ const DEBUG_DEFAULT_TIMEOUT_SECONDS = 10;
 
 const MAX_STDOUT_LENGTH = 50_000;
 // The same rule the judge server uses to pick the test cases shown on the problem page.
-const EXAMPLE_TEST_CASE_ID_PATTERN = /(\d+_)?example(_\d+)?/;
+const EXAMPLE_TEST_CASE_ID_PATTERN = /^(\d+_)?example(_\d+)?$/;
 
 const judgeParamsSchema = z.object({
   language: z.union([z.string(), z.array(z.string())]).optional(),
@@ -208,6 +212,7 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
 
     // calculate decision
     let decisionCode: DecisionCode = DecisionCode.ACCEPTED;
+    let judgementError: string | undefined;
 
     if (spawnResult.status !== 0) {
       decisionCode = DecisionCode.RUNTIME_ERROR;
@@ -220,15 +225,21 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
     } else if (outputFiles.length < (problemMarkdownFrontMatter.requiredOutputFilePaths?.length ?? 0)) {
       decisionCode = DecisionCode.MISSING_REQUIRED_OUTPUT_FILE_ERROR;
     } else {
-      const judgement = await judgeAgainstExpectations({
-        stdout: spawnResult.stdout,
-        expectedStdout: testCase.output,
-        fileOutputPath: testCase.fileOutputPath,
-        cwd: args.cwd,
-        outputFiles,
-      });
-      if (!judgement.matches) decisionCode = DecisionCode.WRONG_ANSWER;
-      outputFiles = judgement.outputFiles;
+      try {
+        const judgement = await judgeAgainstExpectations({
+          stdout: spawnResult.stdout,
+          expectedStdout: testCase.output,
+          fileOutputPath: testCase.fileOutputPath,
+          cwd: args.cwd,
+          outputFiles,
+        });
+        if (!judgement.matches) decisionCode = DecisionCode.WRONG_ANSWER;
+        outputFiles = judgement.outputFiles;
+      } catch (error) {
+        // An authoring error (e.g. an oversized expected file) is reported per case, like the command preset does.
+        decisionCode = DecisionCode.RUNTIME_ERROR;
+        judgementError = error instanceof Error ? error.message : String(error);
+      }
     }
 
     printTestCaseResult({
@@ -237,7 +248,7 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
       exitStatus: spawnResult.status ?? undefined,
       stdin: testCase.input,
       stdout: spawnResult.stdout.slice(0, MAX_STDOUT_LENGTH) || undefined,
-      stderr: spawnResult.stderr.slice(0, MAX_STDOUT_LENGTH) || undefined,
+      stderr: (judgementError ?? spawnResult.stderr).slice(0, MAX_STDOUT_LENGTH) || undefined,
       timeSeconds: spawnResult.timeSeconds,
       memoryBytes: spawnResult.memoryBytes,
       outputFiles: outputFiles.length > 0 ? outputFiles : undefined,
@@ -281,9 +292,20 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
   // The copy keeps the directory hierarchy and links every ancestor `node_modules`, so packages the
   // answer resolves from its parents still resolve.
   const { tempRoot, copiedProblemDir: cwd } = await copyProblemDirToTemporaryRoot(args.cwd);
+  // `mkdtemp` creates a 0700 root; the sandbox user must be able to traverse it to reach the copy.
+  makeAccessibleToSandboxUser(tempRoot);
+  // A terminated debug run must not leave the copy behind; `finally` does not run on a signal.
+  const removeOnSignal = (): void => {
+    forciblyRemoveDirectorySync(tempRoot);
+    process.exit(1);
+  };
+  process.once('SIGINT', removeOnSignal);
+  process.once('SIGTERM', removeOnSignal);
   try {
     await debugInTemporaryCopy(problemDir, cwd, params);
   } finally {
+    process.off('SIGINT', removeOnSignal);
+    process.off('SIGTERM', removeOnSignal);
     await forciblyRemoveDirectory(tempRoot);
   }
 }
