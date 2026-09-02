@@ -24,6 +24,8 @@ const JUDGE_DEFAULT_TIMEOUT_SECONDS = 2;
 const DEBUG_DEFAULT_TIMEOUT_SECONDS = 10;
 
 const MAX_STDOUT_LENGTH = 50_000;
+// The same rule the judge server uses to pick the test cases shown on the problem page.
+const EXAMPLE_TEST_CASE_ID_PATTERN = /(\d+_)?example(_\d+)?/;
 
 const judgeParamsSchema = z.object({
   language: z.union([z.string(), z.array(z.string())]).optional(),
@@ -256,7 +258,7 @@ async function hasExpectedFiles(fileOutputPath: string | undefined): Promise<boo
 
 /**
  * A preset debug function using stdin and stdout as test cases. The answer directory is copied to a
- * temporary directory where it is built and run together with `_shared.fin/` and the first test
+ * temporary directory where it is built and run together with `_shared.fin/` and the first example
  * case's `.fin/`; files the program writes are reported only through `requiredOutputFilePaths`.
  *
  * A standard stdio problem must NOT commit a `debug.ts` that only calls this preset: the Exercode
@@ -383,11 +385,15 @@ async function debugInTemporaryCopy(problemDir: string, cwd: string, params: Deb
     }
   }
 
-  // A debug run has no test case of its own: it gets the shared input files and the first test
-  // case's `.fin/` (the sorted order puts `example_*` before `test_*`), placed the way the judge does.
+  // A debug run has no test case of its own: it gets the shared input files and the `.fin/` of the
+  // first example case (the cases a learner may see), placed the way the judge does. Hidden cases'
+  // input files are never handed to learner code.
   const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
   if (testCases.shared?.fileInputPath) await copyTestCaseFileInput(testCases.shared.fileInputPath, cwd);
-  if (testCases[0]?.fileInputPath) await copyTestCaseFileInput(testCases[0].fileInputPath, cwd);
+  const exampleFileInputPath = testCases.find(
+    (testCase) => EXAMPLE_TEST_CASE_ID_PATTERN.test(testCase.id) && testCase.fileInputPath
+  )?.fileInputPath;
+  if (exampleFileInputPath) await copyTestCaseFileInput(exampleFileInputPath, cwd);
 
   {
     const timeoutSeconds = Math.max(

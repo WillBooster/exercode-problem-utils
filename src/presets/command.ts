@@ -98,6 +98,7 @@ export interface CommandJudgePresetOptions<
    */
   buildSubmission?: boolean;
   limits?: CommandJudgeLimits;
+  /** The per-case time limit used only when `problem.md` declares no `timeLimitMs`. */
   runTimeoutSeconds?: number;
   readTestCases?: (problemDir: string) => Promise<readonly TTestCase[]>;
   /**
@@ -152,11 +153,11 @@ export interface CommandJudgePresetOptions<
  *
  * @example
  * Create `judge.ts` that judges `test_cases/` like the default stdio harness, with the command
- * preset's debug mode and custom limits:
+ * preset's debug mode:
  * ```ts
  * import { commandJudgePreset } from '@exercode/problem-utils/presets/command';
  *
- * await commandJudgePreset(import.meta.dirname, { runTimeoutSeconds: 10 });
+ * await commandJudgePreset(import.meta.dirname);
  * ```
  *
  * @example
@@ -479,8 +480,7 @@ async function readCommandTestCases<TTestCase extends BaseCommandTestCase = Comm
   return (await readFileTestCases(path.join(problemDir, 'test_cases'))) as unknown as readonly TTestCase[];
 }
 
-/** The default verdict: `.out` decides stdout and `.fout/` decides output files; either may be absent. */
-/** The default verdict for the default reader's cases; a custom case type carries no `.out`/`.fout/` expectation. */
+/** The default verdict: a case exposing a string `output` / `fileOutputPath` is judged against it. */
 async function compareWithExpectedOutputs(context: {
   testCase: BaseCommandTestCase & Partial<CommandTestCase>;
   runResult: CommandRunResult;
