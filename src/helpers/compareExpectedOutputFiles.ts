@@ -19,8 +19,8 @@ export interface ExpectedOutputFilesComparison {
   mismatchedPaths: string[];
   /**
    * `<name>_expected.<ext>` / `<name>_received.<ext>` pairs for each mismatched file, in the
-   * format Exercode renders side by side. A missing or unreadable received file yields only the
-   * expected entry. Exercode decides per test case whether a learner may see these files.
+   * format Exercode renders side by side. A received file that is missing, unreadable, not a
+   * regular file or far larger than its expectation yields only the expected entry. Exercode decides per test case whether a learner may see these files.
    */
   outputFiles: OutputFile[];
 }
@@ -36,7 +36,6 @@ export async function compareExpectedOutputFiles(
 ): Promise<ExpectedOutputFilesComparison> {
   const mismatchedPaths: string[] = [];
   const outputFiles: OutputFile[] = [];
-  const usedPaths = new Set<string>();
   const dirents = await fs.promises.readdir(fileOutputPath, { withFileTypes: true, recursive: true });
   for (const dirent of dirents.toSorted((a, b) => a.name.localeCompare(b.name))) {
     if (!dirent.isFile()) continue;
@@ -47,15 +46,8 @@ export async function compareExpectedOutputFiles(
     if (received && fileContentsMatch(expected, received)) continue;
 
     mismatchedPaths.push(relativePath);
-    // A `.fout/` file literally named `<name>_received.<ext>` would otherwise collide with a pair entry.
-    const expectedPath = toComparisonPath(relativePath, 'expected');
-    if (!usedPaths.has(expectedPath)) outputFiles.push(encodeFileForTestCaseResult(expectedPath, expected));
-    usedPaths.add(expectedPath);
-    const receivedPath = toComparisonPath(relativePath, 'received');
-    if (received && !usedPaths.has(receivedPath)) {
-      outputFiles.push(encodeFileForTestCaseResult(receivedPath, received));
-    }
-    usedPaths.add(receivedPath);
+    outputFiles.push(encodeFileForTestCaseResult(toComparisonPath(relativePath, 'expected'), expected));
+    if (received) outputFiles.push(encodeFileForTestCaseResult(toComparisonPath(relativePath, 'received'), received));
   }
   return { matches: mismatchedPaths.length === 0, mismatchedPaths, outputFiles };
 }
@@ -68,15 +60,22 @@ export function mergeComparisonOutputFiles(
   outputFiles: readonly OutputFile[],
   comparison: ExpectedOutputFilesComparison
 ): OutputFile[] {
-  return [...outputFiles.filter((file) => !comparison.mismatchedPaths.includes(file.path)), ...comparison.outputFiles];
+  // A kept file literally named like a pair entry (e.g. `a_received.txt`) would make the path ambiguous.
+  const comparisonPaths = new Set(comparison.outputFiles.map((file) => file.path));
+  return [
+    ...outputFiles.filter((file) => !comparison.mismatchedPaths.includes(file.path) && !comparisonPaths.has(file.path)),
+    ...comparison.outputFiles,
+  ];
 }
 
 /** `c.txt` → `c_expected.txt`; `out/c.txt` → `out/c_expected.txt`. */
-export function toComparisonPath(filePath: string, role: 'expected' | 'received'): string {
+function toComparisonPath(filePath: string, role: 'expected' | 'received'): string {
   const { dir, name, ext } = path.parse(filePath);
   return path.join(dir, `${name}_${role}${ext}`);
 }
 
+// A submission controls this path, so anything that is not a plain, readable, reasonably sized
+// file (a directory, a FIFO that would block, an unreadable file) counts as "not produced".
 async function readReceivedFile(
   cwd: string,
   receivedPath: string,
@@ -84,16 +83,15 @@ async function readReceivedFile(
 ): Promise<Buffer | undefined> {
   // A submission-planted symlink to the expected file itself would otherwise compare equal.
   if (!(await isSafeSubmissionOutputPath(cwd, receivedPath))) return undefined;
-  let stats: fs.Stats;
   try {
-    stats = await fs.promises.stat(receivedPath);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
-    throw error;
+    const stats = await fs.promises.stat(receivedPath);
+    if (!stats.isFile()) return undefined;
+    // A file far larger than its expectation cannot match; skip reading it into memory at all.
+    if (stats.size > Math.max(MIN_RECEIVED_FILE_BYTES_LIMIT, expectedLength * 4)) return undefined;
+    return await fs.promises.readFile(receivedPath);
+  } catch {
+    return undefined;
   }
-  // A file far larger than its expectation cannot match; skip reading it into memory at all.
-  if (stats.size > Math.max(MIN_RECEIVED_FILE_BYTES_LIMIT, expectedLength * 4)) return undefined;
-  return await fs.promises.readFile(receivedPath);
 }
 
 function fileContentsMatch(expected: Buffer, received: Buffer): boolean {

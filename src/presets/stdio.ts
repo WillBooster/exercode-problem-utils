@@ -61,12 +61,15 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
 
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
   const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
-  // Without an expectation, a case would accept any run; only custom harnesses may judge input-only cases.
-  for (const testCase of testCases) {
-    if (testCase.output === undefined && !(await hasExpectedFiles(testCase.fileOutputPath))) {
-      throw new Error(
-        `test case ${testCase.id} needs an expected output (${testCase.id}.out or a non-empty ${testCase.id}.fout/)`
-      );
+  // Without an expectation, a case would accept any run; only custom harnesses may judge input-only
+  // cases. Required output files are an expectation of their own (their absence is judged).
+  if (!problemMarkdownFrontMatter.requiredOutputFilePaths?.length) {
+    for (const testCase of testCases) {
+      if (testCase.output === undefined && !(await hasExpectedFiles(testCase.fileOutputPath))) {
+        throw new Error(
+          `test case ${testCase.id} needs an expected output (${testCase.id}.out or a non-empty ${testCase.id}.fout/)`
+        );
+      }
     }
   }
 
@@ -270,12 +273,6 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
   makeAccessibleToSandboxUser(args.cwd);
 
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
-  // A debug run has no test case of its own, so give the program the shared input files and the
-  // input files of the first test case (the sorted order puts `example_*` before `test_*`).
-  const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
-  if (testCases.shared?.fileInputPath) await copyTestCaseFileInput(testCases.shared.fileInputPath, args.cwd);
-  const firstFileInputPath = testCases.find((testCase) => testCase.fileInputPath)?.fileInputPath;
-  if (firstFileInputPath) await copyTestCaseFileInput(firstFileInputPath, args.cwd);
 
   const originalMainFilePath = await findEntryPointFile(args.cwd, params.language);
   if (!originalMainFilePath) {
@@ -368,6 +365,15 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
     }
   }
 
+  // The entry point is resolved and built above, so a copied input file can never be taken for the
+  // program. A debug run has no test case of its own: it gets the shared input files and the input
+  // files of the first test case (the sorted order puts `example_*` before `test_*`), and the copies
+  // are removed afterwards because this is the developer's own answer directory.
+  const cwdSnapshot = await snapshotWorkingDirectory(args.cwd);
+  const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
+  if (testCases.shared?.fileInputPath) await copyTestCaseFileInput(testCases.shared.fileInputPath, args.cwd);
+  if (testCases[0]?.fileInputPath) await copyTestCaseFileInput(testCases[0].fileInputPath, args.cwd);
+
   {
     const timeoutSeconds = Math.max(
       DEBUG_DEFAULT_TIMEOUT_SECONDS,
@@ -410,5 +416,7 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
       memoryBytes: spawnResult.memoryBytes,
       outputFiles: outputFiles.length > 0 ? outputFiles : undefined,
     });
+
+    await cleanWorkingDirectory(args.cwd, cwdSnapshot);
   }
 }
