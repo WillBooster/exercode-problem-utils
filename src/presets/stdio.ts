@@ -19,6 +19,7 @@ import { makeAccessibleToSandboxUser } from '../helpers/sandboxUser.js';
 import { judgesWithoutTestCases, readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases } from '../helpers/readTestCases.js';
 import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
+import { forciblyRemoveDirectory } from '../helpers/temporaryProblemDirCopy.js';
 import { DecisionCode } from '../types/decisionCode.js';
 
 const BUILD_TIMEOUT_SECONDS = 10;
@@ -34,6 +35,8 @@ const judgeParamsSchema = z.object({
 const debugParamsSchema = judgeParamsSchema.extend({
   stdin: z.string().optional(),
 });
+
+type DebugParams = z.infer<typeof debugParamsSchema>;
 
 /**
  * A preset judge function using stdin and stdout as test cases.
@@ -257,9 +260,9 @@ async function hasExpectedFiles(fileOutputPath: string | undefined): Promise<boo
 }
 
 /**
- * A preset debug function using stdin and stdout as test cases. The program runs in a temporary copy
- * of the answer directory that also holds `_shared.fin/` and the first test case's `.fin/`; files it
- * writes are reported only through `requiredOutputFilePaths`.
+ * A preset debug function using stdin and stdout as test cases. The answer directory is copied to a
+ * temporary directory where it is built and run together with `_shared.fin/` and the first test
+ * case's `.fin/`; files the program writes are reported only through `requiredOutputFilePaths`.
  *
  * A standard stdio problem must NOT commit a `debug.ts` that only calls this preset: the Exercode
  * server applies this preset automatically when `debug.ts` is absent, and committed copies would
@@ -276,12 +279,24 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
   if (!args.cwd) throw new Error('cwd argument required');
   const params = debugParamsSchema.parse(args.params);
 
+  // Everything (build, input files, run) happens in a disposable copy of the answer directory, so
+  // the developer's files are never touched and whatever the submission leaves behind goes with it.
+  const cwd = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'exercode-debug-'));
+  try {
+    await copyWithoutFollowingSymlinks(args.cwd, cwd);
+    await debugInTemporaryCopy(problemDir, cwd, params);
+  } finally {
+    await forciblyRemoveDirectory(cwd);
+  }
+}
+
+async function debugInTemporaryCopy(problemDir: string, cwd: string, params: DebugParams): Promise<void> {
   // The sandboxed submission must read its sources and write build/run outputs in its directory.
-  makeAccessibleToSandboxUser(args.cwd);
+  makeAccessibleToSandboxUser(cwd);
 
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
 
-  const originalMainFilePath = await findEntryPointFile(args.cwd, params.language);
+  const originalMainFilePath = await findEntryPointFile(cwd, params.language);
   if (!originalMainFilePath) {
     printTestCaseResult({
       testCaseId: 'prebuild',
@@ -308,8 +323,8 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
 
   if (languageDefinition.prebuild) {
     try {
-      await languageDefinition.prebuild(args.cwd);
-      prebuiltMainFilePath = await findEntryPointFile(args.cwd, params.language);
+      await languageDefinition.prebuild(cwd);
+      prebuiltMainFilePath = await findEntryPointFile(cwd, params.language);
     } catch (error) {
       console.error('prebuild error', error);
 
@@ -331,7 +346,7 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
       const buildSpawnResult = spawnSyncWithTimeout(
         buildCommand[0],
         buildCommand.slice(1),
-        { cwd: args.cwd, encoding: 'utf8', env },
+        { cwd, encoding: 'utf8', env },
         BUILD_TIMEOUT_SECONDS
       );
 
@@ -372,17 +387,13 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
     }
   }
 
-  // A debug run works on a temporary copy of the built answer directory: the shared input files and
-  // the first test case's `.fin/` (the sorted order puts `example_*` before `test_*`) are placed the
-  // way the judge does, the developer's files are never touched, and nothing is left behind.
-  const runCwd = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'exercode-debug-'));
-  try {
-    await copyWithoutFollowingSymlinks(args.cwd, runCwd);
-    makeAccessibleToSandboxUser(runCwd);
-    const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
-    if (testCases.shared?.fileInputPath) await copyTestCaseFileInput(testCases.shared.fileInputPath, runCwd);
-    if (testCases[0]?.fileInputPath) await copyTestCaseFileInput(testCases[0].fileInputPath, runCwd);
+  // A debug run has no test case of its own: it gets the shared input files and the first test
+  // case's `.fin/` (the sorted order puts `example_*` before `test_*`), placed the way the judge does.
+  const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
+  if (testCases.shared?.fileInputPath) await copyTestCaseFileInput(testCases.shared.fileInputPath, cwd);
+  if (testCases[0]?.fileInputPath) await copyTestCaseFileInput(testCases[0].fileInputPath, cwd);
 
+  {
     const timeoutSeconds = Math.max(
       DEBUG_DEFAULT_TIMEOUT_SECONDS,
       (problemMarkdownFrontMatter.timeLimitMs ?? 0) / 1000
@@ -393,11 +404,11 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
     const spawnResult = spawnSyncWithTimeout(
       command[0],
       command.slice(1),
-      { cwd: runCwd, encoding: 'utf8', input: params.stdin, env },
+      { cwd, encoding: 'utf8', input: params.stdin, env },
       timeoutSeconds
     );
 
-    const outputFiles = await readOutputFiles(runCwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
+    const outputFiles = await readOutputFiles(cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
 
     let decisionCode: DecisionCode = DecisionCode.ACCEPTED;
 
@@ -424,7 +435,5 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
       memoryBytes: spawnResult.memoryBytes,
       outputFiles: outputFiles.length > 0 ? outputFiles : undefined,
     });
-  } finally {
-    await fs.promises.rm(runCwd, { recursive: true, force: true });
   }
 }
