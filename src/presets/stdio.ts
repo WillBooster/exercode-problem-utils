@@ -12,7 +12,7 @@ import { judgeByStaticAnalysis } from '../helpers/judgeByStaticAnalysis.js';
 import { parseArgs } from '../helpers/parseArgs.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readOutputFiles } from '../helpers/readOutputFiles.js';
-import { makeAccessibleToSandboxUser } from '../helpers/sandboxUser.js';
+import { makeAccessibleToSandboxUser, makeTraversableBySandboxUser } from '../helpers/sandboxUser.js';
 import { judgesWithoutTestCases, readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases } from '../helpers/readTestCases.js';
 import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
@@ -291,26 +291,33 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
   // the developer's files are never touched and whatever the submission leaves behind goes with it.
   // The copy keeps the directory hierarchy and links every ancestor `node_modules`, so packages the
   // answer resolves from its parents still resolve.
-  const { tempRoot, copiedProblemDir: cwd } = await copyProblemDirToTemporaryRoot(args.cwd);
-  // `mkdtemp` creates a 0700 root; the sandbox user must traverse it and read, build and run the copy.
-  makeAccessibleToSandboxUser(tempRoot);
-  // A terminated debug run must not leave the copy behind; `finally` does not run on a signal.
+  // A terminated debug run must not leave the copy behind; `finally` does not run on a signal, so
+  // the handlers are registered before the copy exists and stay until it is removed.
+  let tempRoot: string | undefined;
   const removeOnSignal = (): void => {
-    forciblyRemoveDirectorySync(tempRoot);
+    if (tempRoot !== undefined) forciblyRemoveDirectorySync(tempRoot);
     process.exit(1);
   };
   process.once('SIGINT', removeOnSignal);
   process.once('SIGTERM', removeOnSignal);
   try {
-    await debugInTemporaryCopy(problemDir, cwd, params);
+    const copy = await copyProblemDirToTemporaryRoot(args.cwd);
+    tempRoot = copy.tempRoot;
+    // `mkdtemp` creates a 0700 root: the sandbox user only traverses the root and the synthesized
+    // ancestors, and gets full access to the copied answer directory alone.
+    makeTraversableBySandboxUser(tempRoot, path.dirname(copy.copiedProblemDir));
+    await debugInTemporaryCopy(problemDir, copy.copiedProblemDir, params);
   } finally {
+    if (tempRoot !== undefined) await forciblyRemoveDirectory(tempRoot);
     process.off('SIGINT', removeOnSignal);
     process.off('SIGTERM', removeOnSignal);
-    await forciblyRemoveDirectory(tempRoot);
   }
 }
 
 async function debugInTemporaryCopy(problemDir: string, cwd: string, params: DebugParams): Promise<void> {
+  // The sandboxed submission must read its sources and write build/run outputs in its directory.
+  makeAccessibleToSandboxUser(cwd);
+
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
 
   const originalMainFilePath = await findEntryPointFile(cwd, params.language);

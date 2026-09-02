@@ -180,6 +180,20 @@ export function makeAccessibleToSandboxUser(targetPath: string): void {
 }
 
 /**
+ * Let the sandbox user traverse (but not modify) every directory from `rootPath` down to
+ * `directoryPath`, e.g. the synthesized ancestors of a temporary copy.
+ */
+export function makeTraversableBySandboxUser(rootPath: string, directoryPath: string): void {
+  if (!sandboxUserName) return;
+  const directories: string[] = [];
+  for (let current = directoryPath; ; current = path.dirname(current)) {
+    directories.push(current);
+    if (current === rootPath || path.dirname(current) === current) break;
+  }
+  child_process.spawnSync(CHMOD_PATH, ['a+X', ...directories], { env: MINIMAL_ENV });
+}
+
+/**
  * Kill the sandbox user's processes with the given signals. The harness user cannot signal another
  * user's processes (nor the root-owned `sudo` wrapper), so this goes through sudo. Killing every
  * sandbox process is safe because the judge server handles one request at a time. The default
