@@ -35,14 +35,14 @@ A standard stdin/stdout problem must NOT commit a `judge.ts` or `debug.ts` that 
 
 A problem keeps its test cases under `test_cases/`. A test case id is the shared name of the following entries, and each entry is optional:
 
-| Entry          | Meaning                                                                                                                           |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `<id>.in`      | Standard input. Omit it (or leave it empty) when the program reads nothing.                                                       |
-| `<id>.out`     | Expected standard output.                                                                                                         |
-| `<id>.fin/`    | Files copied into the working directory before the run (input files).                                                             |
-| `<id>.fout/`   | Expected output files, compared with the files of the same relative paths in the working directory.                               |
-| `_shared.fin/` | Files copied into the working directory before every test case.                                                                   |
-| `<id>.json`    | Configuration for a custom `judge.ts` that reads it itself; the presets ignore it, and it does not create a test case on its own. |
+| Entry          | Meaning                                                                                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<id>.in`      | Standard input. Omit it (or leave it empty) when the program reads nothing.                                                                       |
+| `<id>.out`     | Expected standard output.                                                                                                                         |
+| `<id>.fin/`    | Files copied into the working directory before the run (input files).                                                                             |
+| `<id>.fout/`   | Expected output files, compared with the files of the same relative paths in the working directory.                                               |
+| `_shared.fin/` | Files copied into the working directory before every test case.                                                                                   |
+| `<id>.json`    | Configuration for a custom `judge.ts` that reads it itself; the presets ignore it (the Judge server lists it as a test case of the custom judge). |
 
 A test case whose id contains `example` (the judge server's rule, e.g. `example_1` or `01_example_small`) is an example shown to learners; every other case is hidden.
 
