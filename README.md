@@ -35,14 +35,14 @@ A standard stdin/stdout problem must NOT commit a `judge.ts` or `debug.ts` that 
 
 A problem keeps its test cases under `test_cases/`. A test case id is the shared name of the following entries, and each entry is optional:
 
-| Entry          | Meaning                                                                                                                           |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `<id>.in`      | Standard input. Omit it (or leave it empty) when the program reads nothing.                                                       |
-| `<id>.out`     | Expected standard output.                                                                                                         |
-| `<id>.fin/`    | Files copied into the working directory before the run (input files).                                                             |
-| `<id>.fout/`   | Expected output files, compared with the files of the same relative paths in the working directory.                               |
-| `_shared.fin/` | Files copied into the working directory before every test case.                                                                   |
-| `<id>.json`    | Configuration for a custom `judge.ts` that reads it itself; the presets ignore it, and it does not create a test case on its own. |
+| Entry          | Meaning                                                                                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<id>.in`      | Standard input. Omit it (or leave it empty) when the program reads nothing.                                                                       |
+| `<id>.out`     | Expected standard output.                                                                                                                         |
+| `<id>.fin/`    | Files copied into the working directory before the run (input files).                                                                             |
+| `<id>.fout/`   | Expected output files, compared with the files of the same relative paths in the working directory.                                               |
+| `_shared.fin/` | Files copied into the working directory before every test case.                                                                                   |
+| `<id>.json`    | Configuration for a custom `judge.ts` that reads it itself; the presets ignore it (the Judge server lists it as a test case of the custom judge). |
 
 A test case whose id contains `example` (the judge server's rule, e.g. `example_1` or `01_example_small`) is an example shown to learners; every other case is hidden.
 
@@ -50,7 +50,7 @@ Standard output and text files are compared as space-separated tokens: consecuti
 
 How a missing expectation is treated depends on the harness:
 
-- `stdioJudgePreset` (the default for problems without `judge.ts`) requires `<id>.out` or a non-empty `<id>.fout/` for every test case, so a standard problem cannot accept a run without checking it. A problem whose `problem.md` declares `requiredOutputFilePaths`, code rules (`requiredRegExpsInCode` etc.), `requiredSubmissionFilePaths` or `isManualScoringRequired` is exempt, because it is judged by those instead.
+- `stdioJudgePreset` (the default for problems without `judge.ts`) requires `<id>.out` or a non-empty `<id>.fout/` for every test case, so a standard problem cannot accept a run without checking it. A problem whose `problem.md` declares `requiredOutputFilePaths` or `isManualScoringRequired` is exempt, because every test case is judged by those instead; code rules (`requiredRegExpsInCode` etc.) and `requiredSubmissionFilePaths` check the submission once, in addition to the output comparison, and do not exempt.
 - `commandJudgePreset` without a `test` option checks whatever expectations exist, and a test case with neither only has to run within the limits. A `test` option replaces that comparison; it receives `testCase.output`, `testCase.fileOutputPath` and `cwd` and can call the exported `judgeAgainstExpectations` (or `compareStdoutAsSpaceSeparatedTokens` and `compareExpectedOutputFiles`). A custom `readTestCases` may return any test case type with `id` (plus optional `input` and `fileInputPath`); the default verdict judges any case that exposes a string `output` or `fileOutputPath`, which the default reader's `CommandTestCase` does.
 - `guiCommandJudgePreset` passes the expectations to the problem's `test`, which decides everything.
 - `llmJudgePreset` runs no program, so it copies no `.fin/`; it hands `<id>.in` as the prompt input and the whole entry (including `fileOutputPath`) to the problem's `test`.

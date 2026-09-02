@@ -13,7 +13,10 @@ import { parseArgs } from '../helpers/parseArgs.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readOutputFiles } from '../helpers/readOutputFiles.js';
 import { makeAccessibleToSandboxUser, makeTraversableBySandboxUser } from '../helpers/sandboxUser.js';
-import { judgesWithoutTestCases, readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
+import {
+  judgesTestCasesWithoutExpectations,
+  readProblemMarkdownFrontMatter,
+} from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases } from '../helpers/readTestCases.js';
 import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
 import {
@@ -69,19 +72,12 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
 
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
   const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
-  const staticAnalysisTestCaseResult = await judgeByStaticAnalysis(args.cwd, problemMarkdownFrontMatter);
-  if (staticAnalysisTestCaseResult) {
-    printTestCaseResult({ testCaseId: testCases[0]?.id ?? 'prebuild', ...staticAnalysisTestCaseResult });
-    return;
-  }
 
   // Without an expectation, a case would accept any run; only custom harnesses may judge input-only
-  // cases. A problem judged by static analysis, manual scoring or the presence of required output
-  // files has an expectation of its own.
-  if (
-    !judgesWithoutTestCases(problemMarkdownFrontMatter) &&
-    !problemMarkdownFrontMatter.requiredOutputFilePaths?.length
-  ) {
+  // cases. A problem judged by manual scoring or the presence of required output files has an
+  // expectation of its own. Checked before the static analysis so that an authoring error surfaces
+  // regardless of the submission.
+  if (!judgesTestCasesWithoutExpectations(problemMarkdownFrontMatter)) {
     for (const testCase of testCases) {
       if (testCase.output === undefined && !(await hasExpectedFiles(testCase.fileOutputPath))) {
         throw new Error(
@@ -89,6 +85,12 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
         );
       }
     }
+  }
+
+  const staticAnalysisTestCaseResult = await judgeByStaticAnalysis(args.cwd, problemMarkdownFrontMatter);
+  if (staticAnalysisTestCaseResult) {
+    printTestCaseResult({ testCaseId: testCases[0]?.id ?? 'prebuild', ...staticAnalysisTestCaseResult });
+    return;
   }
 
   const originalMainFilePath = await findEntryPointFile(args.cwd, params.language);

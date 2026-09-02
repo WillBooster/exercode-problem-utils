@@ -20,6 +20,16 @@ export function judgesWithoutTestCases(frontMatter: ProblemMarkdownFrontMatter):
   );
 }
 
+/**
+ * Whether the front matter judges every test case without an expected output: manual scoring
+ * accepts every run, and required output files are checked by their presence after each run.
+ * Code rules and required submission files do not count because they check the submission once,
+ * in addition to the output comparison.
+ */
+export function judgesTestCasesWithoutExpectations(frontMatter: ProblemMarkdownFrontMatter): boolean {
+  return frontMatter.isManualScoringRequired === true || (frontMatter.requiredOutputFilePaths?.length ?? 0) > 0;
+}
+
 export async function readProblemMarkdownFrontMatter(problemDir: string): Promise<ProblemMarkdownFrontMatter> {
   for (const dirent of await fs.promises.readdir(problemDir, { withFileTypes: true })) {
     if (!dirent.isFile()) continue;
