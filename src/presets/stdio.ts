@@ -28,8 +28,8 @@ const JUDGE_DEFAULT_TIMEOUT_SECONDS = 2;
 const DEBUG_DEFAULT_TIMEOUT_SECONDS = 10;
 
 const MAX_STDOUT_LENGTH = 50_000;
-// The same rule the judge server uses to pick the test cases shown on the problem page.
-const EXAMPLE_TEST_CASE_ID_PATTERN = /^(\d+_)?example(_\d+)?$/;
+// The exact (unanchored) rule the judge server uses to pick the test cases shown on the problem page.
+const EXAMPLE_TEST_CASE_ID_PATTERN = /(\d+_)?example(_\d+)?/;
 
 const judgeParamsSchema = z.object({
   language: z.union([z.string(), z.array(z.string())]).optional(),
@@ -412,7 +412,11 @@ async function debugInTemporaryCopy(problemDir: string, cwd: string, params: Deb
   const exampleFileInputPath = testCases.find(
     (testCase) => EXAMPLE_TEST_CASE_ID_PATTERN.test(testCase.id) && testCase.fileInputPath
   )?.fileInputPath;
-  if (exampleFileInputPath) await copyTestCaseFileInput(exampleFileInputPath, cwd);
+  if (exampleFileInputPath) {
+    await copyTestCaseFileInput(exampleFileInputPath, cwd);
+  } else if (testCases.some((testCase) => testCase.fileInputPath)) {
+    console.error('debug: no example test case has input files, so the program runs without them');
+  }
 
   const timeoutSeconds = Math.max(DEBUG_DEFAULT_TIMEOUT_SECONDS, (problemMarkdownFrontMatter.timeLimitMs ?? 0) / 1000);
 

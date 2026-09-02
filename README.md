@@ -44,7 +44,7 @@ A problem keeps its test cases under `test_cases/`. A test case id is the shared
 | `_shared.fin/` | Files copied into the working directory before every test case.                                                                   |
 | `<id>.json`    | Configuration for a custom `judge.ts` that reads it itself; the presets ignore it, and it does not create a test case on its own. |
 
-A test case whose id matches `^(\d+_)?example(_\d+)?$` (e.g. `example_1`) is an example the judge server shows to learners; every other case is hidden.
+A test case whose id contains `example` (the judge server's rule, e.g. `example_1` or `01_example_small`) is an example shown to learners; every other case is hidden.
 
 Standard output and text files are compared as space-separated tokens: consecutive white spaces count as one separator, and an expected token that contains a decimal point and parses as a finite number (e.g. `3.14`, but not `1`, `1e-3` or `1.0e309`) accepts a value within an absolute or relative error of `1e-6`. A file is text when it is valid UTF-8 without NUL bytes; other files (e.g. images) must match byte for byte. A received file larger than 8 MiB counts as not produced, an expected file larger than 8 MiB is an authoring error (the case is reported as a runtime error), and a file larger than 1 MiB is left out of the reported pair. When a file differs, the result carries `<name>_expected.<ext>` and `<name>_received.<ext>` so Exercode can show both (Exercode decides per test case whether a learner may see them, as it does for expected stdout).
 
