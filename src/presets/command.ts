@@ -132,6 +132,8 @@ export interface CommandJudgePresetOptions<
     testCase: TTestCase;
     runResult: TRunResult;
     outputFiles: NonNullable<TestCaseResult['outputFiles']>;
+    /** The submission's working directory, e.g. for `compareExpectedOutputFiles(cwd, testCase.fileOutputPath)`. */
+    cwd: string;
     context: CommandJudgeContext;
   }) => Promise<Partial<CommandJudgeCaseResult>> | Partial<CommandJudgeCaseResult> | undefined;
 }
@@ -368,7 +370,7 @@ async function runCommandJudgeForCwd<
     if (baseJudgeResult.decisionCode === DecisionCode.ACCEPTED) {
       try {
         const extendedJudgeResult = options.test
-          ? await options.test({ testCase, runResult, outputFiles, context: judgeContext })
+          ? await options.test({ testCase, runResult, outputFiles, cwd, context: judgeContext })
           : await compareWithExpectedOutputs({ testCase, runResult, outputFiles, cwd });
         if (extendedJudgeResult) {
           judgeResult = {

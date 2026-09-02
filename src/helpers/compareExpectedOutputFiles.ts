@@ -10,7 +10,8 @@ import { isSafeSubmissionOutputPath } from './readOutputFiles.js';
 type OutputFile = NonNullable<TestCaseResult['outputFiles']>[number];
 
 // A submission controls the received files, so bound what the trusted harness reads and reports.
-const MIN_RECEIVED_FILE_BYTES_LIMIT = 1024 * 1024;
+export const MAX_COMPARED_FILE_BYTES = 8 * 1024 * 1024;
+export const MAX_REPORTED_FILE_BYTES = 1024 * 1024;
 
 export interface ExpectedOutputFilesComparison {
   /** Whether every file under the expected directory has a matching file in the working directory. */
@@ -20,7 +21,8 @@ export interface ExpectedOutputFilesComparison {
   /**
    * `<name>_expected.<ext>` / `<name>_received.<ext>` pairs for each mismatched file, in the
    * format Exercode renders side by side. A received file that is missing, unreadable, not a
-   * regular file or far larger than its expectation yields only the expected entry. Exercode decides per test case whether a learner may see these files.
+   * regular file or larger than `MAX_COMPARED_FILE_BYTES` yields only the expected entry, and a
+   * file larger than `MAX_REPORTED_FILE_BYTES` is left out of the pair. Exercode decides per test case whether a learner may see these files.
    */
   outputFiles: OutputFile[];
 }
@@ -40,14 +42,23 @@ export async function compareExpectedOutputFiles(
   for (const dirent of dirents.toSorted((a, b) => a.name.localeCompare(b.name))) {
     if (!dirent.isFile()) continue;
 
-    const relativePath = path.join(path.relative(fileOutputPath, dirent.parentPath), dirent.name);
+    // POSIX separators: `requiredOutputFilePaths` and the result format use them on every platform.
+    const relativePath = path.posix.join(
+      ...path.relative(fileOutputPath, dirent.parentPath).split(path.sep),
+      dirent.name
+    );
     const expected = await fs.promises.readFile(path.join(dirent.parentPath, dirent.name));
-    const received = await readReceivedFile(cwd, path.join(cwd, relativePath), expected.length);
+    const received = await readReceivedFile(cwd, path.join(cwd, relativePath));
     if (received && fileContentsMatch(expected, received)) continue;
 
     mismatchedPaths.push(relativePath);
-    outputFiles.push(encodeFileForTestCaseResult(toComparisonPath(relativePath, 'expected'), expected));
-    if (received) outputFiles.push(encodeFileForTestCaseResult(toComparisonPath(relativePath, 'received'), received));
+    // A file too large to ship in a result line is left out of the pair rather than truncated.
+    if (expected.length <= MAX_REPORTED_FILE_BYTES) {
+      outputFiles.push(encodeFileForTestCaseResult(toComparisonPath(relativePath, 'expected'), expected));
+    }
+    if (received && received.length <= MAX_REPORTED_FILE_BYTES) {
+      outputFiles.push(encodeFileForTestCaseResult(toComparisonPath(relativePath, 'received'), received));
+    }
   }
   return { matches: mismatchedPaths.length === 0, mismatchedPaths, outputFiles };
 }
@@ -70,24 +81,18 @@ export function mergeComparisonOutputFiles(
 
 /** `c.txt` → `c_expected.txt`; `out/c.txt` → `out/c_expected.txt`. */
 function toComparisonPath(filePath: string, role: 'expected' | 'received'): string {
-  const { dir, name, ext } = path.parse(filePath);
-  return path.join(dir, `${name}_${role}${ext}`);
+  const { dir, name, ext } = path.posix.parse(filePath);
+  return path.posix.join(dir, `${name}_${role}${ext}`);
 }
 
-// A submission controls this path, so anything that is not a plain, readable, reasonably sized
-// file (a directory, a FIFO that would block, an unreadable file) counts as "not produced".
-async function readReceivedFile(
-  cwd: string,
-  receivedPath: string,
-  expectedLength: number
-): Promise<Buffer | undefined> {
+// A submission controls this path, so anything that is not a plain, readable file within the size
+// limit (a directory, a FIFO that would block, an unreadable or huge file) counts as "not produced".
+async function readReceivedFile(cwd: string, receivedPath: string): Promise<Buffer | undefined> {
   // A submission-planted symlink to the expected file itself would otherwise compare equal.
   if (!(await isSafeSubmissionOutputPath(cwd, receivedPath))) return undefined;
   try {
     const stats = await fs.promises.stat(receivedPath);
-    if (!stats.isFile()) return undefined;
-    // A file far larger than its expectation cannot match; skip reading it into memory at all.
-    if (stats.size > Math.max(MIN_RECEIVED_FILE_BYTES_LIMIT, expectedLength * 4)) return undefined;
+    if (!stats.isFile() || stats.size > MAX_COMPARED_FILE_BYTES) return undefined;
     return await fs.promises.readFile(receivedPath);
   } catch {
     return undefined;

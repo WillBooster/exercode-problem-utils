@@ -142,6 +142,8 @@ export interface GuiCommandJudgePresetOptions<TTestCase extends BaseGuiTestCase 
     testCase: TTestCase;
     runResult: GuiCommandRunResult;
     outputFiles: NonNullable<TestCaseResult['outputFiles']>;
+    /** The submission's working directory, e.g. for `compareExpectedOutputFiles(cwd, testCase.fileOutputPath)`. */
+    cwd: string;
     context: GuiJudgeContext;
   }) => Promise<Partial<GuiJudgeCaseResult>> | Partial<GuiJudgeCaseResult>;
 }
@@ -372,6 +374,7 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
             testCase,
             runResult,
             outputFiles,
+            cwd: args.cwd,
             context: judgeContext,
           });
           judgeResult = {
