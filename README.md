@@ -44,13 +44,15 @@ A problem keeps its test cases under `test_cases/`. A test case id is the shared
 | `_shared.fin/` | Files copied into the working directory before every test case.                                     |
 | `<id>.json`    | Configuration for a custom `judge.ts` that reads it itself; the presets ignore it.                  |
 
-Standard output and text files are compared as space-separated tokens: consecutive white spaces count as one separator, and a token that parses as a decimal number in the expectation accepts a value within an absolute or relative error of `1e-6`. Binary files (e.g. images) must match byte for byte. When a file differs, the result carries `<name>_expected.<ext>` and `<name>_received.<ext>` so Exercode can show both.
+Standard output and text files are compared as space-separated tokens: consecutive white spaces count as one separator, and an expected token that contains a decimal point and parses as a number (e.g. `3.14`, but not `1` or `1e-3`) accepts a value within an absolute or relative error of `1e-6`. A file is text when it is valid UTF-8 without NUL bytes; other files (e.g. images) must match byte for byte. When a file differs, the result carries `<name>_expected.<ext>` and `<name>_received.<ext>` so Exercode can show both (Exercode decides per test case whether a learner may see them, as it does for expected stdout).
 
 How a missing expectation is treated depends on the harness:
 
 - `stdioJudgePreset` (the default for problems without `judge.ts`) requires `<id>.out` or `<id>.fout/` for every test case, so a standard problem cannot accept a run without checking it.
 - `commandJudgePreset` without a `test` option checks whatever expectations exist, and a test case with neither only has to run within the limits. A `test` option replaces that comparison; it receives `testCase.output` and `testCase.fileOutputPath` and can call the exported `compareStdoutAsSpaceSeparatedTokens` and `compareExpectedOutputFiles`.
-- `guiCommandJudgePreset` and `llmJudgePreset` pass the expectations to the problem's `test`, which decides everything.
+- `guiCommandJudgePreset` passes the expectations to the problem's `test`, which decides everything.
+- `llmJudgePreset` runs no program, so it copies no `.fin/`; it hands `<id>.in` as the prompt input and the whole entry (including `fileOutputPath`) to the problem's `test`.
+- `stdioDebugPreset` copies `_shared.fin/` and the first test case's `.fin/` into the working directory before the debug run.
 - `evaluationJudgePreset` does not use `test_cases/`.
 
 `readTestCases` is exported for harnesses that enumerate `test_cases/` themselves.

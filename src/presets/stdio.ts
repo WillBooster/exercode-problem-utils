@@ -1,9 +1,10 @@
+import fs from 'node:fs';
 import path from 'node:path';
 
 import { z } from 'zod';
 
 import { cleanWorkingDirectory, snapshotWorkingDirectory } from '../helpers/cleanWorkingDirectory.js';
-import { compareExpectedOutputFiles } from '../helpers/compareExpectedOutputFiles.js';
+import { compareExpectedOutputFiles, mergeComparisonOutputFiles } from '../helpers/compareExpectedOutputFiles.js';
 import { compareStdoutAsSpaceSeparatedTokens } from '../helpers/compareStdoutAsSpaceSeparatedTokens.js';
 import { copyTestCaseFileInput } from '../helpers/copyTestCaseFileInput.js';
 import { findEntryPointFile } from '../helpers/findEntryPointFile.js';
@@ -62,8 +63,10 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
   const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
   // Without an expectation, a case would accept any run; only custom harnesses may judge input-only cases.
   for (const testCase of testCases) {
-    if (testCase.output === undefined && testCase.fileOutputPath === undefined) {
-      throw new Error(`test case ${testCase.id} needs an expected output (${testCase.id}.out or ${testCase.id}.fout/)`);
+    if (testCase.output === undefined && !(await hasExpectedFiles(testCase.fileOutputPath))) {
+      throw new Error(
+        `test case ${testCase.id} needs an expected output (${testCase.id}.out or a non-empty ${testCase.id}.fout/)`
+      );
     }
   }
 
@@ -205,20 +208,17 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
       decisionCode = DecisionCode.OUTPUT_SIZE_LIMIT_EXCEEDED;
     } else if (outputFiles.length < (problemMarkdownFrontMatter.requiredOutputFilePaths?.length ?? 0)) {
       decisionCode = DecisionCode.MISSING_REQUIRED_OUTPUT_FILE_ERROR;
-    } else if (
-      testCase.output !== undefined &&
-      !compareStdoutAsSpaceSeparatedTokens(spawnResult.stdout, testCase.output)
-    ) {
-      decisionCode = DecisionCode.WRONG_ANSWER;
-    } else if (testCase.fileOutputPath) {
-      const comparison = await compareExpectedOutputFiles(args.cwd, testCase.fileOutputPath);
-      if (!comparison.matches) {
+    } else {
+      // Check stdout and files independently so a result carries every mismatch, not just the first.
+      if (testCase.output !== undefined && !compareStdoutAsSpaceSeparatedTokens(spawnResult.stdout, testCase.output)) {
         decisionCode = DecisionCode.WRONG_ANSWER;
-        // Show the expected/received pair instead of the plain copy of a mismatched required output file.
-        outputFiles = [
-          ...outputFiles.filter((file) => !comparison.mismatchedPaths.includes(file.path)),
-          ...comparison.outputFiles,
-        ];
+      }
+      if (testCase.fileOutputPath) {
+        const comparison = await compareExpectedOutputFiles(args.cwd, testCase.fileOutputPath);
+        if (!comparison.matches) {
+          decisionCode = DecisionCode.WRONG_ANSWER;
+          outputFiles = mergeComparisonOutputFiles(outputFiles, comparison);
+        }
       }
     }
 
@@ -241,8 +241,15 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
   }
 }
 
+async function hasExpectedFiles(fileOutputPath: string | undefined): Promise<boolean> {
+  if (fileOutputPath === undefined) return false;
+  const dirents = await fs.promises.readdir(fileOutputPath, { withFileTypes: true, recursive: true });
+  return dirents.some((dirent) => dirent.isFile());
+}
+
 /**
- * A preset debug function using stdin and stdout as test cases.
+ * A preset debug function using stdin and stdout as test cases. Files under `_shared.fin/` and the
+ * first test case's `.fin/` are copied into the working directory before the run.
  *
  * A standard stdio problem must NOT commit a `debug.ts` that only calls this preset: the Exercode
  * server applies this preset automatically when `debug.ts` is absent, and committed copies would
@@ -263,6 +270,12 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
   makeAccessibleToSandboxUser(args.cwd);
 
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
+  // A debug run has no test case of its own, so give the program the shared input files and the
+  // input files of the first test case (the sorted order puts `example_*` before `test_*`).
+  const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
+  if (testCases.shared?.fileInputPath) await copyTestCaseFileInput(testCases.shared.fileInputPath, args.cwd);
+  const firstFileInputPath = testCases.find((testCase) => testCase.fileInputPath)?.fileInputPath;
+  if (firstFileInputPath) await copyTestCaseFileInput(firstFileInputPath, args.cwd);
 
   const originalMainFilePath = await findEntryPointFile(args.cwd, params.language);
   if (!originalMainFilePath) {

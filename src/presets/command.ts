@@ -3,7 +3,7 @@ import path from 'node:path';
 import { z } from 'zod';
 
 import { cleanWorkingDirectory, snapshotWorkingDirectory } from '../helpers/cleanWorkingDirectory.js';
-import { compareExpectedOutputFiles } from '../helpers/compareExpectedOutputFiles.js';
+import { compareExpectedOutputFiles, mergeComparisonOutputFiles } from '../helpers/compareExpectedOutputFiles.js';
 import { compareStdoutAsSpaceSeparatedTokens } from '../helpers/compareStdoutAsSpaceSeparatedTokens.js';
 import { copyTestCaseFileInput } from '../helpers/copyTestCaseFileInput.js';
 import { findEntryPointFile } from '../helpers/findEntryPointFile.js';
@@ -481,17 +481,16 @@ async function compareWithExpectedOutputs(context: {
   cwd: string;
 }): Promise<Partial<CommandJudgeCaseResult>> {
   const { testCase, runResult, outputFiles, cwd } = context;
-  if (testCase.output !== undefined && !compareStdoutAsSpaceSeparatedTokens(runResult.stdout, testCase.output)) {
-    return { decisionCode: DecisionCode.WRONG_ANSWER };
+  // Check stdout and files independently so a result carries every mismatch, not just the first.
+  const stdoutMatches =
+    testCase.output === undefined || compareStdoutAsSpaceSeparatedTokens(runResult.stdout, testCase.output);
+  let filesMatch = true;
+  if (testCase.fileOutputPath !== undefined) {
+    const comparison = await compareExpectedOutputFiles(cwd, testCase.fileOutputPath);
+    filesMatch = comparison.matches;
+    if (!filesMatch) outputFiles.splice(0, outputFiles.length, ...mergeComparisonOutputFiles(outputFiles, comparison));
   }
-  if (testCase.fileOutputPath === undefined) return {};
-
-  const comparison = await compareExpectedOutputFiles(cwd, testCase.fileOutputPath);
-  if (comparison.matches) return {};
-  // Show the expected/received pair instead of the plain copy of a mismatched required output file.
-  const keptOutputFiles = outputFiles.filter((file) => !comparison.mismatchedPaths.includes(file.path));
-  outputFiles.splice(0, outputFiles.length, ...keptOutputFiles, ...comparison.outputFiles);
-  return { decisionCode: DecisionCode.WRONG_ANSWER };
+  return stdoutMatches && filesMatch ? {} : { decisionCode: DecisionCode.WRONG_ANSWER };
 }
 
 function runCommand(

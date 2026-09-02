@@ -32,13 +32,21 @@ const judgeParamsSchema = z.object({
   model: z.string().min(1),
 });
 
+/** A `test_cases/` entry; the preset uses `input` for the prompt and hands everything to `test`. */
+interface LlmTestCase {
+  id: string;
+  input?: string;
+  output?: string;
+  /** Present when `<id>.fin/` exists; the preset does not copy it anywhere (there is no program run). */
+  fileInputPath?: string;
+  /** Present when `<id>.fout/` exists, for `test` to read. */
+  fileOutputPath?: string;
+}
+
 interface LlmJudgePresetOptions {
-  buildPrompt?: (context: {
-    prompt: string;
-    testCase: { id: string; input?: string; output?: string };
-  }) => string | ModelMessage[];
+  buildPrompt?: (context: { prompt: string; testCase: LlmTestCase }) => string | ModelMessage[];
   test: (context: {
-    testCase: { id: string; input?: string; output?: string };
+    testCase: LlmTestCase;
     result: { output: string };
   }) => Partial<TestCaseResult> | Promise<Partial<TestCaseResult>>;
 }
