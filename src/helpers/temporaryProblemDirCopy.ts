@@ -8,9 +8,14 @@ import path from 'node:path';
  * copied harness still resolves its imports. Callers must remove the returned `tempRoot`.
  */
 export async function copyProblemDirToTemporaryRoot(
-  problemDir: string
+  problemDir: string,
+  options: {
+    /** Called as soon as the root exists, so a caller's signal cleanup can cover the copy phase too. */
+    onTempRootCreated?: (tempRoot: string) => void;
+  } = {}
 ): Promise<{ tempRoot: string; copiedProblemDir: string }> {
   const tempRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'problem-utils-isolation_'));
+  options.onTempRootCreated?.(tempRoot);
   try {
     const absoluteProblemDir = path.resolve(problemDir);
     const copiedProblemDir = path.join(tempRoot, toTempRelativePath(absoluteProblemDir));

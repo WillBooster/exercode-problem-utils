@@ -292,7 +292,7 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
   // The copy keeps the directory hierarchy and links every ancestor `node_modules`, so packages the
   // answer resolves from its parents still resolve.
   // A terminated debug run must not leave the copy behind; `finally` does not run on a signal, so
-  // the handlers are registered before the copy exists and stay until it is removed.
+  // the handlers learn the root as soon as it is created and stay until it is removed.
   let tempRoot: string | undefined;
   const removeOnSignal = (): void => {
     if (tempRoot !== undefined) forciblyRemoveDirectorySync(tempRoot);
@@ -301,11 +301,10 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
   process.once('SIGINT', removeOnSignal);
   process.once('SIGTERM', removeOnSignal);
   try {
-    const copy = await copyProblemDirToTemporaryRoot(args.cwd);
-    tempRoot = copy.tempRoot;
+    const copy = await copyProblemDirToTemporaryRoot(args.cwd, { onTempRootCreated: (root) => (tempRoot = root) });
     // `mkdtemp` creates a 0700 root: the sandbox user only traverses the root and the synthesized
     // ancestors, and gets full access to the copied answer directory alone.
-    makeTraversableBySandboxUser(tempRoot, path.dirname(copy.copiedProblemDir));
+    makeTraversableBySandboxUser(copy.tempRoot, path.dirname(copy.copiedProblemDir));
     await debugInTemporaryCopy(problemDir, copy.copiedProblemDir, params);
   } finally {
     if (tempRoot !== undefined) await forciblyRemoveDirectory(tempRoot);
