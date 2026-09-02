@@ -28,8 +28,8 @@ const JUDGE_DEFAULT_TIMEOUT_SECONDS = 2;
 const DEBUG_DEFAULT_TIMEOUT_SECONDS = 10;
 
 const MAX_STDOUT_LENGTH = 50_000;
-// The exact (unanchored) rule the judge server uses to pick the test cases shown on the problem page.
-const EXAMPLE_TEST_CASE_ID_PATTERN = /(\d+_)?example(_\d+)?/;
+// The judge server shows a test case on the problem page when its id contains `example`.
+const EXAMPLE_TEST_CASE_ID_PATTERN = /example/;
 
 const judgeParamsSchema = z.object({
   language: z.union([z.string(), z.array(z.string())]).optional(),
