@@ -72,14 +72,11 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
 
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
   const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
-  const staticAnalysisTestCaseResult = await judgeByStaticAnalysis(args.cwd, problemMarkdownFrontMatter);
-  if (staticAnalysisTestCaseResult) {
-    printTestCaseResult({ testCaseId: testCases[0]?.id ?? 'prebuild', ...staticAnalysisTestCaseResult });
-    return;
-  }
 
   // Without an expectation, a case would accept any run; only custom harnesses may judge input-only
-  // cases. A problem judged by manual scoring or the presence of required files has an expectation of its own.
+  // cases. A problem judged by manual scoring or the presence of required output files has an
+  // expectation of its own. Checked before the static analysis so that an authoring error surfaces
+  // regardless of the submission.
   if (!judgesTestCasesWithoutExpectations(problemMarkdownFrontMatter)) {
     for (const testCase of testCases) {
       if (testCase.output === undefined && !(await hasExpectedFiles(testCase.fileOutputPath))) {
@@ -88,6 +85,12 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
         );
       }
     }
+  }
+
+  const staticAnalysisTestCaseResult = await judgeByStaticAnalysis(args.cwd, problemMarkdownFrontMatter);
+  if (staticAnalysisTestCaseResult) {
+    printTestCaseResult({ testCaseId: testCases[0]?.id ?? 'prebuild', ...staticAnalysisTestCaseResult });
+    return;
   }
 
   const originalMainFilePath = await findEntryPointFile(args.cwd, params.language);

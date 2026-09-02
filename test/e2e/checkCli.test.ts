@@ -84,3 +84,21 @@ test('check reports a model answer that fails a test case', { timeout: 120_000 }
   expect(result.stdout).toContain('0 passed, 1 failed');
   expect(result.status).toBe(1);
 });
+
+test('check rejects a code-rules problem whose test case lacks an expected output', { timeout: 120_000 }, async () => {
+  const tempRoot = await copyProblemToTempRoot();
+  const problemDir = path.join(tempRoot, 'a_plus_b_file');
+  // Code rules check the submission once; they do not replace the per-case output comparison.
+  const problemFilePath = path.join(problemDir, 'problem.md');
+  const problemFile = await fs.promises.readFile(problemFilePath, 'utf8');
+  await fs.promises.writeFile(
+    problemFilePath,
+    problemFile.replace("requiredOutputFilePaths: ['c.txt']", String.raw`requiredRegExpsInCode: ['\+']`)
+  );
+  await fs.promises.rm(path.join(problemDir, 'test_cases', 'test_1.fout'), { recursive: true });
+
+  const result = runCheck(tempRoot);
+
+  expect(result.stderr).toContain('test case test_1 needs an expected output');
+  expect(result.status).toBe(1);
+});
