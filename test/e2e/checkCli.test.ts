@@ -86,8 +86,9 @@ test('check reports a model answer that fails a test case', { timeout: 120_000 }
 });
 
 // Code rules and required submission files check the submission once; they do not replace the
-// per-case output comparison.
-test.each([String.raw`requiredRegExpsInCode: ['\+']`, "requiredSubmissionFilePaths: ['main.mjs']"])(
+// per-case output comparison. The rules fail the model answer, so the authoring error must surface
+// before the static analysis.
+test.each(["requiredRegExpsInCode: ['no_such_token']", "requiredSubmissionFilePaths: ['missing.txt']"])(
   'check rejects a problem with %s whose test case lacks an expected output',
   { timeout: 120_000 },
   async (frontMatterLine) => {
@@ -105,5 +106,21 @@ test.each([String.raw`requiredRegExpsInCode: ['\+']`, "requiredSubmissionFilePat
 
     expect(result.stderr).toContain('test case test_1 needs an expected output');
     expect(result.status).toBe(1);
+  }
+);
+
+test(
+  'check accepts a required-output-files problem whose test case has no expected output',
+  { timeout: 120_000 },
+  async () => {
+    const tempRoot = await copyProblemToTempRoot();
+    // The presence of the required output file judges such a case.
+    await fs.promises.rm(path.join(tempRoot, 'a_plus_b_file', 'test_cases', 'test_1.fout'), { recursive: true });
+
+    const result = runCheck(tempRoot);
+
+    if (result.stderr) console.error(result.stderr);
+    expect(result.stdout).toContain('1 passed, 0 failed');
+    expect(result.status).toBe(0);
   }
 );
