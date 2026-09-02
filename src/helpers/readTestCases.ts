@@ -3,6 +3,12 @@ import path from 'node:path';
 
 const SHARED_TEST_CASE_NAME = '_shared';
 
+/**
+ * Read the test cases of a `test_cases/` directory. A test case id is the name of every
+ * `<id>.in` / `<id>.out` file and `<id>.fin/` / `<id>.fout/` directory; any of them may be absent,
+ * and what an absent part means is up to the harness (the presets document their rules).
+ * Other entries (e.g. `.json` configuration read by a custom `judge.ts`) are ignored.
+ */
 export async function readTestCases(directory: string): Promise<
   { id: string; input?: string; output?: string; fileInputPath?: string; fileOutputPath?: string }[] & {
     shared?: { fileInputPath?: string };

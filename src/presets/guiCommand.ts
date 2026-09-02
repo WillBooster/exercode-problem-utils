@@ -48,8 +48,14 @@ const judgeParamsSchema = z.object({
 
 interface BaseGuiTestCase {
   id: string;
+  /** Standard input (`test_cases/<id>.in`). */
   input?: string;
+  /** Expected standard output (`test_cases/<id>.out`), for the problem's `test` to compare. */
+  output?: string;
+  /** Directory copied into the working directory before the run (`test_cases/<id>.fin/`). */
   fileInputPath?: string;
+  /** Directory of expected output files (`test_cases/<id>.fout/`), for the problem's `test` to compare. */
+  fileOutputPath?: string;
 }
 
 export interface GuiScreenshotFile {
@@ -518,6 +524,7 @@ function evaluateGuiRunResult(context: {
 }
 
 async function readGuiTestCases<TTestCase extends BaseGuiTestCase>(problemDir: string): Promise<readonly TTestCase[]> {
+  // The default reader yields the base shape; a narrower TTestCase must come from `options.readTestCases`.
   return (await readFileTestCases(path.join(problemDir, 'test_cases'))) as unknown as readonly TTestCase[];
 }
 

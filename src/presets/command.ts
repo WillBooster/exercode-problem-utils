@@ -3,6 +3,8 @@ import path from 'node:path';
 import { z } from 'zod';
 
 import { cleanWorkingDirectory, snapshotWorkingDirectory } from '../helpers/cleanWorkingDirectory.js';
+import { compareExpectedOutputFiles } from '../helpers/compareExpectedOutputFiles.js';
+import { compareStdoutAsSpaceSeparatedTokens } from '../helpers/compareStdoutAsSpaceSeparatedTokens.js';
 import { copyTestCaseFileInput } from '../helpers/copyTestCaseFileInput.js';
 import { findEntryPointFile } from '../helpers/findEntryPointFile.js';
 import { findLanguageDefinitionByPath } from '../helpers/findLanguageDefinitionByPath.js';
@@ -42,8 +44,14 @@ type JudgeParams = z.infer<typeof judgeParamsSchema>;
 
 interface BaseCommandTestCase {
   id: string;
+  /** Standard input (`test_cases/<id>.in`). */
   input?: string;
+  /** Expected standard output (`test_cases/<id>.out`). */
+  output?: string;
+  /** Directory copied into the working directory before the run (`test_cases/<id>.fin/`). */
   fileInputPath?: string;
+  /** Directory of expected output files compared after the run (`test_cases/<id>.fout/`). */
+  fileOutputPath?: string;
 }
 
 type CommandJudgeCaseResult = Pick<TestCaseResult, 'decisionCode' | 'feedbackMarkdown' | 'stderr'>;
@@ -113,6 +121,13 @@ export interface CommandJudgePresetOptions<
     env: NodeJS.ProcessEnv;
     timeLimitSeconds: number;
   }) => Promise<TRunResult> | TRunResult;
+  /**
+   * Decides the verdict of a run that passed the limit checks. It replaces the default comparison
+   * of `testCase.output` (space-separated tokens) and `testCase.fileOutputPath` (see
+   * `compareStdoutAsSpaceSeparatedTokens` and `compareExpectedOutputFiles`, both exported), so
+   * call those yourself when the test case ships `.out` / `.fout` expectations to keep.
+   * `outputFiles` is the array printed with the result and may be edited in place.
+   */
   test?: (context: {
     testCase: TTestCase;
     runResult: TRunResult;
@@ -124,10 +139,22 @@ export interface CommandJudgePresetOptions<
 /**
  * A preset function for judging by executable command.
  *
+ * Without options, test cases come from `test_cases/` (`.in`, `.out`, `.fin/`, `.fout/`) and a run
+ * within the limits is accepted when its stdout matches `.out` and its files match `.fout/`; a
+ * case without either expectation only has to run within the limits.
  * Keep problem-specific logic in `resolveInput` and `test`.
  *
  * @example
- * Create `judge.ts`:
+ * Create `judge.ts` that judges `test_cases/` like the default stdio harness, with the command
+ * preset's debug mode and custom limits:
+ * ```ts
+ * import { commandJudgePreset } from '@exercode/problem-utils/presets/command';
+ *
+ * await commandJudgePreset(import.meta.dirname, { runTimeoutSeconds: 10 });
+ * ```
+ *
+ * @example
+ * Create `judge.ts` with an own verdict:
  * ```ts
  * import { commandJudgePreset } from '@exercode/problem-utils/presets/command';
  * import { DecisionCode } from '@exercode/problem-utils';
@@ -158,7 +185,7 @@ export interface CommandJudgePresetOptions<
 export async function commandJudgePreset<
   TTestCase extends BaseCommandTestCase = BaseCommandTestCase,
   TRunResult extends CommandRunResult = CommandRunResult,
->(problemDir: string, options: CommandJudgePresetOptions<TTestCase, TRunResult>): Promise<void> {
+>(problemDir: string, options: CommandJudgePresetOptions<TTestCase, TRunResult> = {}): Promise<void> {
   const args = parseArgs(process.argv);
   const params = judgeParamsSchema.parse(args.params);
 
@@ -340,7 +367,9 @@ async function runCommandJudgeForCwd<
     let judgeResult = baseJudgeResult;
     if (baseJudgeResult.decisionCode === DecisionCode.ACCEPTED) {
       try {
-        const extendedJudgeResult = await options.test?.({ testCase, runResult, outputFiles, context: judgeContext });
+        const extendedJudgeResult = options.test
+          ? await options.test({ testCase, runResult, outputFiles, context: judgeContext })
+          : await compareWithExpectedOutputs({ testCase, runResult, outputFiles, cwd });
         if (extendedJudgeResult) {
           judgeResult = {
             decisionCode: extendedJudgeResult.decisionCode ?? baseJudgeResult.decisionCode,
@@ -437,25 +466,32 @@ function errorToMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function toCommandTestCase(value: {
-  id: string;
-  input?: string;
-  fileInputPath?: string;
-  fileOutputPath?: string;
-  output?: string;
-}): BaseCommandTestCase {
-  return { id: value.id, input: value.input, fileInputPath: value.fileInputPath };
-}
-
 async function readCommandTestCases<TTestCase extends BaseCommandTestCase = BaseCommandTestCase>(
   problemDir: string
 ): Promise<readonly TTestCase[]> {
-  const fileTestCases = await readFileTestCases(path.join(problemDir, 'test_cases'));
-  const commandTestCases = fileTestCases.map((testCase) => toCommandTestCase(testCase) as TTestCase);
-  if (fileTestCases.shared?.fileInputPath) {
-    return Object.assign(commandTestCases, { shared: { fileInputPath: fileTestCases.shared.fileInputPath } });
+  // The default reader yields the base shape; a narrower TTestCase must come from `options.readTestCases`.
+  return (await readFileTestCases(path.join(problemDir, 'test_cases'))) as unknown as readonly TTestCase[];
+}
+
+/** The default verdict: `.out` decides stdout and `.fout/` decides output files; either may be absent. */
+async function compareWithExpectedOutputs(context: {
+  testCase: BaseCommandTestCase;
+  runResult: CommandRunResult;
+  outputFiles: NonNullable<TestCaseResult['outputFiles']>;
+  cwd: string;
+}): Promise<Partial<CommandJudgeCaseResult>> {
+  const { testCase, runResult, outputFiles, cwd } = context;
+  if (testCase.output !== undefined && !compareStdoutAsSpaceSeparatedTokens(runResult.stdout, testCase.output)) {
+    return { decisionCode: DecisionCode.WRONG_ANSWER };
   }
-  return commandTestCases;
+  if (testCase.fileOutputPath === undefined) return {};
+
+  const comparison = await compareExpectedOutputFiles(cwd, testCase.fileOutputPath);
+  if (comparison.matches) return {};
+  // Show the expected/received pair instead of the plain copy of a mismatched required output file.
+  const keptOutputFiles = outputFiles.filter((file) => !comparison.mismatchedPaths.includes(file.path));
+  outputFiles.splice(0, outputFiles.length, ...keptOutputFiles, ...comparison.outputFiles);
+  return { decisionCode: DecisionCode.WRONG_ANSWER };
 }
 
 function runCommand(

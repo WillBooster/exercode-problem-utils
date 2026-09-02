@@ -1,9 +1,9 @@
-import fs from 'node:fs';
 import path from 'node:path';
 
 import { z } from 'zod';
 
 import { cleanWorkingDirectory, snapshotWorkingDirectory } from '../helpers/cleanWorkingDirectory.js';
+import { compareExpectedOutputFiles } from '../helpers/compareExpectedOutputFiles.js';
 import { compareStdoutAsSpaceSeparatedTokens } from '../helpers/compareStdoutAsSpaceSeparatedTokens.js';
 import { copyTestCaseFileInput } from '../helpers/copyTestCaseFileInput.js';
 import { findEntryPointFile } from '../helpers/findEntryPointFile.js';
@@ -11,7 +11,7 @@ import { findLanguageDefinitionByPath } from '../helpers/findLanguageDefinitionB
 import { judgeByStaticAnalysis } from '../helpers/judgeByStaticAnalysis.js';
 import { parseArgs } from '../helpers/parseArgs.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
-import { isSafeSubmissionOutputPath, readOutputFiles } from '../helpers/readOutputFiles.js';
+import { readOutputFiles } from '../helpers/readOutputFiles.js';
 import { makeAccessibleToSandboxUser } from '../helpers/sandboxUser.js';
 import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases } from '../helpers/readTestCases.js';
@@ -60,6 +60,12 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
 
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
   const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
+  // Without an expectation, a case would accept any run; only custom harnesses may judge input-only cases.
+  for (const testCase of testCases) {
+    if (testCase.output === undefined && testCase.fileOutputPath === undefined) {
+      throw new Error(`test case ${testCase.id} needs an expected output (${testCase.id}.out or ${testCase.id}.fout/)`);
+    }
+  }
 
   const staticAnalysisTestCaseResult = await judgeByStaticAnalysis(args.cwd, problemMarkdownFrontMatter);
   if (staticAnalysisTestCaseResult) {
@@ -184,7 +190,7 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
       timeoutSeconds
     );
 
-    const outputFiles = await readOutputFiles(args.cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
+    let outputFiles = await readOutputFiles(args.cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
 
     // calculate decision
     let decisionCode: DecisionCode = DecisionCode.ACCEPTED;
@@ -199,24 +205,20 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
       decisionCode = DecisionCode.OUTPUT_SIZE_LIMIT_EXCEEDED;
     } else if (outputFiles.length < (problemMarkdownFrontMatter.requiredOutputFilePaths?.length ?? 0)) {
       decisionCode = DecisionCode.MISSING_REQUIRED_OUTPUT_FILE_ERROR;
-    } else if (!compareStdoutAsSpaceSeparatedTokens(spawnResult.stdout, testCase.output ?? '')) {
+    } else if (
+      testCase.output !== undefined &&
+      !compareStdoutAsSpaceSeparatedTokens(spawnResult.stdout, testCase.output)
+    ) {
       decisionCode = DecisionCode.WRONG_ANSWER;
     } else if (testCase.fileOutputPath) {
-      const dirents = await fs.promises.readdir(testCase.fileOutputPath, { withFileTypes: true, recursive: true });
-      for (const dirent of dirents) {
-        if (!dirent.isFile()) continue;
-        const direntRelativePath = path.relative(testCase.fileOutputPath, dirent.parentPath);
-        const expected = await fs.promises.readFile(path.join(dirent.parentPath, dirent.name));
-        try {
-          const receivedPath = path.join(args.cwd, direntRelativePath, dirent.name);
-          // A submission-planted symlink to the expected file itself would otherwise compare equal.
-          if (!(await isSafeSubmissionOutputPath(args.cwd, receivedPath))) throw new Error('unsafe output path');
-          const received = await fs.promises.readFile(receivedPath);
-          if (received.compare(expected) !== 0) decisionCode = DecisionCode.WRONG_ANSWER;
-        } catch (error) {
-          console.error(error);
-          decisionCode = DecisionCode.WRONG_ANSWER;
-        }
+      const comparison = await compareExpectedOutputFiles(args.cwd, testCase.fileOutputPath);
+      if (!comparison.matches) {
+        decisionCode = DecisionCode.WRONG_ANSWER;
+        // Show the expected/received pair instead of the plain copy of a mismatched required output file.
+        outputFiles = [
+          ...outputFiles.filter((file) => !comparison.mismatchedPaths.includes(file.path)),
+          ...comparison.outputFiles,
+        ];
       }
     }
 

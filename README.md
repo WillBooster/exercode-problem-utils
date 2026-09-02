@@ -30,3 +30,27 @@ bun x exercode-problem debug model_answers/python '{ "stdin": "1 2" }'
 The all-problem check judges serially by default because time limits are measured in wall-clock time; pass `--concurrency <n>` to parallelize when the checked problems are not timing-sensitive.
 
 A standard stdin/stdout problem must NOT commit a `judge.ts` or `debug.ts` that is identical to the default stdio harness: the absence of `judge.ts` marks the problem as standard, and committed copies would drift from the server's defaults. The CLI rejects such files; a file kept intentionally (e.g. to demonstrate the default harness) can add an explanatory comment to be treated as custom.
+
+## Test cases
+
+A problem keeps its test cases under `test_cases/`. A test case id is the shared name of the following entries, and each entry is optional:
+
+| Entry          | Meaning                                                                                             |
+| -------------- | --------------------------------------------------------------------------------------------------- |
+| `<id>.in`      | Standard input. Omit it (or leave it empty) when the program reads nothing.                         |
+| `<id>.out`     | Expected standard output.                                                                           |
+| `<id>.fin/`    | Files copied into the working directory before the run (input files).                               |
+| `<id>.fout/`   | Expected output files, compared with the files of the same relative paths in the working directory. |
+| `_shared.fin/` | Files copied into the working directory before every test case.                                     |
+| `<id>.json`    | Configuration for a custom `judge.ts` that reads it itself; the presets ignore it.                  |
+
+Standard output and text files are compared as space-separated tokens: consecutive white spaces count as one separator, and a token that parses as a decimal number in the expectation accepts a value within an absolute or relative error of `1e-6`. Binary files (e.g. images) must match byte for byte. When a file differs, the result carries `<name>_expected.<ext>` and `<name>_received.<ext>` so Exercode can show both.
+
+How a missing expectation is treated depends on the harness:
+
+- `stdioJudgePreset` (the default for problems without `judge.ts`) requires `<id>.out` or `<id>.fout/` for every test case, so a standard problem cannot accept a run without checking it.
+- `commandJudgePreset` without a `test` option checks whatever expectations exist, and a test case with neither only has to run within the limits. A `test` option replaces that comparison; it receives `testCase.output` and `testCase.fileOutputPath` and can call the exported `compareStdoutAsSpaceSeparatedTokens` and `compareExpectedOutputFiles`.
+- `guiCommandJudgePreset` and `llmJudgePreset` pass the expectations to the problem's `test`, which decides everything.
+- `evaluationJudgePreset` does not use `test_cases/`.
+
+`readTestCases` is exported for harnesses that enumerate `test_cases/` themselves.

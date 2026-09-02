@@ -339,7 +339,38 @@ test.each<
         exitStatus: 0,
         timeSeconds: expect.any(Number),
         memoryBytes: expect.any(Number),
-        outputFiles: [{ path: 'c.txt', data: '8\n' }],
+        outputFiles: [
+          { path: 'c_expected.txt', data: '1442807128\n' },
+          { path: 'c_received.txt', data: '8\n' },
+        ],
+      },
+    ],
+  ],
+
+  // commandJudgePreset without a `test` option compares `.out` like the stdio preset.
+  [
+    'example/a_plus_b_command',
+    'judge.ts',
+    'model_answers/python',
+    {},
+    {},
+    [acceptedTestCaseResultsForAPlusB[0], acceptedTestCaseResultsForAPlusB[2]],
+  ],
+  [
+    'example/a_plus_b_command',
+    'judge.ts',
+    'model_answers.fails/python_wa',
+    {},
+    {},
+    [
+      {
+        testCaseId: '01_small_00',
+        decisionCode: 1000,
+        exitStatus: 0,
+        stdin: '1 1\n',
+        stdout: '0\n',
+        timeSeconds: expect.any(Number),
+        memoryBytes: expect.any(Number),
       },
     ],
   ],
