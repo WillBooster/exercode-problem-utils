@@ -13,7 +13,10 @@ import { parseArgs } from '../helpers/parseArgs.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readOutputFiles } from '../helpers/readOutputFiles.js';
 import { makeAccessibleToSandboxUser, makeTraversableBySandboxUser } from '../helpers/sandboxUser.js';
-import { judgesWithoutTestCases, readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
+import {
+  judgesTestCasesWithoutExpectations,
+  readProblemMarkdownFrontMatter,
+} from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases } from '../helpers/readTestCases.js';
 import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
 import {
@@ -76,12 +79,8 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
   }
 
   // Without an expectation, a case would accept any run; only custom harnesses may judge input-only
-  // cases. A problem judged by static analysis, manual scoring or the presence of required output
-  // files has an expectation of its own.
-  if (
-    !judgesWithoutTestCases(problemMarkdownFrontMatter) &&
-    !problemMarkdownFrontMatter.requiredOutputFilePaths?.length
-  ) {
+  // cases. A problem judged by manual scoring or the presence of required files has an expectation of its own.
+  if (!judgesTestCasesWithoutExpectations(problemMarkdownFrontMatter)) {
     for (const testCase of testCases) {
       if (testCase.output === undefined && !(await hasExpectedFiles(testCase.fileOutputPath))) {
         throw new Error(
