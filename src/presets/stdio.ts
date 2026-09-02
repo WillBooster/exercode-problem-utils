@@ -292,7 +292,7 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
   // The copy keeps the directory hierarchy and links every ancestor `node_modules`, so packages the
   // answer resolves from its parents still resolve.
   const { tempRoot, copiedProblemDir: cwd } = await copyProblemDirToTemporaryRoot(args.cwd);
-  // `mkdtemp` creates a 0700 root; the sandbox user must be able to traverse it to reach the copy.
+  // `mkdtemp` creates a 0700 root; the sandbox user must traverse it and read, build and run the copy.
   makeAccessibleToSandboxUser(tempRoot);
   // A terminated debug run must not leave the copy behind; `finally` does not run on a signal.
   const removeOnSignal = (): void => {
@@ -311,9 +311,6 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
 }
 
 async function debugInTemporaryCopy(problemDir: string, cwd: string, params: DebugParams): Promise<void> {
-  // The sandboxed submission must read its sources and write build/run outputs in its directory.
-  makeAccessibleToSandboxUser(cwd);
-
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
 
   const originalMainFilePath = await findEntryPointFile(cwd, params.language);
@@ -417,47 +414,42 @@ async function debugInTemporaryCopy(problemDir: string, cwd: string, params: Deb
   )?.fileInputPath;
   if (exampleFileInputPath) await copyTestCaseFileInput(exampleFileInputPath, cwd);
 
-  {
-    const timeoutSeconds = Math.max(
-      DEBUG_DEFAULT_TIMEOUT_SECONDS,
-      (problemMarkdownFrontMatter.timeLimitMs ?? 0) / 1000
-    );
+  const timeoutSeconds = Math.max(DEBUG_DEFAULT_TIMEOUT_SECONDS, (problemMarkdownFrontMatter.timeLimitMs ?? 0) / 1000);
 
-    const command = languageDefinition.command(mainFilePath);
+  const command = languageDefinition.command(mainFilePath);
 
-    const spawnResult = spawnSyncWithTimeout(
-      command[0],
-      command.slice(1),
-      { cwd, encoding: 'utf8', input: params.stdin, env },
-      timeoutSeconds
-    );
+  const spawnResult = spawnSyncWithTimeout(
+    command[0],
+    command.slice(1),
+    { cwd, encoding: 'utf8', input: params.stdin, env },
+    timeoutSeconds
+  );
 
-    const outputFiles = await readOutputFiles(cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
+  const outputFiles = await readOutputFiles(cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
 
-    let decisionCode: DecisionCode = DecisionCode.ACCEPTED;
+  let decisionCode: DecisionCode = DecisionCode.ACCEPTED;
 
-    if (spawnResult.status !== 0) {
-      decisionCode = DecisionCode.RUNTIME_ERROR;
-    } else if (spawnResult.timeSeconds > timeoutSeconds) {
-      decisionCode = DecisionCode.TIME_LIMIT_EXCEEDED;
-    } else if (spawnResult.memoryBytes > (problemMarkdownFrontMatter.memoryLimitByte ?? Number.POSITIVE_INFINITY)) {
-      decisionCode = DecisionCode.MEMORY_LIMIT_EXCEEDED;
-    } else if (spawnResult.stdout.length > MAX_STDOUT_LENGTH || spawnResult.stderr.length > MAX_STDOUT_LENGTH) {
-      decisionCode = DecisionCode.OUTPUT_SIZE_LIMIT_EXCEEDED;
-    } else if (outputFiles.length < (problemMarkdownFrontMatter.requiredOutputFilePaths?.length ?? 0)) {
-      decisionCode = DecisionCode.MISSING_REQUIRED_OUTPUT_FILE_ERROR;
-    }
-
-    printTestCaseResult({
-      testCaseId: 'debug',
-      decisionCode,
-      exitStatus: spawnResult.status ?? undefined,
-      stdin: params.stdin,
-      stdout: spawnResult.stdout.slice(0, MAX_STDOUT_LENGTH) || undefined,
-      stderr: spawnResult.stderr.slice(0, MAX_STDOUT_LENGTH) || undefined,
-      timeSeconds: spawnResult.timeSeconds,
-      memoryBytes: spawnResult.memoryBytes,
-      outputFiles: outputFiles.length > 0 ? outputFiles : undefined,
-    });
+  if (spawnResult.status !== 0) {
+    decisionCode = DecisionCode.RUNTIME_ERROR;
+  } else if (spawnResult.timeSeconds > timeoutSeconds) {
+    decisionCode = DecisionCode.TIME_LIMIT_EXCEEDED;
+  } else if (spawnResult.memoryBytes > (problemMarkdownFrontMatter.memoryLimitByte ?? Number.POSITIVE_INFINITY)) {
+    decisionCode = DecisionCode.MEMORY_LIMIT_EXCEEDED;
+  } else if (spawnResult.stdout.length > MAX_STDOUT_LENGTH || spawnResult.stderr.length > MAX_STDOUT_LENGTH) {
+    decisionCode = DecisionCode.OUTPUT_SIZE_LIMIT_EXCEEDED;
+  } else if (outputFiles.length < (problemMarkdownFrontMatter.requiredOutputFilePaths?.length ?? 0)) {
+    decisionCode = DecisionCode.MISSING_REQUIRED_OUTPUT_FILE_ERROR;
   }
+
+  printTestCaseResult({
+    testCaseId: 'debug',
+    decisionCode,
+    exitStatus: spawnResult.status ?? undefined,
+    stdin: params.stdin,
+    stdout: spawnResult.stdout.slice(0, MAX_STDOUT_LENGTH) || undefined,
+    stderr: spawnResult.stderr.slice(0, MAX_STDOUT_LENGTH) || undefined,
+    timeSeconds: spawnResult.timeSeconds,
+    memoryBytes: spawnResult.memoryBytes,
+    outputFiles: outputFiles.length > 0 ? outputFiles : undefined,
+  });
 }
