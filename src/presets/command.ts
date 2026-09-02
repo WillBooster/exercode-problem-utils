@@ -3,6 +3,7 @@ import path from 'node:path';
 import { z } from 'zod';
 
 import { cleanWorkingDirectory, snapshotWorkingDirectory } from '../helpers/cleanWorkingDirectory.js';
+import { judgeAgainstExpectations } from '../helpers/compareExpectedOutputFiles.js';
 import { copyTestCaseFileInput } from '../helpers/copyTestCaseFileInput.js';
 import { findEntryPointFile } from '../helpers/findEntryPointFile.js';
 import { findLanguageDefinitionByPath } from '../helpers/findLanguageDefinitionByPath.js';
@@ -40,10 +41,21 @@ const judgeParamsSchema = z.object({
 
 type JudgeParams = z.infer<typeof judgeParamsSchema>;
 
+/** What every command test case needs; a custom `readTestCases` may add any fields of its own. */
 interface BaseCommandTestCase {
   id: string;
+  /** Standard input (`test_cases/<id>.in`). */
   input?: string;
+  /** Directory copied into the working directory before the run (`test_cases/<id>.fin/`). */
   fileInputPath?: string;
+}
+
+/** A test case read from `test_cases/` by the default reader. */
+export interface CommandTestCase extends BaseCommandTestCase {
+  /** Expected standard output (`test_cases/<id>.out`). */
+  output?: string;
+  /** Directory of expected output files compared after the run (`test_cases/<id>.fout/`). */
+  fileOutputPath?: string;
 }
 
 type CommandJudgeCaseResult = Pick<TestCaseResult, 'decisionCode' | 'feedbackMarkdown' | 'stderr'>;
@@ -77,7 +89,7 @@ interface ResolvedCommandProblem<TTestCase extends BaseCommandTestCase> {
 }
 
 export interface CommandJudgePresetOptions<
-  TTestCase extends BaseCommandTestCase = BaseCommandTestCase,
+  TTestCase extends BaseCommandTestCase = CommandTestCase,
   TRunResult extends CommandRunResult = CommandRunResult,
 > {
   /**
@@ -86,6 +98,7 @@ export interface CommandJudgePresetOptions<
    */
   buildSubmission?: boolean;
   limits?: CommandJudgeLimits;
+  /** The per-case time limit used only when `problem.md` declares no `timeLimitMs`. */
   runTimeoutSeconds?: number;
   readTestCases?: (problemDir: string) => Promise<readonly TTestCase[]>;
   /**
@@ -113,10 +126,19 @@ export interface CommandJudgePresetOptions<
     env: NodeJS.ProcessEnv;
     timeLimitSeconds: number;
   }) => Promise<TRunResult> | TRunResult;
+  /**
+   * Decides the verdict of a run that passed the limit checks. It replaces the default comparison
+   * of `testCase.output` (space-separated tokens) and `testCase.fileOutputPath` (see
+   * `compareStdoutAsSpaceSeparatedTokens` and `compareExpectedOutputFiles`, both exported), so
+   * call those yourself when the test case ships `.out` / `.fout` expectations to keep.
+   * `outputFiles` is the array printed with the result and may be edited in place.
+   */
   test?: (context: {
     testCase: TTestCase;
     runResult: TRunResult;
     outputFiles: NonNullable<TestCaseResult['outputFiles']>;
+    /** The submission's working directory, e.g. for `compareExpectedOutputFiles(cwd, testCase.fileOutputPath)`. */
+    cwd: string;
     context: CommandJudgeContext;
   }) => Promise<Partial<CommandJudgeCaseResult>> | Partial<CommandJudgeCaseResult> | undefined;
 }
@@ -124,10 +146,22 @@ export interface CommandJudgePresetOptions<
 /**
  * A preset function for judging by executable command.
  *
+ * Without options, test cases come from `test_cases/` (`.in`, `.out`, `.fin/`, `.fout/`) and a run
+ * within the limits is accepted when its stdout matches `.out` and its files match `.fout/`; a
+ * case without either expectation only has to run within the limits.
  * Keep problem-specific logic in `resolveInput` and `test`.
  *
  * @example
- * Create `judge.ts`:
+ * Create `judge.ts` that judges `test_cases/` like the default stdio harness, with the command
+ * preset's debug mode:
+ * ```ts
+ * import { commandJudgePreset } from '@exercode/problem-utils/presets/command';
+ *
+ * await commandJudgePreset(import.meta.dirname);
+ * ```
+ *
+ * @example
+ * Create `judge.ts` with an own verdict:
  * ```ts
  * import { commandJudgePreset } from '@exercode/problem-utils/presets/command';
  * import { DecisionCode } from '@exercode/problem-utils';
@@ -156,9 +190,9 @@ export interface CommandJudgePresetOptions<
  * ```
  */
 export async function commandJudgePreset<
-  TTestCase extends BaseCommandTestCase = BaseCommandTestCase,
+  TTestCase extends BaseCommandTestCase = CommandTestCase,
   TRunResult extends CommandRunResult = CommandRunResult,
->(problemDir: string, options: CommandJudgePresetOptions<TTestCase, TRunResult>): Promise<void> {
+>(problemDir: string, options: CommandJudgePresetOptions<TTestCase, TRunResult> = {}): Promise<void> {
   const args = parseArgs(process.argv);
   const params = judgeParamsSchema.parse(args.params);
 
@@ -340,7 +374,9 @@ async function runCommandJudgeForCwd<
     let judgeResult = baseJudgeResult;
     if (baseJudgeResult.decisionCode === DecisionCode.ACCEPTED) {
       try {
-        const extendedJudgeResult = await options.test?.({ testCase, runResult, outputFiles, context: judgeContext });
+        const extendedJudgeResult = options.test
+          ? await options.test({ testCase, runResult, outputFiles, cwd, context: judgeContext })
+          : await compareWithExpectedOutputs({ testCase, runResult, outputFiles, cwd });
         if (extendedJudgeResult) {
           judgeResult = {
             decisionCode: extendedJudgeResult.decisionCode ?? baseJudgeResult.decisionCode,
@@ -437,25 +473,30 @@ function errorToMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function toCommandTestCase(value: {
-  id: string;
-  input?: string;
-  fileInputPath?: string;
-  fileOutputPath?: string;
-  output?: string;
-}): BaseCommandTestCase {
-  return { id: value.id, input: value.input, fileInputPath: value.fileInputPath };
-}
-
-async function readCommandTestCases<TTestCase extends BaseCommandTestCase = BaseCommandTestCase>(
+async function readCommandTestCases<TTestCase extends BaseCommandTestCase = CommandTestCase>(
   problemDir: string
 ): Promise<readonly TTestCase[]> {
-  const fileTestCases = await readFileTestCases(path.join(problemDir, 'test_cases'));
-  const commandTestCases = fileTestCases.map((testCase) => toCommandTestCase(testCase) as TTestCase);
-  if (fileTestCases.shared?.fileInputPath) {
-    return Object.assign(commandTestCases, { shared: { fileInputPath: fileTestCases.shared.fileInputPath } });
-  }
-  return commandTestCases;
+  // The default reader yields the base shape; a narrower TTestCase must come from `options.readTestCases`.
+  return (await readFileTestCases(path.join(problemDir, 'test_cases'))) as unknown as readonly TTestCase[];
+}
+
+/** The default verdict: a case exposing a string `output` / `fileOutputPath` is judged against it. */
+async function compareWithExpectedOutputs(context: {
+  testCase: BaseCommandTestCase & Partial<CommandTestCase>;
+  runResult: CommandRunResult;
+  outputFiles: NonNullable<TestCaseResult['outputFiles']>;
+  cwd: string;
+}): Promise<Partial<CommandJudgeCaseResult>> {
+  const { testCase, runResult, outputFiles, cwd } = context;
+  const judgement = await judgeAgainstExpectations({
+    stdout: runResult.stdout,
+    expectedStdout: typeof testCase.output === 'string' ? testCase.output : undefined,
+    fileOutputPath: typeof testCase.fileOutputPath === 'string' ? testCase.fileOutputPath : undefined,
+    cwd,
+    outputFiles,
+  });
+  outputFiles.splice(0, outputFiles.length, ...judgement.outputFiles);
+  return judgement.matches ? {} : { decisionCode: DecisionCode.WRONG_ANSWER };
 }
 
 function runCommand(

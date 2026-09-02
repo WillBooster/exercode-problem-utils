@@ -4,18 +4,23 @@ import path from 'node:path';
 import { z } from 'zod';
 
 import { cleanWorkingDirectory, snapshotWorkingDirectory } from '../helpers/cleanWorkingDirectory.js';
-import { compareStdoutAsSpaceSeparatedTokens } from '../helpers/compareStdoutAsSpaceSeparatedTokens.js';
+import { judgeAgainstExpectations } from '../helpers/compareExpectedOutputFiles.js';
 import { copyTestCaseFileInput } from '../helpers/copyTestCaseFileInput.js';
 import { findEntryPointFile } from '../helpers/findEntryPointFile.js';
 import { findLanguageDefinitionByPath } from '../helpers/findLanguageDefinitionByPath.js';
 import { judgeByStaticAnalysis } from '../helpers/judgeByStaticAnalysis.js';
 import { parseArgs } from '../helpers/parseArgs.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
-import { isSafeSubmissionOutputPath, readOutputFiles } from '../helpers/readOutputFiles.js';
-import { makeAccessibleToSandboxUser } from '../helpers/sandboxUser.js';
-import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
+import { readOutputFiles } from '../helpers/readOutputFiles.js';
+import { makeAccessibleToSandboxUser, makeTraversableBySandboxUser } from '../helpers/sandboxUser.js';
+import { judgesWithoutTestCases, readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases } from '../helpers/readTestCases.js';
 import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
+import {
+  copyProblemDirToTemporaryRoot,
+  forciblyRemoveDirectory,
+  forciblyRemoveDirectorySync,
+} from '../helpers/temporaryProblemDirCopy.js';
 import { DecisionCode } from '../types/decisionCode.js';
 
 const BUILD_TIMEOUT_SECONDS = 10;
@@ -23,6 +28,8 @@ const JUDGE_DEFAULT_TIMEOUT_SECONDS = 2;
 const DEBUG_DEFAULT_TIMEOUT_SECONDS = 10;
 
 const MAX_STDOUT_LENGTH = 50_000;
+// The judge server shows a test case on the problem page when its id contains `example`.
+const EXAMPLE_TEST_CASE_ID_PATTERN = /example/;
 
 const judgeParamsSchema = z.object({
   language: z.union([z.string(), z.array(z.string())]).optional(),
@@ -31,6 +38,8 @@ const judgeParamsSchema = z.object({
 const debugParamsSchema = judgeParamsSchema.extend({
   stdin: z.string().optional(),
 });
+
+type DebugParams = z.infer<typeof debugParamsSchema>;
 
 /**
  * A preset judge function using stdin and stdout as test cases.
@@ -60,11 +69,26 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
 
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
   const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
-
   const staticAnalysisTestCaseResult = await judgeByStaticAnalysis(args.cwd, problemMarkdownFrontMatter);
   if (staticAnalysisTestCaseResult) {
     printTestCaseResult({ testCaseId: testCases[0]?.id ?? 'prebuild', ...staticAnalysisTestCaseResult });
     return;
+  }
+
+  // Without an expectation, a case would accept any run; only custom harnesses may judge input-only
+  // cases. A problem judged by static analysis, manual scoring or the presence of required output
+  // files has an expectation of its own.
+  if (
+    !judgesWithoutTestCases(problemMarkdownFrontMatter) &&
+    !problemMarkdownFrontMatter.requiredOutputFilePaths?.length
+  ) {
+    for (const testCase of testCases) {
+      if (testCase.output === undefined && !(await hasExpectedFiles(testCase.fileOutputPath))) {
+        throw new Error(
+          `test case ${testCase.id} needs an expected output (${testCase.id}.out or a non-empty ${testCase.id}.fout/)`
+        );
+      }
+    }
   }
 
   const originalMainFilePath = await findEntryPointFile(args.cwd, params.language);
@@ -184,10 +208,11 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
       timeoutSeconds
     );
 
-    const outputFiles = await readOutputFiles(args.cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
+    let outputFiles = await readOutputFiles(args.cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
 
     // calculate decision
     let decisionCode: DecisionCode = DecisionCode.ACCEPTED;
+    let judgementError: string | undefined;
 
     if (spawnResult.status !== 0) {
       decisionCode = DecisionCode.RUNTIME_ERROR;
@@ -199,24 +224,21 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
       decisionCode = DecisionCode.OUTPUT_SIZE_LIMIT_EXCEEDED;
     } else if (outputFiles.length < (problemMarkdownFrontMatter.requiredOutputFilePaths?.length ?? 0)) {
       decisionCode = DecisionCode.MISSING_REQUIRED_OUTPUT_FILE_ERROR;
-    } else if (!compareStdoutAsSpaceSeparatedTokens(spawnResult.stdout, testCase.output ?? '')) {
-      decisionCode = DecisionCode.WRONG_ANSWER;
-    } else if (testCase.fileOutputPath) {
-      const dirents = await fs.promises.readdir(testCase.fileOutputPath, { withFileTypes: true, recursive: true });
-      for (const dirent of dirents) {
-        if (!dirent.isFile()) continue;
-        const direntRelativePath = path.relative(testCase.fileOutputPath, dirent.parentPath);
-        const expected = await fs.promises.readFile(path.join(dirent.parentPath, dirent.name));
-        try {
-          const receivedPath = path.join(args.cwd, direntRelativePath, dirent.name);
-          // A submission-planted symlink to the expected file itself would otherwise compare equal.
-          if (!(await isSafeSubmissionOutputPath(args.cwd, receivedPath))) throw new Error('unsafe output path');
-          const received = await fs.promises.readFile(receivedPath);
-          if (received.compare(expected) !== 0) decisionCode = DecisionCode.WRONG_ANSWER;
-        } catch (error) {
-          console.error(error);
-          decisionCode = DecisionCode.WRONG_ANSWER;
-        }
+    } else {
+      try {
+        const judgement = await judgeAgainstExpectations({
+          stdout: spawnResult.stdout,
+          expectedStdout: testCase.output,
+          fileOutputPath: testCase.fileOutputPath,
+          cwd: args.cwd,
+          outputFiles,
+        });
+        if (!judgement.matches) decisionCode = DecisionCode.WRONG_ANSWER;
+        outputFiles = judgement.outputFiles;
+      } catch (error) {
+        // An authoring error (e.g. an oversized expected file) is reported per case, like the command preset does.
+        decisionCode = DecisionCode.RUNTIME_ERROR;
+        judgementError = error instanceof Error ? error.message : String(error);
       }
     }
 
@@ -226,7 +248,7 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
       exitStatus: spawnResult.status ?? undefined,
       stdin: testCase.input,
       stdout: spawnResult.stdout.slice(0, MAX_STDOUT_LENGTH) || undefined,
-      stderr: spawnResult.stderr.slice(0, MAX_STDOUT_LENGTH) || undefined,
+      stderr: (judgementError ?? spawnResult.stderr).slice(0, MAX_STDOUT_LENGTH) || undefined,
       timeSeconds: spawnResult.timeSeconds,
       memoryBytes: spawnResult.memoryBytes,
       outputFiles: outputFiles.length > 0 ? outputFiles : undefined,
@@ -239,8 +261,16 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
   }
 }
 
+async function hasExpectedFiles(fileOutputPath: string | undefined): Promise<boolean> {
+  if (fileOutputPath === undefined) return false;
+  const dirents = await fs.promises.readdir(fileOutputPath, { withFileTypes: true, recursive: true });
+  return dirents.some((dirent) => dirent.isFile());
+}
+
 /**
- * A preset debug function using stdin and stdout as test cases.
+ * A preset debug function using stdin and stdout as test cases. The answer directory is copied to a
+ * temporary directory where it is built and run together with `_shared.fin/` and the first example
+ * case's `.fin/`; files the program writes are reported only through `requiredOutputFilePaths`.
  *
  * A standard stdio problem must NOT commit a `debug.ts` that only calls this preset: the Exercode
  * server applies this preset automatically when `debug.ts` is absent, and committed copies would
@@ -257,12 +287,39 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
   if (!args.cwd) throw new Error('cwd argument required');
   const params = debugParamsSchema.parse(args.params);
 
+  // Everything (build, input files, run) happens in a disposable copy of the answer directory, so
+  // the developer's files are never touched and whatever the submission leaves behind goes with it.
+  // The copy keeps the directory hierarchy and links every ancestor `node_modules`, so packages the
+  // answer resolves from its parents still resolve.
+  // A terminated debug run must not leave the copy behind; `finally` does not run on a signal, so
+  // the handlers learn the root as soon as it is created and stay until it is removed.
+  let tempRoot: string | undefined;
+  const removeOnSignal = (): void => {
+    if (tempRoot !== undefined) forciblyRemoveDirectorySync(tempRoot);
+    process.exit(1);
+  };
+  process.once('SIGINT', removeOnSignal);
+  process.once('SIGTERM', removeOnSignal);
+  try {
+    const copy = await copyProblemDirToTemporaryRoot(args.cwd, { onTempRootCreated: (root) => (tempRoot = root) });
+    // `mkdtemp` creates a 0700 root: the sandbox user only traverses the root and the synthesized
+    // ancestors, and gets full access to the copied answer directory alone.
+    makeTraversableBySandboxUser(copy.tempRoot, path.dirname(copy.copiedProblemDir));
+    await debugInTemporaryCopy(problemDir, copy.copiedProblemDir, params);
+  } finally {
+    if (tempRoot !== undefined) await forciblyRemoveDirectory(tempRoot);
+    process.off('SIGINT', removeOnSignal);
+    process.off('SIGTERM', removeOnSignal);
+  }
+}
+
+async function debugInTemporaryCopy(problemDir: string, cwd: string, params: DebugParams): Promise<void> {
   // The sandboxed submission must read its sources and write build/run outputs in its directory.
-  makeAccessibleToSandboxUser(args.cwd);
+  makeAccessibleToSandboxUser(cwd);
 
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
 
-  const originalMainFilePath = await findEntryPointFile(args.cwd, params.language);
+  const originalMainFilePath = await findEntryPointFile(cwd, params.language);
   if (!originalMainFilePath) {
     printTestCaseResult({
       testCaseId: 'prebuild',
@@ -289,8 +346,8 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
 
   if (languageDefinition.prebuild) {
     try {
-      await languageDefinition.prebuild(args.cwd);
-      prebuiltMainFilePath = await findEntryPointFile(args.cwd, params.language);
+      await languageDefinition.prebuild(cwd);
+      prebuiltMainFilePath = await findEntryPointFile(cwd, params.language);
     } catch (error) {
       console.error('prebuild error', error);
 
@@ -312,7 +369,7 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
       const buildSpawnResult = spawnSyncWithTimeout(
         buildCommand[0],
         buildCommand.slice(1),
-        { cwd: args.cwd, encoding: 'utf8', env },
+        { cwd, encoding: 'utf8', env },
         BUILD_TIMEOUT_SECONDS
       );
 
@@ -353,47 +410,56 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
     }
   }
 
-  {
-    const timeoutSeconds = Math.max(
-      DEBUG_DEFAULT_TIMEOUT_SECONDS,
-      (problemMarkdownFrontMatter.timeLimitMs ?? 0) / 1000
-    );
-
-    const command = languageDefinition.command(mainFilePath);
-
-    const spawnResult = spawnSyncWithTimeout(
-      command[0],
-      command.slice(1),
-      { cwd: args.cwd, encoding: 'utf8', input: params.stdin, env },
-      timeoutSeconds
-    );
-
-    const outputFiles = await readOutputFiles(args.cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
-
-    let decisionCode: DecisionCode = DecisionCode.ACCEPTED;
-
-    if (spawnResult.status !== 0) {
-      decisionCode = DecisionCode.RUNTIME_ERROR;
-    } else if (spawnResult.timeSeconds > timeoutSeconds) {
-      decisionCode = DecisionCode.TIME_LIMIT_EXCEEDED;
-    } else if (spawnResult.memoryBytes > (problemMarkdownFrontMatter.memoryLimitByte ?? Number.POSITIVE_INFINITY)) {
-      decisionCode = DecisionCode.MEMORY_LIMIT_EXCEEDED;
-    } else if (spawnResult.stdout.length > MAX_STDOUT_LENGTH || spawnResult.stderr.length > MAX_STDOUT_LENGTH) {
-      decisionCode = DecisionCode.OUTPUT_SIZE_LIMIT_EXCEEDED;
-    } else if (outputFiles.length < (problemMarkdownFrontMatter.requiredOutputFilePaths?.length ?? 0)) {
-      decisionCode = DecisionCode.MISSING_REQUIRED_OUTPUT_FILE_ERROR;
-    }
-
-    printTestCaseResult({
-      testCaseId: 'debug',
-      decisionCode,
-      exitStatus: spawnResult.status ?? undefined,
-      stdin: params.stdin,
-      stdout: spawnResult.stdout.slice(0, MAX_STDOUT_LENGTH) || undefined,
-      stderr: spawnResult.stderr.slice(0, MAX_STDOUT_LENGTH) || undefined,
-      timeSeconds: spawnResult.timeSeconds,
-      memoryBytes: spawnResult.memoryBytes,
-      outputFiles: outputFiles.length > 0 ? outputFiles : undefined,
-    });
+  // A debug run has no test case of its own: it gets the shared input files and the `.fin/` of the
+  // first example case (the cases a learner may see), placed the way the judge does. Hidden cases'
+  // input files are never handed to learner code.
+  const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
+  if (testCases.shared?.fileInputPath) await copyTestCaseFileInput(testCases.shared.fileInputPath, cwd);
+  const exampleFileInputPath = testCases.find(
+    (testCase) => EXAMPLE_TEST_CASE_ID_PATTERN.test(testCase.id) && testCase.fileInputPath
+  )?.fileInputPath;
+  if (exampleFileInputPath) {
+    await copyTestCaseFileInput(exampleFileInputPath, cwd);
+  } else if (testCases.some((testCase) => testCase.fileInputPath)) {
+    console.error('debug: no example test case has input files, so the program runs without them');
   }
+
+  const timeoutSeconds = Math.max(DEBUG_DEFAULT_TIMEOUT_SECONDS, (problemMarkdownFrontMatter.timeLimitMs ?? 0) / 1000);
+
+  const command = languageDefinition.command(mainFilePath);
+
+  const spawnResult = spawnSyncWithTimeout(
+    command[0],
+    command.slice(1),
+    { cwd, encoding: 'utf8', input: params.stdin, env },
+    timeoutSeconds
+  );
+
+  const outputFiles = await readOutputFiles(cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
+
+  let decisionCode: DecisionCode = DecisionCode.ACCEPTED;
+
+  if (spawnResult.status !== 0) {
+    decisionCode = DecisionCode.RUNTIME_ERROR;
+  } else if (spawnResult.timeSeconds > timeoutSeconds) {
+    decisionCode = DecisionCode.TIME_LIMIT_EXCEEDED;
+  } else if (spawnResult.memoryBytes > (problemMarkdownFrontMatter.memoryLimitByte ?? Number.POSITIVE_INFINITY)) {
+    decisionCode = DecisionCode.MEMORY_LIMIT_EXCEEDED;
+  } else if (spawnResult.stdout.length > MAX_STDOUT_LENGTH || spawnResult.stderr.length > MAX_STDOUT_LENGTH) {
+    decisionCode = DecisionCode.OUTPUT_SIZE_LIMIT_EXCEEDED;
+  } else if (outputFiles.length < (problemMarkdownFrontMatter.requiredOutputFilePaths?.length ?? 0)) {
+    decisionCode = DecisionCode.MISSING_REQUIRED_OUTPUT_FILE_ERROR;
+  }
+
+  printTestCaseResult({
+    testCaseId: 'debug',
+    decisionCode,
+    exitStatus: spawnResult.status ?? undefined,
+    stdin: params.stdin,
+    stdout: spawnResult.stdout.slice(0, MAX_STDOUT_LENGTH) || undefined,
+    stderr: spawnResult.stderr.slice(0, MAX_STDOUT_LENGTH) || undefined,
+    timeSeconds: spawnResult.timeSeconds,
+    memoryBytes: spawnResult.memoryBytes,
+    outputFiles: outputFiles.length > 0 ? outputFiles : undefined,
+  });
 }
