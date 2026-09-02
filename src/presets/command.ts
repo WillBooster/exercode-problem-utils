@@ -3,8 +3,7 @@ import path from 'node:path';
 import { z } from 'zod';
 
 import { cleanWorkingDirectory, snapshotWorkingDirectory } from '../helpers/cleanWorkingDirectory.js';
-import { compareExpectedOutputFiles, mergeComparisonOutputFiles } from '../helpers/compareExpectedOutputFiles.js';
-import { compareStdoutAsSpaceSeparatedTokens } from '../helpers/compareStdoutAsSpaceSeparatedTokens.js';
+import { judgeAgainstExpectations } from '../helpers/compareExpectedOutputFiles.js';
 import { copyTestCaseFileInput } from '../helpers/copyTestCaseFileInput.js';
 import { findEntryPointFile } from '../helpers/findEntryPointFile.js';
 import { findLanguageDefinitionByPath } from '../helpers/findLanguageDefinitionByPath.js';
@@ -42,14 +41,19 @@ const judgeParamsSchema = z.object({
 
 type JudgeParams = z.infer<typeof judgeParamsSchema>;
 
+/** What every command test case needs; a custom `readTestCases` may add any fields of its own. */
 interface BaseCommandTestCase {
   id: string;
   /** Standard input (`test_cases/<id>.in`). */
   input?: string;
-  /** Expected standard output (`test_cases/<id>.out`). */
-  output?: string;
   /** Directory copied into the working directory before the run (`test_cases/<id>.fin/`). */
   fileInputPath?: string;
+}
+
+/** A test case read from `test_cases/` by the default reader. */
+export interface CommandTestCase extends BaseCommandTestCase {
+  /** Expected standard output (`test_cases/<id>.out`). */
+  output?: string;
   /** Directory of expected output files compared after the run (`test_cases/<id>.fout/`). */
   fileOutputPath?: string;
 }
@@ -85,7 +89,7 @@ interface ResolvedCommandProblem<TTestCase extends BaseCommandTestCase> {
 }
 
 export interface CommandJudgePresetOptions<
-  TTestCase extends BaseCommandTestCase = BaseCommandTestCase,
+  TTestCase extends BaseCommandTestCase = CommandTestCase,
   TRunResult extends CommandRunResult = CommandRunResult,
 > {
   /**
@@ -185,7 +189,7 @@ export interface CommandJudgePresetOptions<
  * ```
  */
 export async function commandJudgePreset<
-  TTestCase extends BaseCommandTestCase = BaseCommandTestCase,
+  TTestCase extends BaseCommandTestCase = CommandTestCase,
   TRunResult extends CommandRunResult = CommandRunResult,
 >(problemDir: string, options: CommandJudgePresetOptions<TTestCase, TRunResult> = {}): Promise<void> {
   const args = parseArgs(process.argv);
@@ -468,7 +472,7 @@ function errorToMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function readCommandTestCases<TTestCase extends BaseCommandTestCase = BaseCommandTestCase>(
+async function readCommandTestCases<TTestCase extends BaseCommandTestCase = CommandTestCase>(
   problemDir: string
 ): Promise<readonly TTestCase[]> {
   // The default reader yields the base shape; a narrower TTestCase must come from `options.readTestCases`.
@@ -476,23 +480,23 @@ async function readCommandTestCases<TTestCase extends BaseCommandTestCase = Base
 }
 
 /** The default verdict: `.out` decides stdout and `.fout/` decides output files; either may be absent. */
+/** The default verdict for the default reader's cases; a custom case type carries no `.out`/`.fout/` expectation. */
 async function compareWithExpectedOutputs(context: {
-  testCase: BaseCommandTestCase;
+  testCase: BaseCommandTestCase & Partial<CommandTestCase>;
   runResult: CommandRunResult;
   outputFiles: NonNullable<TestCaseResult['outputFiles']>;
   cwd: string;
 }): Promise<Partial<CommandJudgeCaseResult>> {
   const { testCase, runResult, outputFiles, cwd } = context;
-  // Check stdout and files independently so a result carries every mismatch, not just the first.
-  const stdoutMatches =
-    testCase.output === undefined || compareStdoutAsSpaceSeparatedTokens(runResult.stdout, testCase.output);
-  let filesMatch = true;
-  if (testCase.fileOutputPath !== undefined) {
-    const comparison = await compareExpectedOutputFiles(cwd, testCase.fileOutputPath);
-    filesMatch = comparison.matches;
-    if (!filesMatch) outputFiles.splice(0, outputFiles.length, ...mergeComparisonOutputFiles(outputFiles, comparison));
-  }
-  return stdoutMatches && filesMatch ? {} : { decisionCode: DecisionCode.WRONG_ANSWER };
+  const judgement = await judgeAgainstExpectations({
+    stdout: runResult.stdout,
+    expectedStdout: typeof testCase.output === 'string' ? testCase.output : undefined,
+    fileOutputPath: typeof testCase.fileOutputPath === 'string' ? testCase.fileOutputPath : undefined,
+    cwd,
+    outputFiles,
+  });
+  outputFiles.splice(0, outputFiles.length, ...judgement.outputFiles);
+  return judgement.matches ? {} : { decisionCode: DecisionCode.WRONG_ANSWER };
 }
 
 function runCommand(

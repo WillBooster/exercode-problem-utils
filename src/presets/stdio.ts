@@ -1,12 +1,10 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 
 import { z } from 'zod';
 
 import { cleanWorkingDirectory, snapshotWorkingDirectory } from '../helpers/cleanWorkingDirectory.js';
-import { compareExpectedOutputFiles, mergeComparisonOutputFiles } from '../helpers/compareExpectedOutputFiles.js';
-import { compareStdoutAsSpaceSeparatedTokens } from '../helpers/compareStdoutAsSpaceSeparatedTokens.js';
+import { judgeAgainstExpectations } from '../helpers/compareExpectedOutputFiles.js';
 import { copyTestCaseFileInput } from '../helpers/copyTestCaseFileInput.js';
 import { findEntryPointFile } from '../helpers/findEntryPointFile.js';
 import { findLanguageDefinitionByPath } from '../helpers/findLanguageDefinitionByPath.js';
@@ -14,12 +12,11 @@ import { judgeByStaticAnalysis } from '../helpers/judgeByStaticAnalysis.js';
 import { parseArgs } from '../helpers/parseArgs.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readOutputFiles } from '../helpers/readOutputFiles.js';
-import { copyWithoutFollowingSymlinks } from '../helpers/safeFs.js';
 import { makeAccessibleToSandboxUser } from '../helpers/sandboxUser.js';
 import { judgesWithoutTestCases, readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases } from '../helpers/readTestCases.js';
 import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
-import { forciblyRemoveDirectory } from '../helpers/temporaryProblemDirCopy.js';
+import { copyProblemDirToTemporaryRoot, forciblyRemoveDirectory } from '../helpers/temporaryProblemDirCopy.js';
 import { DecisionCode } from '../types/decisionCode.js';
 
 const BUILD_TIMEOUT_SECONDS = 10;
@@ -221,17 +218,15 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
     } else if (outputFiles.length < (problemMarkdownFrontMatter.requiredOutputFilePaths?.length ?? 0)) {
       decisionCode = DecisionCode.MISSING_REQUIRED_OUTPUT_FILE_ERROR;
     } else {
-      // Check stdout and files independently so a result carries every mismatch, not just the first.
-      if (testCase.output !== undefined && !compareStdoutAsSpaceSeparatedTokens(spawnResult.stdout, testCase.output)) {
-        decisionCode = DecisionCode.WRONG_ANSWER;
-      }
-      if (testCase.fileOutputPath) {
-        const comparison = await compareExpectedOutputFiles(args.cwd, testCase.fileOutputPath);
-        if (!comparison.matches) {
-          decisionCode = DecisionCode.WRONG_ANSWER;
-          outputFiles = mergeComparisonOutputFiles(outputFiles, comparison);
-        }
-      }
+      const judgement = await judgeAgainstExpectations({
+        stdout: spawnResult.stdout,
+        expectedStdout: testCase.output,
+        fileOutputPath: testCase.fileOutputPath,
+        cwd: args.cwd,
+        outputFiles,
+      });
+      if (!judgement.matches) decisionCode = DecisionCode.WRONG_ANSWER;
+      outputFiles = judgement.outputFiles;
     }
 
     printTestCaseResult({
@@ -281,12 +276,13 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
 
   // Everything (build, input files, run) happens in a disposable copy of the answer directory, so
   // the developer's files are never touched and whatever the submission leaves behind goes with it.
-  const cwd = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'exercode-debug-'));
+  // The copy keeps the directory hierarchy and links every ancestor `node_modules`, so packages the
+  // answer resolves from its parents still resolve.
+  const { tempRoot, copiedProblemDir: cwd } = await copyProblemDirToTemporaryRoot(args.cwd);
   try {
-    await copyWithoutFollowingSymlinks(args.cwd, cwd);
     await debugInTemporaryCopy(problemDir, cwd, params);
   } finally {
-    await forciblyRemoveDirectory(cwd);
+    await forciblyRemoveDirectory(tempRoot);
   }
 }
 

@@ -48,6 +48,11 @@ export async function compareExpectedOutputFiles(
     }))
     .toSorted((a, b) => (a.relativePath < b.relativePath ? -1 : a.relativePath > b.relativePath ? 1 : 0));
   for (const { absolutePath, relativePath } of expectedFiles) {
+    // A larger expectation could never be matched by a received file, so it is an authoring error.
+    const expectedStats = await fs.promises.stat(absolutePath);
+    if (expectedStats.size > MAX_COMPARED_FILE_BYTES) {
+      throw new Error(`expected output file ${relativePath} exceeds ${MAX_COMPARED_FILE_BYTES} bytes`);
+    }
     const expected = await fs.promises.readFile(absolutePath);
     const received = await readReceivedFile(cwd, path.join(cwd, relativePath));
     if (received && fileContentsMatch(expected, received)) continue;
@@ -62,6 +67,32 @@ export async function compareExpectedOutputFiles(
     }
   }
   return { matches: mismatchedPaths.length === 0, mismatchedPaths, outputFiles };
+}
+
+/**
+ * The default verdict of the presets: `.out` decides stdout and `.fout/` decides output files, both
+ * checked so a result carries every mismatch; either expectation may be absent. Returns whether the
+ * run matched and the output files to report (the plain copies of mismatched required output files
+ * replaced by their comparison pairs).
+ */
+export async function judgeAgainstExpectations(context: {
+  stdout: string;
+  expectedStdout: string | undefined;
+  fileOutputPath: string | undefined;
+  cwd: string;
+  outputFiles: readonly OutputFile[];
+}): Promise<{ matches: boolean; outputFiles: OutputFile[] }> {
+  const { stdout, expectedStdout, fileOutputPath, cwd } = context;
+  let outputFiles = [...context.outputFiles];
+  let matches = expectedStdout === undefined || compareStdoutAsSpaceSeparatedTokens(stdout, expectedStdout);
+  if (fileOutputPath !== undefined) {
+    const comparison = await compareExpectedOutputFiles(cwd, fileOutputPath);
+    if (!comparison.matches) {
+      matches = false;
+      outputFiles = mergeComparisonOutputFiles(outputFiles, comparison);
+    }
+  }
+  return { matches, outputFiles };
 }
 
 /**

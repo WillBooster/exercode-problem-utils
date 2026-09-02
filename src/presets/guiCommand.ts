@@ -46,14 +46,19 @@ const judgeParamsSchema = z.object({
   language: z.union([z.string(), z.array(z.string())]).optional(),
 });
 
+/** What every GUI test case needs; a custom `readTestCases` may add any fields of its own. */
 interface BaseGuiTestCase {
   id: string;
   /** Standard input (`test_cases/<id>.in`). */
   input?: string;
-  /** Expected standard output (`test_cases/<id>.out`), for the problem's `test` to compare. */
-  output?: string;
   /** Directory copied into the working directory before the run (`test_cases/<id>.fin/`). */
   fileInputPath?: string;
+}
+
+/** A test case read from `test_cases/` by the default reader. */
+export interface GuiTestCase extends BaseGuiTestCase {
+  /** Expected standard output (`test_cases/<id>.out`), for the problem's `test` to compare. */
+  output?: string;
   /** Directory of expected output files (`test_cases/<id>.fout/`), for the problem's `test` to compare. */
   fileOutputPath?: string;
 }
@@ -85,7 +90,7 @@ type GuiJudgeCaseResult = Pick<
   'decisionCode' | 'feedbackMarkdown' | 'stderr' | 'stdout' | 'outputFiles'
 >;
 
-export interface GuiCommandJudgePresetOptions<TTestCase extends BaseGuiTestCase = BaseGuiTestCase> {
+export interface GuiCommandJudgePresetOptions<TTestCase extends BaseGuiTestCase = GuiTestCase> {
   mainFilePath?: string;
   runTimeoutSeconds?: number;
   screenshotWaitSeconds?: number;
@@ -170,7 +175,7 @@ export interface GuiCommandJudgePresetOptions<TTestCase extends BaseGuiTestCase 
  * });
  * ```
  */
-export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = BaseGuiTestCase>(
+export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = GuiTestCase>(
   problemDir: string,
   options: GuiCommandJudgePresetOptions<TTestCase>
 ): Promise<void> {
