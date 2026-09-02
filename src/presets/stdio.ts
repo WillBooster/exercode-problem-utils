@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 import { z } from 'zod';
@@ -13,6 +14,7 @@ import { judgeByStaticAnalysis } from '../helpers/judgeByStaticAnalysis.js';
 import { parseArgs } from '../helpers/parseArgs.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readOutputFiles } from '../helpers/readOutputFiles.js';
+import { copyWithoutFollowingSymlinks } from '../helpers/safeFs.js';
 import { makeAccessibleToSandboxUser } from '../helpers/sandboxUser.js';
 import { judgesWithoutTestCases, readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases } from '../helpers/readTestCases.js';
@@ -255,9 +257,9 @@ async function hasExpectedFiles(fileOutputPath: string | undefined): Promise<boo
 }
 
 /**
- * A preset debug function using stdin and stdout as test cases. Files under `_shared.fin/` and the
- * first test case's `.fin/` are copied into the working directory before the run (existing files are
- * kept) and removed afterwards; files the program writes stay.
+ * A preset debug function using stdin and stdout as test cases. The program runs in a temporary copy
+ * of the answer directory that also holds `_shared.fin/` and the first test case's `.fin/`; files it
+ * writes are reported only through `requiredOutputFilePaths`.
  *
  * A standard stdio problem must NOT commit a `debug.ts` that only calls this preset: the Exercode
  * server applies this preset automatically when `debug.ts` is absent, and committed copies would
@@ -370,17 +372,17 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
     }
   }
 
-  // The entry point is resolved and built above, so a copied input file can never be taken for the
-  // program. A debug run has no test case of its own: it gets the shared input files and the input
-  // files of the first test case (the sorted order puts `example_*` before `test_*`). This is the
-  // developer's own answer directory, so existing files are kept and only the copies are removed.
-  const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
-  const copiedInputPaths = await copyDebugInputFiles(
-    [testCases.shared?.fileInputPath, testCases[0]?.fileInputPath].filter((dir) => dir !== undefined),
-    args.cwd
-  );
+  // A debug run works on a temporary copy of the built answer directory: the shared input files and
+  // the first test case's `.fin/` (the sorted order puts `example_*` before `test_*`) are placed the
+  // way the judge does, the developer's files are never touched, and nothing is left behind.
+  const runCwd = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'exercode-debug-'));
+  try {
+    await copyWithoutFollowingSymlinks(args.cwd, runCwd);
+    makeAccessibleToSandboxUser(runCwd);
+    const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
+    if (testCases.shared?.fileInputPath) await copyTestCaseFileInput(testCases.shared.fileInputPath, runCwd);
+    if (testCases[0]?.fileInputPath) await copyTestCaseFileInput(testCases[0].fileInputPath, runCwd);
 
-  {
     const timeoutSeconds = Math.max(
       DEBUG_DEFAULT_TIMEOUT_SECONDS,
       (problemMarkdownFrontMatter.timeLimitMs ?? 0) / 1000
@@ -391,11 +393,11 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
     const spawnResult = spawnSyncWithTimeout(
       command[0],
       command.slice(1),
-      { cwd: args.cwd, encoding: 'utf8', input: params.stdin, env },
+      { cwd: runCwd, encoding: 'utf8', input: params.stdin, env },
       timeoutSeconds
     );
 
-    const outputFiles = await readOutputFiles(args.cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
+    const outputFiles = await readOutputFiles(runCwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
 
     let decisionCode: DecisionCode = DecisionCode.ACCEPTED;
 
@@ -422,30 +424,7 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
       memoryBytes: spawnResult.memoryBytes,
       outputFiles: outputFiles.length > 0 ? outputFiles : undefined,
     });
-
-    await Promise.all(copiedInputPaths.map((copiedPath) => fs.promises.rm(copiedPath, { force: true })));
+  } finally {
+    await fs.promises.rm(runCwd, { recursive: true, force: true });
   }
-}
-
-/** Copy input files for a debug run without overwriting the developer's files; returns the copied paths. */
-async function copyDebugInputFiles(sourceDirectories: string[], cwd: string): Promise<string[]> {
-  const copiedPaths: string[] = [];
-  for (const sourceDirectory of sourceDirectories) {
-    const dirents = await fs.promises.readdir(sourceDirectory, { withFileTypes: true, recursive: true });
-    for (const dirent of dirents) {
-      if (!dirent.isFile()) continue;
-      const sourcePath = path.join(dirent.parentPath, dirent.name);
-      const relativePath = path.relative(sourceDirectory, sourcePath);
-      const destinationPath = path.join(cwd, relativePath);
-      if (fs.existsSync(destinationPath)) {
-        console.error(`debug: keeping the existing ${relativePath} instead of the test case's input file`);
-        continue;
-      }
-      await fs.promises.mkdir(path.dirname(destinationPath), { recursive: true });
-      await fs.promises.copyFile(sourcePath, destinationPath);
-      copiedPaths.push(destinationPath);
-    }
-  }
-  if (copiedPaths.length > 0) makeAccessibleToSandboxUser(cwd);
-  return copiedPaths;
 }

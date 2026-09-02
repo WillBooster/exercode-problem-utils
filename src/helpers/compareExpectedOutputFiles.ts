@@ -39,15 +39,16 @@ export async function compareExpectedOutputFiles(
   const mismatchedPaths: string[] = [];
   const outputFiles: OutputFile[] = [];
   const dirents = await fs.promises.readdir(fileOutputPath, { withFileTypes: true, recursive: true });
-  for (const dirent of dirents.toSorted((a, b) => a.name.localeCompare(b.name))) {
-    if (!dirent.isFile()) continue;
-
-    // POSIX separators: `requiredOutputFilePaths` and the result format use them on every platform.
-    const relativePath = path.posix.join(
-      ...path.relative(fileOutputPath, dirent.parentPath).split(path.sep),
-      dirent.name
-    );
-    const expected = await fs.promises.readFile(path.join(dirent.parentPath, dirent.name));
+  const expectedFiles = dirents
+    .filter((dirent) => dirent.isFile())
+    .map((dirent) => ({
+      absolutePath: path.join(dirent.parentPath, dirent.name),
+      // POSIX separators: `requiredOutputFilePaths` and the result format use them on every platform.
+      relativePath: path.posix.join(...path.relative(fileOutputPath, dirent.parentPath).split(path.sep), dirent.name),
+    }))
+    .toSorted((a, b) => (a.relativePath < b.relativePath ? -1 : a.relativePath > b.relativePath ? 1 : 0));
+  for (const { absolutePath, relativePath } of expectedFiles) {
+    const expected = await fs.promises.readFile(absolutePath);
     const received = await readReceivedFile(cwd, path.join(cwd, relativePath));
     if (received && fileContentsMatch(expected, received)) continue;
 
@@ -71,10 +72,14 @@ export function mergeComparisonOutputFiles(
   outputFiles: readonly OutputFile[],
   comparison: ExpectedOutputFilesComparison
 ): OutputFile[] {
-  // A kept file literally named like a pair entry (e.g. `a_received.txt`) would make the path ambiguous.
   const comparisonPaths = new Set(comparison.outputFiles.map((file) => file.path));
+  // The plain copy gives way to its `_received` entry; a mismatch too large for a pair keeps the
+  // plain copy, and a kept file literally named like a pair entry would make the path ambiguous.
+  const replacedPaths = new Set(
+    comparison.mismatchedPaths.filter((filePath) => comparisonPaths.has(toComparisonPath(filePath, 'received')))
+  );
   return [
-    ...outputFiles.filter((file) => !comparison.mismatchedPaths.includes(file.path) && !comparisonPaths.has(file.path)),
+    ...outputFiles.filter((file) => !replacedPaths.has(file.path) && !comparisonPaths.has(file.path)),
     ...comparison.outputFiles,
   ];
 }

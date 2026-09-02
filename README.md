@@ -52,7 +52,7 @@ How a missing expectation is treated depends on the harness:
 - `commandJudgePreset` without a `test` option checks whatever expectations exist, and a test case with neither only has to run within the limits. A `test` option replaces that comparison; it receives `testCase.output` and `testCase.fileOutputPath` and can call the exported `compareStdoutAsSpaceSeparatedTokens` and `compareExpectedOutputFiles`.
 - `guiCommandJudgePreset` passes the expectations to the problem's `test`, which decides everything.
 - `llmJudgePreset` runs no program, so it copies no `.fin/`; it hands `<id>.in` as the prompt input and the whole entry (including `fileOutputPath`) to the problem's `test`.
-- `stdioDebugPreset` copies `_shared.fin/` and the first test case's `.fin/` into the working directory before the debug run.
+- `stdioDebugPreset` runs the program in a temporary copy of the answer directory that also holds `_shared.fin/` and the first test case's `.fin/` (the case's files win), so the answer directory is left untouched; files the program writes are reported only through `requiredOutputFilePaths`.
 - `evaluationJudgePreset` does not use `test_cases/`.
 
 `readTestCases` is exported for harnesses that enumerate `test_cases/` themselves.
