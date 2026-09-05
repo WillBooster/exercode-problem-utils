@@ -206,6 +206,15 @@ describe('validateCourseDirectory', () => {
     expect(conflictResult.errors).toEqual([expect.stringContaining('both course.yaml and course.yml exist')]);
   });
 
+  test('rejects a symbolic link used as the course directory', async () => {
+    const tempDir = await createTempDir();
+    await symlink(validCourseDir, join(tempDir, 'example_course'));
+    const result = await validateCourseDirectory(join(tempDir, 'example_course'), {
+      problemsDirectoryPath: problemsDir,
+    });
+    expect(result.errors).toEqual([expect.stringContaining('course directory is a symbolic link')]);
+  });
+
   test('rejects a course.yaml symbolic link', async () => {
     const courseDir = await copyCourseFixture();
     await rename(join(courseDir, 'course.yaml'), join(courseDir, 'course.real.yaml'));

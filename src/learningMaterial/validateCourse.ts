@@ -1,7 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { isDirectory, isFile, isRegularFile } from './fsHelpers.js';
+import { isDirectory, isFile, isRegularDirectory, isRegularFile } from './fsHelpers.js';
 import {
   CONTEST_MATERIAL_FILE_SUFFIX,
   courseFileSchema,
@@ -27,8 +27,13 @@ export async function validateCourseDirectory(
   const result = { errors, warnings };
 
   const absoluteDirectoryPath = resolve(courseDirectoryPath);
-  if (!(await isDirectory(absoluteDirectoryPath))) {
-    errors.push(`course directory not found: ${courseDirectoryPath}`);
+  // Course discovery does not traverse a symbolic link, so a linked course directory is never imported.
+  if (!(await isRegularDirectory(absoluteDirectoryPath))) {
+    errors.push(
+      (await isDirectory(absoluteDirectoryPath))
+        ? `course directory is a symbolic link, which the judge does not traverse: ${courseDirectoryPath}`
+        : `course directory not found: ${courseDirectoryPath}`
+    );
     return result;
   }
   const courseId = basename(absoluteDirectoryPath);

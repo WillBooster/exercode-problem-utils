@@ -13,7 +13,14 @@ import { EXAMPLE_TEST_CASE_ID_PATTERN, MAX_STDOUT_LENGTH } from '../helpers/stdi
 import { type CodeRule, normalizeCodeRule } from '../types/problem.js';
 
 import { parseFrontmatter } from './frontmatter.js';
-import { isDirectory, isFile, isRegularFile, readSourceFilesRecursively, type SourceFile } from './fsHelpers.js';
+import {
+  isDirectory,
+  isFile,
+  isRegularDirectory,
+  isRegularFile,
+  readSourceFilesRecursively,
+  type SourceFile,
+} from './fsHelpers.js';
 import {
   availableLanguageIds,
   LEARNING_MATERIAL_ID_REGEX,
@@ -71,8 +78,13 @@ export async function validateProblemDirectory(problemDirectoryPath: string): Pr
   const result = { errors, warnings };
 
   const absoluteDirectoryPath = resolve(problemDirectoryPath);
-  if (!(await isDirectory(absoluteDirectoryPath))) {
-    errors.push(`problem directory not found: ${problemDirectoryPath}`);
+  // Problem discovery does not traverse a symbolic link, so a linked problem directory is never imported.
+  if (!(await isRegularDirectory(absoluteDirectoryPath))) {
+    errors.push(
+      (await isDirectory(absoluteDirectoryPath))
+        ? `problem directory is a symbolic link, which the judge does not traverse: ${problemDirectoryPath}`
+        : `problem directory not found: ${problemDirectoryPath}`
+    );
     return result;
   }
 
