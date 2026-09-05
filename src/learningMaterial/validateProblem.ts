@@ -354,11 +354,11 @@ async function readFileTestCases(
         );
       }
     }
-    // The stdio judge rejects a run whose raw stdout exceeds the limit, and a program prints at least
-    // a trailing newline after the trimmed expectation, so an expectation at the limit can never match.
-    if (testCase.stdout !== undefined && testCase.stdout.length >= MAX_STDOUT_LENGTH) {
+    // The stdio judge rejects a run whose raw stdout exceeds the limit, so a longer expectation can
+    // never match (a program may still print exactly the limit without a trailing newline).
+    if (testCase.stdout !== undefined && testCase.stdout.length > MAX_STDOUT_LENGTH) {
       errors.push(
-        `test case ${testCase.id}: .out is too large (length: ${testCase.stdout.length}); the stdio judge rejects a run that prints ${MAX_STDOUT_LENGTH} or more characters`
+        `test case ${testCase.id}: .out is too large (length: ${testCase.stdout.length}); the stdio judge rejects a run that prints more than ${MAX_STDOUT_LENGTH} characters`
       );
     }
     // The judge accepts an empty `.out` (the program must print nothing or an empty line), but it is
