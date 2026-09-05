@@ -44,6 +44,14 @@ describe('validateContestFile', () => {
     expect(malformedResult.errors).toEqual([expect.stringContaining('adminEmails')]);
   });
 
+  test('checks references against a supplied set of problem IDs without a problems directory', async () => {
+    const result = await validateContestFile(validContestPath, { availableProblemIds: new Set(['a_plus_b']) });
+    expect(result.errors).toEqual([
+      expect.stringContaining('problem "arithmetic_subtraction" is referenced but does not exist'),
+    ]);
+    expect(result.warnings).toEqual([]);
+  });
+
   test('rejects a file name without the .contest.yaml suffix', async () => {
     const contestPath = await copyContestFixture('sample_contest.yaml');
     const result = await validateContestFile(contestPath);

@@ -87,26 +87,29 @@ export async function validateContestFile(
     errors
   );
 
-  if (options.problemsDirectoryPath === undefined) {
-    if (!options.isNestedInCourse) {
-      warnings.push('no problems directory given (pass --problems-dir); problem references are not checked');
-    }
-  } else if (!(await isRegularDirectory(options.problemsDirectoryPath))) {
-    errors.push(
-      (await isDirectory(options.problemsDirectoryPath))
-        ? `problems directory is a symbolic link, which the judge does not traverse: ${options.problemsDirectoryPath}`
-        : `problems directory not found: ${options.problemsDirectoryPath}`
-    );
-  } else {
-    let availableProblemIds = options.availableProblemIds;
-    if (availableProblemIds === undefined) {
+  let availableProblemIds = options.availableProblemIds;
+  if (availableProblemIds === undefined) {
+    if (options.problemsDirectoryPath === undefined) {
+      if (!options.isNestedInCourse) {
+        warnings.push('no problems directory given (pass --problems-dir); problem references are not checked');
+      }
+    } else if (!(await isRegularDirectory(options.problemsDirectoryPath))) {
+      errors.push(
+        (await isDirectory(options.problemsDirectoryPath))
+          ? `problems directory is a symbolic link, which the judge does not traverse: ${options.problemsDirectoryPath}`
+          : `problems directory not found: ${options.problemsDirectoryPath}`
+      );
+    } else {
       const definitionPathsById = await collectProblemDefinitions(options.problemsDirectoryPath);
       reportProblemDefinitionIssues(definitionPathsById, errors);
       availableProblemIds = new Set(definitionPathsById.keys());
     }
+  }
+  if (availableProblemIds !== undefined) {
+    const location = options.problemsDirectoryPath === undefined ? '' : ` under ${options.problemsDirectoryPath}`;
     for (const problem of parsed.data.problems) {
       if (!availableProblemIds.has(problem.id)) {
-        errors.push(`problem "${problem.id}" is referenced but does not exist under ${options.problemsDirectoryPath}`);
+        errors.push(`problem "${problem.id}" is referenced but does not exist${location}`);
       }
     }
   }
