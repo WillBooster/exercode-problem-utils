@@ -86,6 +86,10 @@ const uniqueOptionsSchema = z
   .min(1)
   .refine((options) => options.length === new Set(options).size, { error: 'options must contain unique values' });
 
+// A quoted index is coerced like the judge does, but a non-numeric string is a schema error rather
+// than a NaN that would surface as an out-of-bounds index.
+const answerIndexStringSchema = z.string().transform(Number).pipe(z.number().int().nonnegative());
+
 const questionBaseShape = {
   id: learningMaterialIdSchema,
   isResubmittable: z.boolean().optional(),
@@ -101,12 +105,9 @@ const selectQuestionShape = {
   answerIndex: z
     .union([
       z.number().int().nonnegative(),
-      z.string().transform(Number),
+      answerIndexStringSchema,
       z.number().int().nonnegative().array(),
-      z
-        .string()
-        .array()
-        .transform((values) => values.map(Number)),
+      answerIndexStringSchema.array(),
     ])
     .optional(),
 } as const;
@@ -115,15 +116,7 @@ const selectMultipleQuestionShape = {
   ...questionBaseShape,
   type: z.literal('select_multiple'),
   options: uniqueOptionsSchema,
-  answerIndices: z
-    .union([
-      z.number().int().nonnegative().array(),
-      z
-        .string()
-        .array()
-        .transform((values) => values.map(Number)),
-    ])
-    .optional(),
+  answerIndices: z.union([z.number().int().nonnegative().array(), answerIndexStringSchema.array()]).optional(),
 } as const;
 
 const textQuestionShape = {

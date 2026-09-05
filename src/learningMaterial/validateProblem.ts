@@ -125,22 +125,25 @@ export async function validateProblemDirectory(problemDirectoryPath: string): Pr
   validateHarnessFiles(harness, frontmatter !== undefined, errors, warnings);
 
   const modelAnswers = await readModelAnswers(absoluteDirectoryPath, errors, warnings);
-  // Whitespace-only files do not make an answer usable. A custom judge defines what it runs (e.g.
-  // a CSV submission), while the stdio judge needs a file of a supported language as its entry point.
-  const usableModelAnswers = modelAnswers.filter((answer) => answer.files.some((file) => file.data.trim().length > 0));
-  const hasRunnableModelAnswer = usableModelAnswers.some((answer) =>
-    answer.files.some((file) => findLanguageDefinitionByPath(file.path) !== undefined && file.data.trim().length > 0)
-  );
-  if (isScoredAutomatically) {
-    if (usableModelAnswers.length === 0) {
+  // Every model answer directory is judged by the all-problem check, so each one must hold what
+  // its judge runs: a custom judge defines that itself (e.g. a CSV submission), while the stdio
+  // judge needs a non-empty file of a supported language as its entry point.
+  const usableModelAnswers = modelAnswers.filter((answer) => {
+    const hasContent = answer.files.some((file) => file.data.trim().length > 0);
+    const isRunnable = answer.files.some(
+      (file) => findLanguageDefinitionByPath(file.path) !== undefined && file.data.trim().length > 0
+    );
+    if (!hasContent) {
+      errors.push(`model answer directory "${answer.id}" has only empty files; add the answer or delete it`);
+    } else if (!harness.hasCustomJudgeTs && !isRunnable) {
       errors.push(
-        'no model answers found; add at least one model_answers/<languageId>/ directory with non-empty files'
-      );
-    } else if (!harness.hasCustomJudgeTs && !hasRunnableModelAnswer) {
-      errors.push(
-        'no model answer has a source file of a supported language, which the stdio judge needs as its entry point'
+        `model answer directory "${answer.id}" has no source file of a supported language, which the stdio judge needs as its entry point`
       );
     }
+    return hasContent;
+  });
+  if (isScoredAutomatically && modelAnswers.length === 0) {
+    errors.push('no model answers found; add at least one model_answers/<languageId>/ directory with non-empty files');
   }
   if (frontmatter) {
     validateCodePatterns(frontmatter, usableModelAnswers, errors, warnings);

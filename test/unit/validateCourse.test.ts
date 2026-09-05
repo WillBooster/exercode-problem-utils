@@ -107,6 +107,13 @@ describe('validateCourseDirectory', () => {
     expect(result.errors).toEqual([expect.stringContaining('answerIndex out of bounds: 5')]);
   });
 
+  test('rejects a non-numeric answerIndex as a schema error', async () => {
+    const courseDir = await copyCourseFixture();
+    await replaceInMaterial(courseDir, 'answerIndex: 0', "answerIndex: 'abc'");
+    const result = await validateCourse(courseDir);
+    expect(result.errors).toEqual([expect.stringContaining('question block 1: answerIndex')]);
+  });
+
   test('rejects a select question without answerIndex when it is not a survey', async () => {
     const courseDir = await copyCourseFixture();
     await replaceInMaterial(courseDir, 'answerIndex: 0\n', '');

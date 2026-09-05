@@ -506,7 +506,7 @@ describe('validateProblemDirectory', () => {
     await writeFile(join(problemDir, 'model_answers', 'python', 'README.md'), '# notes\n');
     const result = await validateProblemDirectory(problemDir);
     expect(result.errors).toEqual([
-      expect.stringContaining('no model answer has a source file of a supported language'),
+      expect.stringContaining('model answer directory "python" has no source file of a supported language'),
     ]);
   });
 
