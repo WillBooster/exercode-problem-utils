@@ -167,6 +167,16 @@ describe('validateCourseDirectory', () => {
     expect(result.errors).toEqual([]);
   });
 
+  test('accepts course.yml and rejects it next to course.yaml', async () => {
+    const courseDir = await copyCourseFixture();
+    await rename(join(courseDir, 'course.yaml'), join(courseDir, 'course.yml'));
+    const result = await validateCourse(courseDir);
+    expect(result.errors).toEqual([]);
+    await cp(join(courseDir, 'course.yml'), join(courseDir, 'course.yaml'));
+    const conflictResult = await validateCourse(courseDir);
+    expect(conflictResult.errors).toEqual([expect.stringContaining('both course.yaml and course.yml exist')]);
+  });
+
   test('rejects a course.yaml symbolic link', async () => {
     const courseDir = await copyCourseFixture();
     await rename(join(courseDir, 'course.yaml'), join(courseDir, 'course.real.yaml'));

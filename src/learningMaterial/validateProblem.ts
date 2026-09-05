@@ -80,6 +80,13 @@ export async function validateProblemDirectory(problemDirectoryPath: string): Pr
   }
   // The judge's front-matter reader takes the first `problem.md` or `*.problem.md` it finds, so a
   // leftover v1 file can be judged instead of problem.md.
+  // The judge readers enumerate regular files and directories only, so a symbolic link anywhere in
+  // the problem is ignored at import time and would silently drop or change what is judged.
+  for (const linkPath of await listSymbolicLinks(absoluteDirectoryPath)) {
+    errors.push(
+      `${relative(absoluteDirectoryPath, linkPath)} is a symbolic link, which the judge ignores; commit a real file or directory`
+    );
+  }
   const problemDirents = await readdir(absoluteDirectoryPath, { withFileTypes: true });
   for (const dirent of problemDirents.toSorted((d1, d2) => d1.name.localeCompare(d2.name))) {
     if (dirent.isFile() && dirent.name.endsWith('.problem.md')) {
@@ -88,13 +95,11 @@ export async function validateProblemDirectory(problemDirectoryPath: string): Pr
   }
 
   const problemFilePath = join(absoluteDirectoryPath, 'problem.md');
-  // The judge discovers problems by their problem.md and skips symbolic links.
+  // The judge discovers problems by their problem.md and skips symbolic links (reported above).
   if (!(await isRegularFile(problemFilePath))) {
-    errors.push(
-      (await isFile(problemFilePath))
-        ? 'problem.md is a symbolic link, which the judge ignores; commit a regular file'
-        : 'problem.md not found; a v2 problem directory must contain problem.md'
-    );
+    if (!(await isFile(problemFilePath))) {
+      errors.push('problem.md not found; a v2 problem directory must contain problem.md');
+    }
     return result;
   }
 
@@ -243,13 +248,8 @@ async function readFileTestCases(
     return testCase;
   };
   for (const dirent of dirents.toSorted((d1, d2) => d1.name.localeCompare(d2.name))) {
-    // The judge readers enumerate real files and directories only, so a symlink would be ignored at judge time.
-    if (dirent.isSymbolicLink() && /\.(in|out|json|fin|fout)$/.test(dirent.name)) {
-      errors.push(
-        `test_cases/${dirent.name} is a symbolic link, which the judge ignores; commit a real file or directory`
-      );
-      continue;
-    }
+    // Symbolic links were already reported for the whole problem directory.
+    if (dirent.isSymbolicLink()) continue;
     // `_shared` is reserved: only `_shared.fin/` (a directory of inputs copied for every case) exists.
     if (dirent.name === SHARED_FILE_INPUT_NAME || dirent.name.startsWith(`${SHARED_FILE_INPUT_NAME}.`)) {
       if (dirent.name !== `${SHARED_FILE_INPUT_NAME}.fin`) {
@@ -402,6 +402,19 @@ async function readFileTestCases(
     }
   }
   return testCases;
+}
+
+async function listSymbolicLinks(directoryPath: string): Promise<string[]> {
+  const linkPaths: string[] = [];
+  for (const dirent of await readdir(directoryPath, { withFileTypes: true })) {
+    const entryPath = join(directoryPath, dirent.name);
+    if (dirent.isSymbolicLink()) {
+      linkPaths.push(entryPath);
+    } else if (dirent.isDirectory() && dirent.name !== 'node_modules') {
+      linkPaths.push(...(await listSymbolicLinks(entryPath)));
+    }
+  }
+  return linkPaths.toSorted((p1, p2) => p1.localeCompare(p2));
 }
 
 /** Lists the real files under a test case directory, leaving out generated artifacts like the importer. */

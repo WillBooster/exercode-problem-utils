@@ -97,16 +97,28 @@ async function reportOrphanLectureDirectories(
 }
 
 async function parseCourseFile(courseDirectoryPath: string, errors: string[]): Promise<CourseFile | undefined> {
-  const courseFilePath = join(courseDirectoryPath, 'course.yaml');
-  // The judge discovers courses by their course.yaml and skips symbolic links.
-  if (!(await isRegularFile(courseFilePath))) {
+  // The judge discovers courses by `course.yaml` or `course.yml` (rejecting a directory with both)
+  // and skips symbolic links.
+  const courseFileNames = ['course.yaml', 'course.yml'];
+  const presentFileNames: string[] = [];
+  for (const fileName of courseFileNames) {
+    if (await isRegularFile(join(courseDirectoryPath, fileName))) presentFileNames.push(fileName);
+  }
+  if (presentFileNames.length > 1) {
+    errors.push('both course.yaml and course.yml exist; the judge rejects the conflicting course files');
+    return undefined;
+  }
+  const courseFileName = presentFileNames[0];
+  if (courseFileName === undefined) {
+    const symlinkFileName = await findFirst(courseFileNames, (fileName) => isFile(join(courseDirectoryPath, fileName)));
     errors.push(
-      (await isFile(courseFilePath))
-        ? 'course.yaml is a symbolic link, which the judge ignores; commit a regular file'
-        : 'course.yaml not found'
+      symlinkFileName === undefined
+        ? 'course.yaml not found'
+        : `${symlinkFileName} is a symbolic link, which the judge ignores; commit a regular file`
     );
     return undefined;
   }
+  const courseFilePath = join(courseDirectoryPath, courseFileName);
   let rawContent: unknown;
   try {
     rawContent = parseYaml(await readFile(courseFilePath, 'utf8'));
@@ -120,6 +132,13 @@ async function parseCourseFile(courseDirectoryPath: string, errors: string[]): P
     return undefined;
   }
   return parsed.data;
+}
+
+async function findFirst<T>(items: readonly T[], predicate: (item: T) => Promise<boolean>): Promise<T | undefined> {
+  for (const item of items) {
+    if (await predicate(item)) return item;
+  }
+  return undefined;
 }
 
 async function resolveProblemsDirectoryPath(

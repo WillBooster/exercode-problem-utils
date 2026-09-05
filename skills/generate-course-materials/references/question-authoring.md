@@ -6,11 +6,11 @@ Embed each question as a fenced code block tagged `yaml question` inside the mat
 
 ## Question schema
 
-Every question needs `id` (unique within the material — course-wide uniqueness is a good habit but not required — matching `/^[0-9_a-z-]+$/`), `type`, and `question`. Optional common fields: `hint`, `explanation`, `isResubmittable`, `isSurvey`. Per-type fields (use no other fields):
+Every question needs `id` (unique within the material — course-wide uniqueness is a good habit but not required — matching `/^[0-9_a-z-]+$/`), `type`, and `question`. Optional common fields: `hint`, `explanation`, `isResubmittable`, `isSurvey` (a survey must omit `answerIndex` / `answerIndices` / `answerPattern`). Per-type fields (use no other fields):
 
 - `type: 'select'` (single choice): `options` (array of unique strings, min 1) and `answerIndex` (0-based number; use an array of numbers to accept multiple options as correct). `answerIndex` is required unless `isSurvey: true` and must be within the bounds of `options`.
 - `type: 'select_multiple'` (multiple choice): `options` and `answerIndices` (array of 0-based numbers, each within bounds).
-- `type: 'text'` (free text): `answerPattern` (a valid regex, implicitly anchored like the HTML `pattern` attribute: treated as `^(?:` ... `)$`) and optional `modelAnswer` (must match `answerPattern`). `answerPattern` is required unless `isSurvey: true`.
+- `type: 'text'` (free text): `answerPattern` (a valid regex, implicitly anchored like the HTML `pattern` attribute: treated as `^(?:` ... `)$`) and `modelAnswer` (must match `answerPattern`; required whenever `answerPattern` uses regex syntax, i.e. does not match itself literally, and optional otherwise). `answerPattern` is required unless `isSurvey: true`.
 
 Quote option strings with single quotes when they contain no escapes or single quotes.
 
