@@ -85,6 +85,20 @@ describe('validateCourseDirectory', () => {
     expect(result.errors).toEqual([]);
   });
 
+  test('still checks course-internal references when --problems-dir does not exist', async () => {
+    const courseDir = await copyCourseFixture();
+    const result = await validateCourseDirectory(courseDir, { problemsDirectoryPath: join(courseDir, 'missing') });
+    expect(result.errors).toEqual([expect.stringContaining('problems directory not found')]);
+    await appendFile(join(courseDir, 'lecture_1', '10_intro.md'), '\n[欠落](problems/missing_problem)\n');
+    const secondResult = await validateCourseDirectory(courseDir, {
+      problemsDirectoryPath: join(courseDir, 'missing'),
+    });
+    expect(secondResult.errors).toEqual([
+      expect.stringContaining('problems directory not found'),
+      expect.stringContaining('problem "missing_problem" is referenced but does not exist'),
+    ]);
+  });
+
   test('warns when --problems-dir points outside the course', async () => {
     const tempDir = await createTempDir();
     await cp(validCourseDir, join(tempDir, 'example_course'), { recursive: true });

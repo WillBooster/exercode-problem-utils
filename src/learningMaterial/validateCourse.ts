@@ -49,20 +49,8 @@ export async function validateCourseDirectory(
   }
 
   const parsedCourseFile = await parseCourseFile(absoluteDirectoryPath, errors);
-  const problemsDirectoryPath = await resolveProblemsDirectoryPath(absoluteDirectoryPath, options, errors, warnings);
-  let availableProblemIds: Set<string> | undefined;
-  if (problemsDirectoryPath !== undefined) {
-    // The judge always scopes every problem inside the course to it; an explicit directory outside
-    // the course only adds to that set (with the warning above).
-    const definitionPathsById = await collectProblemDefinitions(absoluteDirectoryPath);
-    reportProblemDefinitionIssues(definitionPathsById, errors);
-    availableProblemIds = new Set(definitionPathsById.keys());
-    if (relative(absoluteDirectoryPath, resolve(problemsDirectoryPath)).startsWith('..')) {
-      const extraDefinitionPathsById = await collectProblemDefinitions(problemsDirectoryPath);
-      reportProblemDefinitionIssues(extraDefinitionPathsById, errors);
-      for (const problemId of extraDefinitionPathsById.keys()) availableProblemIds.add(problemId);
-    }
-  }
+  const problemsDirectoryPath = options.problemsDirectoryPath ?? absoluteDirectoryPath;
+  const availableProblemIds = await collectAvailableProblemIds(absoluteDirectoryPath, options, errors, warnings);
 
   if (!parsedCourseFile) return result;
   const { courseFile, courseFileName } = parsedCourseFile;
@@ -177,39 +165,42 @@ async function findFirst<T>(items: readonly T[], predicate: (item: T) => Promise
   return undefined;
 }
 
-async function resolveProblemsDirectoryPath(
+/**
+ * The judge scopes every problem inside the course directory (at any depth) to the course, so the
+ * course is always searched; an explicit directory outside the course only adds to that set.
+ */
+async function collectAvailableProblemIds(
   courseDirectoryPath: string,
   options: CourseValidationOptions,
   errors: string[],
   warnings: string[]
-): Promise<string | undefined> {
-  // Problem discovery does not traverse a symbolic link, so a linked problems directory imports nothing.
-  if (options.problemsDirectoryPath !== undefined) {
-    if (!(await isRegularDirectory(options.problemsDirectoryPath))) {
-      errors.push(
-        (await isDirectory(options.problemsDirectoryPath))
-          ? `problems directory is a symbolic link, which the judge does not traverse: ${options.problemsDirectoryPath}`
-          : `problems directory not found: ${options.problemsDirectoryPath}`
-      );
-      return undefined;
-    }
-    if (relative(courseDirectoryPath, resolve(options.problemsDirectoryPath)).startsWith('..')) {
-      warnings.push(
-        `problems directory ${options.problemsDirectoryPath} is outside the course directory; Exercode links a material only to problems inside the course, so move them under the course`
-      );
-    }
-    return options.problemsDirectoryPath;
-  }
-  // Every problem inside the course directory, at any depth, imports as the course's problem (real
-  // courses keep some next to their materials), so the default scope is the whole course directory.
+): Promise<Set<string>> {
+  const definitionPathsById = await collectProblemDefinitions(courseDirectoryPath);
+  reportProblemDefinitionIssues(definitionPathsById, errors);
+  const availableProblemIds = new Set(definitionPathsById.keys());
+  // Discovery does not traverse a symbolic link, so a linked problems directory imports nothing.
   const courseProblemsDirectoryPath = join(courseDirectoryPath, 'problems');
   if (!(await isRegularDirectory(courseProblemsDirectoryPath)) && (await isDirectory(courseProblemsDirectoryPath))) {
     errors.push(
       `problems directory is a symbolic link, which the judge does not traverse: ${courseProblemsDirectoryPath}`
     );
-    return undefined;
   }
-  return courseDirectoryPath;
+  if (options.problemsDirectoryPath === undefined) return availableProblemIds;
+  if (!(await isRegularDirectory(options.problemsDirectoryPath))) {
+    errors.push(
+      (await isDirectory(options.problemsDirectoryPath))
+        ? `problems directory is a symbolic link, which the judge does not traverse: ${options.problemsDirectoryPath}`
+        : `problems directory not found: ${options.problemsDirectoryPath}`
+    );
+  } else if (relative(courseDirectoryPath, resolve(options.problemsDirectoryPath)).startsWith('..')) {
+    warnings.push(
+      `problems directory ${options.problemsDirectoryPath} is outside the course directory; Exercode links a material only to problems inside the course, so move them under the course`
+    );
+    const extraDefinitionPathsById = await collectProblemDefinitions(options.problemsDirectoryPath);
+    reportProblemDefinitionIssues(extraDefinitionPathsById, errors);
+    for (const problemId of extraDefinitionPathsById.keys()) availableProblemIds.add(problemId);
+  }
+  return availableProblemIds;
 }
 
 async function validateLectureDirectory(
