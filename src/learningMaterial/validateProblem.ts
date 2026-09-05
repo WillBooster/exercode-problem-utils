@@ -481,7 +481,12 @@ async function readModelAnswers(
       );
     }
     const files = await readSourceFilesRecursively(join(modelAnswersDirectoryPath, dirent.name));
-    if (files.length > 0) modelAnswers.push({ id: dirent.name, files });
+    // The all-problem check judges every model answer directory, so an empty one fails there.
+    if (files.length === 0) {
+      errors.push(`model answer directory "${dirent.name}" has no source files; add files or delete it`);
+      continue;
+    }
+    modelAnswers.push({ id: dirent.name, files });
   }
   return modelAnswers;
 }

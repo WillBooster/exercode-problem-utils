@@ -479,6 +479,13 @@ describe('validateProblemDirectory', () => {
     expect(withDebug.warnings).toEqual([]);
   });
 
+  test('rejects an empty model answer directory', async () => {
+    const problemDir = await copyProblemFixture();
+    await rm(join(problemDir, 'model_answers', 'javascript', 'main.mjs'));
+    const result = await validateProblemDirectory(problemDir);
+    expect(result.errors).toEqual([expect.stringContaining('model answer directory "javascript" has no source files')]);
+  });
+
   test('rejects missing model answers', async () => {
     const problemDir = await copyProblemFixture();
     await setProblemFrontmatter(problemDir, 'name: A + B');
