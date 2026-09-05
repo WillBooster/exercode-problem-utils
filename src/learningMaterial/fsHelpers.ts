@@ -61,23 +61,50 @@ export async function isDirectory(path: string): Promise<boolean> {
 }
 
 /**
- * Collects the IDs of the problem definitions under a directory the way the judge discovers them:
- * `problem.md` names its directory and `<id>.problem.md` names itself, at any depth, without
- * traversing symbolic links.
+ * Collects the problem definitions under a directory the way the judge discovers them: `problem.md`
+ * names its directory and `<id>.problem.md` names itself, at any depth, without traversing symbolic
+ * links. The result maps each problem ID to the paths of its definitions (relative to the root); the
+ * judge rejects an ID defined more than once.
  */
-export async function collectProblemIds(rootDirectoryPath: string): Promise<Set<string>> {
-  const problemIds = new Set<string>();
-  await collectProblemIdsInto(rootDirectoryPath, problemIds);
-  return problemIds;
+export async function collectProblemDefinitions(rootDirectoryPath: string): Promise<Map<string, string[]>> {
+  const definitionPathsById = new Map<string, string[]>();
+  await collectProblemDefinitionsInto(rootDirectoryPath, rootDirectoryPath, definitionPathsById);
+  return definitionPathsById;
 }
 
-async function collectProblemIdsInto(directoryPath: string, problemIds: Set<string>): Promise<void> {
+async function collectProblemDefinitionsInto(
+  rootDirectoryPath: string,
+  directoryPath: string,
+  definitionPathsById: Map<string, string[]>
+): Promise<void> {
   for (const dirent of await readdir(directoryPath, { withFileTypes: true })) {
     if (dirent.isFile()) {
-      if (dirent.name === 'problem.md') problemIds.add(basename(directoryPath));
-      else if (dirent.name.endsWith('.problem.md')) problemIds.add(dirent.name.slice(0, -'.problem.md'.length));
+      const problemId =
+        dirent.name === 'problem.md'
+          ? basename(directoryPath)
+          : dirent.name.endsWith('.problem.md')
+            ? dirent.name.slice(0, -'.problem.md'.length)
+            : undefined;
+      if (problemId === undefined) continue;
+      const definitionPaths = definitionPathsById.get(problemId) ?? [];
+      definitionPaths.push(relative(rootDirectoryPath, join(directoryPath, dirent.name)));
+      definitionPathsById.set(problemId, definitionPaths);
     } else if (dirent.isDirectory() && dirent.name !== 'node_modules' && !dirent.name.startsWith('.')) {
-      await collectProblemIdsInto(join(directoryPath, dirent.name), problemIds);
+      await collectProblemDefinitionsInto(rootDirectoryPath, join(directoryPath, dirent.name), definitionPathsById);
+    }
+  }
+}
+
+/** Reports problem IDs defined more than once, which the judge rejects as a conflict. */
+export function reportConflictingProblemDefinitions(
+  definitionPathsById: ReadonlyMap<string, string[]>,
+  errors: string[]
+): void {
+  for (const [problemId, definitionPaths] of definitionPathsById) {
+    if (definitionPaths.length > 1) {
+      errors.push(
+        `problem ID "${problemId}" is defined more than once (${definitionPaths.join(', ')}); the judge rejects the conflict`
+      );
     }
   }
 }

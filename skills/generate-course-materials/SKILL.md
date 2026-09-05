@@ -26,6 +26,6 @@ Read these references before authoring any file:
    bunx exercode-problem validate-course <courseDir> --problems-dir <problemsDir>
    ```
 
-   For a course without Judge problems, omit `--problems-dir` (an explicitly given directory must exist) and treat the resulting "no problems directory found" warning as intentional. Fix every reported error and rerun. Repeat until the command reports success. Address warnings too unless they are intentional; if you keep a warning, tell the user why in the final report.
+   For a course without Judge problems, omit `--problems-dir` (an explicitly given directory must exist); the validator then resolves problem references against the problems inside the course directory, so a dangling reference is an error. Fix every reported error and rerun. Repeat until the command reports success. Address warnings too unless they are intentional; if you keep a warning, tell the user why in the final report.
 
 8. Report the created course directory, the lecture list, and any open decisions (e.g., outline items you chose without user confirmation, intentionally kept warnings).

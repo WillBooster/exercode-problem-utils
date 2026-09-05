@@ -31,6 +31,14 @@ describe('validateCourseDirectory', () => {
     expect(result.warnings).toEqual([]);
   });
 
+  test('rejects a problem ID defined twice inside the course', async () => {
+    const courseDir = await copyCourseFixture();
+    await mkdir(join(courseDir, 'lecture_1', 'extra'));
+    await writeFile(join(courseDir, 'lecture_1', 'extra', 'a_plus_b.problem.md'), '---\nname: dup\n---\n');
+    const result = await validateCourse(courseDir);
+    expect(result.errors).toEqual([expect.stringContaining('problem ID "a_plus_b" is defined more than once')]);
+  });
+
   test('warns when --problems-dir points outside the course', async () => {
     const tempDir = await createTempDir();
     await cp(validCourseDir, join(tempDir, 'example_course'), { recursive: true });

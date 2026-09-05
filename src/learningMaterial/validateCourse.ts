@@ -1,7 +1,14 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { collectProblemIds, isDirectory, isFile, isRegularDirectory, isRegularFile } from './fsHelpers.js';
+import {
+  collectProblemDefinitions,
+  isDirectory,
+  isFile,
+  isRegularDirectory,
+  isRegularFile,
+  reportConflictingProblemDefinitions,
+} from './fsHelpers.js';
 import {
   CONTEST_MATERIAL_FILE_SUFFIX,
   courseFileSchema,
@@ -43,8 +50,12 @@ export async function validateCourseDirectory(
 
   const courseFile = await parseCourseFile(absoluteDirectoryPath, errors);
   const problemsDirectoryPath = await resolveProblemsDirectoryPath(absoluteDirectoryPath, options, errors, warnings);
-  const availableProblemIds =
-    problemsDirectoryPath === undefined ? undefined : await collectProblemIds(problemsDirectoryPath);
+  let availableProblemIds: Set<string> | undefined;
+  if (problemsDirectoryPath !== undefined) {
+    const definitionPathsById = await collectProblemDefinitions(problemsDirectoryPath);
+    reportConflictingProblemDefinitions(definitionPathsById, errors);
+    availableProblemIds = new Set(definitionPathsById.keys());
+  }
 
   if (!courseFile) return result;
   const coursePeriodErrors: string[] = [];
