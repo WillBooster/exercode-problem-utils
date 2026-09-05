@@ -89,7 +89,15 @@ const uniqueOptionsSchema = z
 
 // A quoted index is coerced like the judge does, but a non-numeric string is a schema error rather
 // than a NaN that would surface as an out-of-bounds index.
-const answerIndexStringSchema = z.string().transform(Number).pipe(z.number().int().nonnegative());
+const answerIndexStringSchema = z
+  .string()
+  .transform(Number)
+  .pipe(
+    z
+      .number({ error: 'must be a non-negative integer index (quoted numbers such as "0" are accepted)' })
+      .int()
+      .nonnegative()
+  );
 
 const questionBaseShape = {
   id: learningMaterialIdSchema,
