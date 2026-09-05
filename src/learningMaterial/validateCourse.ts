@@ -179,13 +179,23 @@ async function validateLectureDirectory(
   warnings: string[]
 ): Promise<void> {
   const lectureDirectoryPath = join(courseDirectoryPath, lectureId);
-  if (!(await isDirectory(lectureDirectoryPath))) {
-    errors.push(`lecture "${lectureId}": directory not found`);
+  // The judge lists lecture entries as regular files and directories, so symbolic links vanish.
+  if (!(await isRegularDirectory(lectureDirectoryPath))) {
+    errors.push(
+      (await isDirectory(lectureDirectoryPath))
+        ? `lecture "${lectureId}": directory is a symbolic link, which the judge does not traverse`
+        : `lecture "${lectureId}": directory not found`
+    );
     return;
   }
 
   const materialIds: string[] = [];
   const dirents = await readdir(lectureDirectoryPath, { withFileTypes: true });
+  for (const dirent of dirents) {
+    if (dirent.isSymbolicLink()) {
+      errors.push(`${lectureId}/${dirent.name} is a symbolic link, which the judge ignores; commit a regular file`);
+    }
+  }
   const fileNames = dirents
     .filter((dirent) => dirent.isFile())
     .map((dirent) => dirent.name)

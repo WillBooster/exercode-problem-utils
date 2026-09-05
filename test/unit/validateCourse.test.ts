@@ -215,6 +215,13 @@ describe('validateCourseDirectory', () => {
     expect(result.errors).toEqual([expect.stringContaining('course directory is a symbolic link')]);
   });
 
+  test('rejects a symbolic link among lecture materials', async () => {
+    const courseDir = await copyCourseFixture();
+    await symlink('10_intro.md', join(courseDir, 'lecture_1', '20_linked.md'));
+    const result = await validateCourse(courseDir);
+    expect(result.errors).toEqual([expect.stringContaining('lecture_1/20_linked.md is a symbolic link')]);
+  });
+
   test('rejects a course.yaml symbolic link', async () => {
     const courseDir = await copyCourseFixture();
     await rename(join(courseDir, 'course.yaml'), join(courseDir, 'course.real.yaml'));
