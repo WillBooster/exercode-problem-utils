@@ -545,45 +545,53 @@ async function spawnGuiProgram(context: {
     exitCode = code ?? 1;
   });
 
-  if (context.stdin) child.stdin.write(context.stdin);
-  child.stdin.end();
+  // Stop the program even when a helper throws (e.g. `xwininfo` missing); the spawned process
+  // would otherwise outlive this run.
+  try {
+    if (context.stdin) child.stdin.write(context.stdin);
+    child.stdin.end();
 
-  while (exitCode === undefined) {
-    await wait(context.screenshotWaitSeconds * 1000);
-    sampledMemoryBytes = Math.max(sampledMemoryBytes, readProcessGroupMemoryBytes(child.pid));
-    const currentScreenshots = takeScreenshots(context.env.DISPLAY);
-    screenshots = currentScreenshots.toSorted((a, b) => a.data.length - b.data.length);
+    while (exitCode === undefined) {
+      await wait(context.screenshotWaitSeconds * 1000);
+      sampledMemoryBytes = Math.max(sampledMemoryBytes, readProcessGroupMemoryBytes(child.pid));
+      const currentScreenshots = takeScreenshots(context.env.DISPLAY);
+      screenshots = currentScreenshots.toSorted((a, b) => a.data.length - b.data.length);
 
-    if (screenshots.length > 0) {
-      const screenshotSignatures = screenshots.map((file) => file.data).toSorted();
-      screenshotSignaturesHistory.unshift(screenshotSignatures);
-      screenshotSignaturesHistory.length = Math.min(screenshotSignaturesHistory.length, context.stopDetectionThreshold);
-      if (
-        screenshotSignaturesHistory.length === context.stopDetectionThreshold &&
-        screenshotSignaturesHistory.every(
-          (files) =>
-            files.length === screenshotSignatures.length &&
-            files.every((file, index) => file === screenshotSignatures[index])
-        )
-      ) {
-        stopReason = 'stable_screenshot';
+      if (screenshots.length > 0) {
+        const screenshotSignatures = screenshots.map((file) => file.data).toSorted();
+        screenshotSignaturesHistory.unshift(screenshotSignatures);
+        screenshotSignaturesHistory.length = Math.min(
+          screenshotSignaturesHistory.length,
+          context.stopDetectionThreshold
+        );
+        if (
+          screenshotSignaturesHistory.length === context.stopDetectionThreshold &&
+          screenshotSignaturesHistory.every(
+            (files) =>
+              files.length === screenshotSignatures.length &&
+              files.every((file, index) => file === screenshotSignatures[index])
+          )
+        ) {
+          stopReason = 'stable_screenshot';
+          exitCode = 0;
+          break;
+        }
+      }
+
+      if (Date.now() / 1000 - startTimeSeconds > context.timeLimitSeconds) {
+        stopReason = 'timeout';
         exitCode = 0;
         break;
       }
     }
 
-    if (Date.now() / 1000 - startTimeSeconds > context.timeLimitSeconds) {
-      stopReason = 'timeout';
-      exitCode = 0;
-      break;
+    if (stopReason !== 'process_exit' && child.exitCode === null) {
+      child.removeAllListeners('close');
+      child.removeAllListeners('error');
     }
+  } finally {
+    await stopProcess(child);
   }
-
-  if (stopReason !== 'process_exit' && child.exitCode === null) {
-    child.removeAllListeners('close');
-    child.removeAllListeners('error');
-  }
-  await stopProcess(child);
   if (spawnError) throw spawnError;
   const {
     memoryBytes,

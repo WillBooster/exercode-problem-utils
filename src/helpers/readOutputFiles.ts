@@ -12,6 +12,8 @@ export async function readOutputFiles(
   const outputFiles: NonNullable<TestCaseResult['outputFiles']> = [];
   for (const filePath of outputFilePaths) {
     try {
+      // A symlink is followed on purpose: the submission runs as the same OS user as this harness,
+      // so it can already read whatever the link points at.
       const buffer = await fs.promises.readFile(path.join(cwd, filePath));
       outputFiles.push(encodeFileForTestCaseResult(filePath, buffer));
     } catch {
