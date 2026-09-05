@@ -612,6 +612,7 @@ async function spawnGuiProgram(context: {
 }
 
 function takeScreenshots(display: string | undefined): GuiScreenshotFile[] {
+  // Node omits environment entries whose value is undefined, so a missing display is simply not set.
   const env = { ...process.env, DISPLAY: display ?? process.env.DISPLAY };
   const xwininfo = childProcess.spawnSync('xwininfo', ['-root', '-tree'], { encoding: 'utf8', env });
   if (xwininfo.error) throw xwininfo.error;

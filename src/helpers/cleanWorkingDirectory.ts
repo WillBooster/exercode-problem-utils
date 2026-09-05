@@ -13,7 +13,7 @@ export async function cleanWorkingDirectory(cwd: string, snapshot: ReadonlySet<s
 
 async function cleanDirectory(dir: string, relativePrefix: string, snapshot: ReadonlySet<string>): Promise<void> {
   for (const entry of await fs.promises.readdir(dir, { withFileTypes: true })) {
-    const relativePath = relativePrefix ? `${relativePrefix}${path.sep}${entry.name}` : entry.name;
+    const relativePath = path.join(relativePrefix, entry.name);
     if (!snapshot.has(relativePath)) {
       // An unsnapshotted directory is removed whole, so its contents are never visited.
       await fs.promises.rm(path.join(dir, entry.name), { force: true, recursive: true });
