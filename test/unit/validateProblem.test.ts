@@ -562,6 +562,22 @@ describe('validateProblemDirectory', () => {
     expect(result.errors).toEqual([expect.stringContaining('no model answers found')]);
   });
 
+  test('warns about a solved data-file template under a custom judge', async () => {
+    const problemDir = await copyProblemFixture();
+    await setProblemFrontmatter(problemDir, 'name: Evaluation');
+    await rm(join(problemDir, 'test_cases'), { recursive: true });
+    await writeFile(join(problemDir, 'judge.ts'), "import { parseArgs } from '@exercode/problem-utils';\n// custom\n");
+    await writeFile(join(problemDir, 'debug.ts'), "import { parseArgs } from '@exercode/problem-utils';\n// custom\n");
+    await rm(join(problemDir, 'model_answers'), { recursive: true });
+    await mkdir(join(problemDir, 'model_answers', 'default'), { recursive: true });
+    await writeFile(join(problemDir, 'model_answers', 'default', 'submission.csv'), 'id,value\n1,2\n');
+    await rm(join(problemDir, 'templates'), { recursive: true });
+    await mkdir(join(problemDir, 'templates', '_default'), { recursive: true });
+    await writeFile(join(problemDir, 'templates', '_default', 'submission.csv'), 'id,value\n1,2\n');
+    const result = await validateProblemDirectory(problemDir);
+    expect(result.warnings).toContainEqual(expect.stringContaining('identical to a model answer file'));
+  });
+
   test('warns about a solved template even when the model answer has extra notes', async () => {
     const problemDir = await copyProblemFixture();
     await writeFile(join(problemDir, 'model_answers', 'python', 'README.md'), '# notes\n');

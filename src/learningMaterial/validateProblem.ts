@@ -156,7 +156,7 @@ export async function validateProblemDirectory(problemDirectoryPath: string): Pr
     validateCodePatterns(frontmatter, usableModelAnswers, errors, warnings);
     validateRequiredSubmissionFiles(frontmatter, usableModelAnswers, errors);
   }
-  await validateTemplates(absoluteDirectoryPath, usableModelAnswers, errors, warnings);
+  await validateTemplates(absoluteDirectoryPath, usableModelAnswers, harness.hasCustomJudgeTs, errors, warnings);
 
   return result;
 }
@@ -645,6 +645,7 @@ function compilePatterns(rules: CodeRule[], fieldName: string, errors: string[])
 async function validateTemplates(
   problemDirectoryPath: string,
   modelAnswers: ModelAnswer[],
+  hasCustomJudgeTs: boolean,
   errors: string[],
   warnings: string[]
 ): Promise<void> {
@@ -683,24 +684,23 @@ async function validateTemplates(
       );
     }
   }
-  // A template must be an incomplete starting point: a template directory that carries every
-  // runnable source file of a model answer unchanged would pass the judge. Helper modules shared
-  // by both are fine, and notes or data files next to the answer do not change what runs.
+  // A template must be an incomplete starting point: a template directory that carries every file
+  // a model answer is judged by, unchanged, would pass the judge. The stdio judge runs the source
+  // files of a supported language (notes next to the answer do not change what runs), while a
+  // custom judge.ts may read any file (e.g. a CSV submission). Helper modules shared by both are fine.
   const directoryNames = entries.filter((dirent) => dirent.isDirectory()).map((dirent) => dirent.name);
   const templateDirectoryNames = hasDirectories ? directoryNames : [''];
   for (const templateDirectoryName of templateDirectoryNames) {
     const templateFiles = await readSourceFilesRecursively(join(templatesDirectoryPath, templateDirectoryName));
     const templateContentByPath = new Map(templateFiles.map((file) => [file.path, file.data]));
     for (const modelAnswer of modelAnswers) {
-      const runnableFiles = modelAnswer.files.filter(
-        (file) => findLanguageDefinitionByPath(file.path) !== undefined && file.data.trim().length > 0
+      const judgedFiles = modelAnswer.files.filter(
+        (file) =>
+          file.data.trim().length > 0 && (hasCustomJudgeTs || findLanguageDefinitionByPath(file.path) !== undefined)
       );
-      if (
-        runnableFiles.length > 0 &&
-        runnableFiles.every((file) => templateContentByPath.get(file.path) === file.data)
-      ) {
+      if (judgedFiles.length > 0 && judgedFiles.every((file) => templateContentByPath.get(file.path) === file.data)) {
         warnings.push(
-          `templates/${templateDirectoryName} contains every source file of model answer "${modelAnswer.id}" unchanged (identical to a model answer file); templates must not pass the judge`
+          `templates/${templateDirectoryName} contains every judged file of model answer "${modelAnswer.id}" unchanged (identical to a model answer file); templates must not pass the judge`
         );
       }
     }
