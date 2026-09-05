@@ -91,7 +91,8 @@ async function collectProblemDefinitionsInto(
         dirent.name === 'problem.md'
           ? basename(directoryPath)
           : dirent.name.endsWith('.problem.md')
-            ? dirent.name.slice(0, -'.problem.md'.length)
+            ? // The judge lowercases a v1 file name before using it as the ID (a directory name is used as is).
+              dirent.name.slice(0, -'.problem.md'.length).toLowerCase()
             : undefined;
       if (problemId === undefined) continue;
       const definitionPaths = definitionPathsById.get(problemId) ?? [];
