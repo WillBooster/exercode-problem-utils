@@ -55,6 +55,8 @@ const IGNORED_TEST_CASE_ENTRY_NAMES: ReadonlySet<string> = new Set(['.DS_Store',
 interface ModelAnswer {
   id: string;
   files: SourceFile[];
+  /** Every file of the answer directory (relative paths), as the judge's static analysis lists them. */
+  allFilePaths: string[];
 }
 
 /**
@@ -121,6 +123,7 @@ export async function validateProblemDirectory(problemDirectoryPath: string): Pr
   }
   if (frontmatter) {
     validateCodePatterns(frontmatter, usableModelAnswers, errors, warnings);
+    validateRequiredSubmissionFiles(frontmatter, usableModelAnswers, errors);
   }
   await validateTemplates(absoluteDirectoryPath, usableModelAnswers, errors, warnings);
 
@@ -473,8 +476,14 @@ async function readModelAnswers(
         `model answer directory name "${dirent.name}" is not a known language ID (${availableLanguageIds.join(', ')})`
       );
     }
-    const files = await readSourceFilesRecursively(join(modelAnswersDirectoryPath, dirent.name));
-    if (files.length > 0) modelAnswers.push({ id: dirent.name, files });
+    const answerDirectoryPath = join(modelAnswersDirectoryPath, dirent.name);
+    const files = await readSourceFilesRecursively(answerDirectoryPath);
+    if (files.length === 0) continue;
+    const allDirents = await readdir(answerDirectoryPath, { recursive: true, withFileTypes: true });
+    const allFilePaths = allDirents
+      .filter((entry) => entry.isFile())
+      .map((entry) => relative(answerDirectoryPath, join(entry.parentPath, entry.name)));
+    modelAnswers.push({ id: dirent.name, files, allFilePaths });
   }
   return modelAnswers;
 }
@@ -529,6 +538,24 @@ function validateCodePatterns(
         if (file.data.includes(forbiddenText)) {
           errors.push(`forbidden text "${forbiddenText}" appears in model answer file ${modelAnswer.id}/${file.path}`);
         }
+      }
+    }
+  }
+}
+
+/** The judge rejects a submission missing a required file before running it, so every model answer must ship them. */
+function validateRequiredSubmissionFiles(
+  frontmatter: ProblemFrontmatter,
+  modelAnswers: ModelAnswer[],
+  errors: string[]
+): void {
+  for (const modelAnswer of modelAnswers) {
+    const filePathSet = new Set(modelAnswer.allFilePaths);
+    for (const requiredPath of frontmatter.requiredSubmissionFilePaths) {
+      if (!filePathSet.has(requiredPath)) {
+        errors.push(
+          `required submission file "${requiredPath}" is missing from model answer "${modelAnswer.id}" (requiredSubmissionFilePaths)`
+        );
       }
     }
   }

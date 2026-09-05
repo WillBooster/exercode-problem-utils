@@ -275,6 +275,16 @@ describe('validateProblemDirectory', () => {
     ]);
   });
 
+  test('rejects a model answer that lacks a required submission file', async () => {
+    const problemDir = await copyProblemFixture();
+    await setProblemFrontmatter(problemDir, 'name: A + B\nrequiredSubmissionFilePaths: [data.txt]');
+    await writeFile(join(problemDir, 'model_answers', 'python', 'data.txt'), 'x\n');
+    const result = await validateProblemDirectory(problemDir);
+    expect(result.errors).toEqual([
+      expect.stringContaining('required submission file "data.txt" is missing from model answer "javascript"'),
+    ]);
+  });
+
   test('rejects an invalid regular expression', async () => {
     const problemDir = await copyProblemFixture();
     await setProblemFrontmatter(problemDir, "name: A + B\nrequiredRegExpsInCode: ['[']");
