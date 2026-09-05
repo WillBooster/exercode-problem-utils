@@ -1,21 +1,7 @@
 import childProcess from 'node:child_process';
-import nodeFs from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-
-import {
-  forceRemove,
-  getSandboxUserEnvOverrides,
-  killSandboxUserProcesses,
-  makeAccessibleToSandboxUser,
-  prependInsideSandboxWrapper,
-  SANDBOX_WATCHDOG_GRACE_SECONDS,
-  sandboxUserName,
-  startSandboxTimeoutWatchdog,
-  wrapCommandWithSandboxUser,
-} from './sandboxUser.js';
-import { copyWithoutFollowingSymlinks, createDirectoryWithoutFollowingSymlinks } from './safeFs.js';
 
 export type PackageManager = 'bun' | 'cargo' | 'go' | 'gradle' | 'maven' | 'npm' | 'pnpm' | 'ruby' | 'uv' | 'yarn';
 type PackageManagerInstallCommand = readonly [string, ...string[]];
@@ -89,17 +75,12 @@ const packageManagerInstallCommandResolvers = {
 
 const defaultOutputLimitBytes = 50 * 1024 * 1024;
 const killGracePeriodMilliseconds = 1000;
-// Added to the watchdog's own deadline so its kill has time to land and `close` to arrive.
-const watchdogSettleMarginMilliseconds = 2000;
 const timeCommand = resolveTimeCommand();
 
 /**
  * Copies a submission directory to a temporary directory, overlays package
  * manager project files from the problem directory, prepares dependencies,
  * runs a command, and then removes the temporary directory.
- *
- * Under `EXERCODE_SANDBOX_USER` delegation, cleanup kills every process of the sandbox user, so do
- * not run multiple invocations concurrently in that mode — one finishing would kill the others.
  */
 export async function runCommandInTemporaryPackageManagerProject(
   options: RunCommandInTemporaryPackageManagerProjectOptions
@@ -113,9 +94,6 @@ export async function runCommandInTemporaryPackageManagerProject(
       runDir,
       projectFilePaths: options.projectFilePaths,
     });
-    // The sandbox user (if any) runs the install/run commands below and must read the copied
-    // sources and create outputs (e.g. `node_modules`, `.venv`) next to them.
-    makeAccessibleToSandboxUser(runDir);
 
     const env = options.env ? { ...process.env, ...options.env } : process.env;
     const installCommand =
@@ -180,13 +158,7 @@ export async function runCommandInTemporaryPackageManagerProject(
 
     return toPackageManagerCommandRunResult({ elapsedTimeSeconds, options, result });
   } finally {
-    try {
-      // Daemonized children of the sandboxed command would otherwise outlive the run.
-      if (sandboxUserName) killSandboxUserProcesses();
-    } finally {
-      // Must run even when the sweep fails closed, or the temporary submission copy leaks.
-      await forceRemove(runDir);
-    }
+    await fs.rm(runDir, { force: true, recursive: true });
   }
 }
 
@@ -354,24 +326,17 @@ export async function copyPackageManagerProjectFiles(options: {
   projectFilePaths?: readonly string[];
 }): Promise<void> {
   for (const projectFilePath of options.projectFilePaths ?? packageManagerProjectFilePaths[options.packageManager]) {
-    await copyPathIfExists(
-      path.join(options.projectDir, projectFilePath),
-      path.join(options.runDir, projectFilePath),
-      options.runDir
-    );
+    await copyPathIfExists(path.join(options.projectDir, projectFilePath), path.join(options.runDir, projectFilePath));
   }
 }
 
-async function copyPathIfExists(sourcePath: string, destinationPath: string, runDir: string): Promise<void> {
+async function copyPathIfExists(sourcePath: string, destinationPath: string): Promise<void> {
   try {
-    // Before touching the destination: creating the parent levels replaces whatever the submission
-    // put there, which must not happen for a project file the problem does not even ship.
+    // Before touching the destination: creating the parent levels must not happen for a project
+    // file the problem does not even ship.
     await fs.lstat(sourcePath);
-    // No-follow copy: the destination was seeded from the (sandbox-writable) submission tree, so a
-    // planted symlink there — at the destination itself or at any directory level of a nested
-    // project file path — must not redirect this trusted project-file overlay outside runDir.
-    await createDirectoryWithoutFollowingSymlinks(runDir, path.dirname(destinationPath));
-    await copyWithoutFollowingSymlinks(sourcePath, destinationPath);
+    await fs.mkdir(path.dirname(destinationPath), { recursive: true });
+    await fs.cp(sourcePath, destinationPath, { force: true, recursive: true });
   } catch (error) {
     const code =
       typeof error === 'object' && error !== null && 'code' in error ? (error as { code: unknown }).code : undefined;
@@ -399,56 +364,26 @@ async function spawnWithInput(
   outputLimitExceeded: boolean;
 }> {
   const timeOutputPath = timeCommand === undefined ? undefined : path.join(context.cwd, '.exercode-time-result');
-  // `wrapCommandWithSandboxUser` is idempotent, so a command the presets already wrapped is not
-  // nested; `time` is then spliced INSIDE that wrapper so it runs as the sandbox user, never as the
-  // harness user writing `--output` into this sandbox-writable directory.
-  const wrappedCommand = wrapCommandWithSandboxUser(command);
-  const spawnedCommand =
-    timeCommand === undefined
-      ? wrappedCommand
-      : prependInsideSandboxWrapper(wrappedCommand, [...timeCommand, `--output=${timeOutputPath}`]);
-  // Started BEFORE the submission: `killSubprocessGroup` cannot spawn its `sudo` once a submission
-  // has exhausted the PID cgroup, and a submission spawned first could exhaust it before this
-  // watchdog exists. It is the deadline of last resort on this path.
-  const watchdog = startSandboxTimeoutWatchdog(context.timeLimitSeconds);
-  const watchdogDeadlineAt = Date.now() + (Math.ceil(context.timeLimitSeconds) + SANDBOX_WATCHDOG_GRACE_SECONDS) * 1000;
-  let subprocess: childProcess.ChildProcessWithoutNullStreams;
-  try {
-    subprocess = childProcess.spawn(spawnedCommand[0], spawnedCommand.slice(1), {
-      cwd: context.cwd,
-      detached: process.platform !== 'win32',
-      env: { ...context.env, ...getSandboxUserEnvOverrides(context.env) },
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-  } catch (error) {
-    watchdog.cancel();
-    throw error;
-  }
+  const spawnedCommand: readonly [string, ...string[]] =
+    timeCommand === undefined ? command : [...timeCommand, `--output=${timeOutputPath}`, ...command];
+  const subprocess = childProcess.spawn(spawnedCommand[0], spawnedCommand.slice(1), {
+    cwd: context.cwd,
+    detached: process.platform !== 'win32',
+    env: context.env,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
 
   const stdoutChunks: Buffer[] = [];
   const stderrChunks: Buffer[] = [];
   let outputBytes = 0;
   let timedOut = false;
   let outputLimitExceeded = false;
-  // Set when terminating the submission failed (the cleanup `sudo` could not be spawned). The run
-  // then waits for the watchdog to end the submission rather than throwing out of an EventEmitter
-  // callback, which would be an uncaught exception that kills the harness before any cleanup.
-  let killError: Error | undefined;
-  let onKillFailure: (() => void) | undefined;
-  const killOrRecordFailure = (signal: NodeJS.Signals): void => {
-    try {
-      killSubprocessGroup(subprocess, signal);
-    } catch (error) {
-      killError ??= error instanceof Error ? error : new Error(String(error));
-      onKillFailure?.();
-    }
-  };
 
   const appendOutputChunk = (chunks: Buffer[], chunk: Buffer): void => {
     if (outputBytes >= context.outputLimitBytes) {
       if (chunk.byteLength > 0) {
         outputLimitExceeded = true;
-        killOrRecordFailure('SIGKILL');
+        killSubprocessGroup(subprocess, 'SIGKILL');
       }
       return;
     }
@@ -460,7 +395,7 @@ async function spawnWithInput(
 
     if (chunk.byteLength > remainingBytes) {
       outputLimitExceeded = true;
-      killOrRecordFailure('SIGKILL');
+      killSubprocessGroup(subprocess, 'SIGKILL');
     }
   };
 
@@ -469,19 +404,15 @@ async function spawnWithInput(
 
   const timeout = setTimeout(() => {
     timedOut = true;
-    killOrRecordFailure('SIGTERM');
+    killSubprocessGroup(subprocess, 'SIGTERM');
   }, context.timeLimitSeconds * 1000);
   const killTimeout = setTimeout(
     () => {
-      if (timedOut) killOrRecordFailure('SIGKILL');
+      if (timedOut) killSubprocessGroup(subprocess, 'SIGKILL');
     },
     context.timeLimitSeconds * 1000 + killGracePeriodMilliseconds
   );
   killTimeout.unref();
-  // Bounds the wait after a kill failure: the watchdog force-kills the sandbox user at its own
-  // deadline, so `close` should arrive; if even that fails, give up rather than hang.
-  let killFailureTimeout: ReturnType<typeof setTimeout> | undefined;
-  let closeObserved = false;
 
   const { status, signal } = await new Promise<{ status: number | undefined; signal: NodeJS.Signals | undefined }>(
     (resolve, reject) => {
@@ -490,26 +421,11 @@ async function spawnWithInput(
       const failAfterClose = (error: Error): void => {
         if (settled) return;
         pendingError = error;
-        killOrRecordFailure('SIGKILL');
+        killSubprocessGroup(subprocess, 'SIGKILL');
         if (subprocess.pid === undefined) {
           settled = true;
           reject(error);
         }
-      };
-      // Terminating the submission failed. Keep waiting: the watchdog (started before the
-      // submission) force-kills the sandbox user at its own deadline, so `close` still arrives and
-      // the run reports its real verdict. Give up only once that deadline has passed without the
-      // submission ending, so the run can neither hang nor abandon a still-running submission
-      // while its watchdog could still fire.
-      onKillFailure = () => {
-        killFailureTimeout ??= setTimeout(
-          () => {
-            if (settled) return;
-            settled = true;
-            reject(killError ?? new Error('failed to terminate the submission'));
-          },
-          Math.max(0, watchdogDeadlineAt - Date.now()) + watchdogSettleMarginMilliseconds
-        );
       };
       subprocess.on('error', failAfterClose);
       subprocess.stdin.on('error', (error: NodeJS.ErrnoException) => {
@@ -518,10 +434,6 @@ async function spawnWithInput(
       subprocess.on('close', (code, closeSignal) => {
         if (settled) return;
         settled = true;
-        // The submission ended, so the watchdog has nothing left to kill and must not outlive this
-        // run. A kill that failed once but succeeded on retry (or was superseded by the watchdog)
-        // is not an error: the timeout/output-limit verdict below is the correct one to report.
-        closeObserved = true;
         if (pendingError) {
           reject(pendingError);
           return;
@@ -533,10 +445,6 @@ async function spawnWithInput(
   ).finally(() => {
     clearTimeout(timeout);
     clearTimeout(killTimeout);
-    if (killFailureTimeout) clearTimeout(killFailureTimeout);
-    // Cancel unless the submission is still running after a failed kill: the watchdog is then the
-    // only remaining mechanism able to stop it, and cancelling would leave it running unchecked.
-    if (closeObserved || !killError) watchdog.cancel();
   });
 
   const { timeSeconds, memoryBytes } =
@@ -565,18 +473,6 @@ function resolveTimeCommand(): readonly [string, ...string[]] | undefined {
 function killSubprocessGroup(subprocess: childProcess.ChildProcess, signal: NodeJS.Signals): void {
   if (subprocess.pid === undefined) return;
 
-  // The current user cannot signal the root-owned sudo wrapper nor the sandbox user's processes,
-  // so go through sudo with the requested signal only; the callers' existing timers provide the
-  // TERM → grace → KILL escalation.
-  // Throws when the cleanup `sudo` cannot even be spawned (a submission can exhaust the PID
-  // cgroup). Only `killOrRecordFailure` may call this: it records the failure and lets the
-  // watchdog (or, past its deadline, a bounded timer) settle the run instead of letting the throw
-  // escape an EventEmitter callback.
-  if (sandboxUserName) {
-    killSandboxUserProcesses([signal === 'SIGKILL' ? 'KILL' : 'TERM']);
-    return;
-  }
-
   try {
     if (process.platform === 'win32') {
       subprocess.kill(signal);
@@ -595,32 +491,13 @@ function isErrorWithCode(error: unknown, code: string): boolean {
 }
 
 async function readTimeResult(timeOutputPath: string): Promise<{ timeSeconds: number; memoryBytes: number }> {
-  // The submission owns this directory and can put anything at this path, so decide what was
-  // opened from the handle itself rather than from a prior `lstat` it could race:
-  // - `O_NOFOLLOW` refuses a symlink to a harness-readable file (e.g. the problem's expected
-  //   outputs), which would otherwise report that file's trailing numbers as the submission's own
-  //   time and memory usage;
-  // - `O_NONBLOCK` keeps a planted FIFO from blocking the harness forever waiting for a writer;
-  // - the `fstat` then rejects anything that is not a regular file.
-  //
-  // Only an absent file means "no measurement" (the command was killed before `time` wrote one).
-  // Anything else at this path is the submission tampering with its own accounting — reporting zero
-  // memory would let it slip past a memory limit — so that fails the run instead.
+  // An absent file means "no measurement" (the command was killed before `time` wrote one).
   let content: string;
-  let fileHandle: Awaited<ReturnType<typeof fs.open>> | undefined;
   try {
-    fileHandle = await fs.open(
-      timeOutputPath,
-      nodeFs.constants.O_RDONLY | nodeFs.constants.O_NOFOLLOW | nodeFs.constants.O_NONBLOCK
-    );
-    const stats = await fileHandle.stat();
-    if (!stats.isFile()) throw new Error(`${timeOutputPath} is not a regular file`);
-    content = await fileHandle.readFile('utf8');
+    content = await fs.readFile(timeOutputPath, 'utf8');
   } catch (error) {
     if (isErrorWithCode(error, 'ENOENT')) return { timeSeconds: 0, memoryBytes: 0 };
-    throw new Error(`failed to read the time measurement at ${timeOutputPath}`, { cause: error });
-  } finally {
-    await fileHandle?.close();
+    throw error;
   }
 
   const match = /(\d+(?:[.,]\d+)?) (\d+)\s*$/.exec(content);

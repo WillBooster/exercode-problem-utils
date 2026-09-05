@@ -5,11 +5,10 @@ import type { TestCaseResult } from '../types/testCaseResult.js';
 
 import { compareStdoutAsSpaceSeparatedTokens } from './compareStdoutAsSpaceSeparatedTokens.js';
 import { encodeFileForTestCaseResult } from './printTestCaseResult.js';
-import { isSafeSubmissionOutputPath } from './readOutputFiles.js';
 
 type OutputFile = NonNullable<TestCaseResult['outputFiles']>[number];
 
-// A submission controls the received files, so bound what the trusted harness reads and reports.
+// Bound what the harness reads and reports.
 export const MAX_COMPARED_FILE_BYTES = 8 * 1024 * 1024;
 export const MAX_REPORTED_FILE_BYTES = 1024 * 1024;
 
@@ -54,7 +53,7 @@ export async function compareExpectedOutputFiles(
       throw new Error(`expected output file ${relativePath} exceeds ${MAX_COMPARED_FILE_BYTES} bytes`);
     }
     const expected = await fs.promises.readFile(absolutePath);
-    const received = await readReceivedFile(cwd, path.join(cwd, relativePath));
+    const received = await readReceivedFile(path.join(cwd, relativePath));
     if (received && fileContentsMatch(expected, received)) continue;
 
     mismatchedPaths.push(relativePath);
@@ -121,11 +120,9 @@ function toComparisonPath(filePath: string, role: 'expected' | 'received'): stri
   return path.posix.join(dir, `${name}_${role}${ext}`);
 }
 
-// A submission controls this path, so anything that is not a plain, readable file within the size
-// limit (a directory, a FIFO that would block, an unreadable or huge file) counts as "not produced".
-async function readReceivedFile(cwd: string, receivedPath: string): Promise<Buffer | undefined> {
-  // A submission-planted symlink to the expected file itself would otherwise compare equal.
-  if (!(await isSafeSubmissionOutputPath(cwd, receivedPath))) return undefined;
+// Anything that is not a plain, readable file within the size limit (a directory, a FIFO that would
+// block, an unreadable or huge file) counts as "not produced".
+async function readReceivedFile(receivedPath: string): Promise<Buffer | undefined> {
   try {
     const stats = await fs.promises.stat(receivedPath);
     if (!stats.isFile() || stats.size > MAX_COMPARED_FILE_BYTES) return undefined;

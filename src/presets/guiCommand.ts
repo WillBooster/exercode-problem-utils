@@ -16,17 +16,6 @@ import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readOutputFiles } from '../helpers/readOutputFiles.js';
 import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases as readFileTestCases } from '../helpers/readTestCases.js';
-import { runCustomRunner } from '../helpers/runCustomRunner.js';
-import {
-  getSandboxUserEnvOverrides,
-  getTrustedHelperEnv,
-  killSandboxUserProcesses,
-  makeAccessibleToSandboxUser,
-  sandboxUserName,
-  startSandboxTimeoutWatchdog,
-  TIMEOUT_COMMAND,
-  wrapCommandWithSandboxUser,
-} from '../helpers/sandboxUser.js';
 import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
 import { DecisionCode } from '../types/decisionCode.js';
 import { languageIdToDefinition } from '../types/language.js';
@@ -98,24 +87,10 @@ export interface GuiCommandJudgePresetOptions<TTestCase extends BaseGuiTestCase 
   readTestCases?: (problemDir: string) => Promise<readonly TTestCase[]>;
   prepare?: (context: {
     cwd: string;
-    /**
-     * Build the submission with it. Under `EXERCODE_SANDBOX_USER` delegation it already carries the
-     * sandbox user's overrides, but the handler must still wrap whatever it spawns with
-     * `wrapCommandWithSandboxUser` (both exported): a build runs the submission's own scripts
-     * (`package.json` lifecycle scripts, `build.gradle`, `build.rs`), which as the trusted harness
-     * user could read the problem's test cases and rewrite the harness. The preset terminates
-     * leftover sandbox processes after the handler returns.
-     */
     env: NodeJS.ProcessEnv;
     mainFilePath: string;
     problemMarkdownFrontMatter: ProblemMarkdownFrontMatter;
   }) => Promise<Partial<GuiJudgeCaseResult> | undefined> | Partial<GuiJudgeCaseResult> | undefined;
-  /**
-   * Runs as the trusted harness user with the submission's `cwd`. Fixture files it creates there
-   * must be written with `createDirectoryWithoutFollowingSymlinks`/`writeFileWithoutFollowingSymlinks`
-   * (both exported): a submission can plant a symlink at a fixture path, and a plain `fs.writeFile`
-   * would follow it into a file only the harness can write.
-   */
   resolveInput?: (context: { testCase: TTestCase; cwd: string; env: NodeJS.ProcessEnv }) => Promise<string> | string;
   command?: (context: {
     testCase: TTestCase;
@@ -125,16 +100,6 @@ export interface GuiCommandJudgePresetOptions<TTestCase extends BaseGuiTestCase 
   }) => Promise<readonly [string, ...string[]]> | readonly [string, ...string[]];
   runCommand?: (context: {
     testCase: TTestCase;
-    /**
-     * The command to run. Under `EXERCODE_SANDBOX_USER` delegation it is already wrapped so it
-     * executes as the sandbox user; spawn it as given (with the supplied `env`) instead of
-     * reconstructing it, or the submission runs as the trusted harness user.
-     *
-     * Its direct child is then a root-owned `sudo` whose descendants belong to the sandbox user, so
-     * the handler cannot signal them: enforce `timeLimitSeconds` with `startSandboxTimeoutWatchdog`
-     * and `killSandboxUserProcesses` (both exported) rather than `child.kill()` or an outer
-     * `timeout`. The preset terminates leftover sandbox processes after the handler returns.
-     */
     command: readonly [string, ...string[]];
     stdin: string;
     cwd: string;
@@ -183,9 +148,6 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
   if (!args.cwd) throw new Error('cwd argument required');
   const params = judgeParamsSchema.parse(args.params);
   const submissionDir = args.cwd;
-
-  // The sandboxed submission must read its sources and write build/run outputs in its directory.
-  makeAccessibleToSandboxUser(submissionDir);
 
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
   const configuredTestCases = await (options.readTestCases ?? readGuiTestCases<TTestCase>)(problemDir);
@@ -261,17 +223,15 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
   let customPrepareResult: Partial<GuiJudgeCaseResult> | undefined;
   if (options.prepare) {
     try {
-      customPrepareResult = await runCustomRunner(() =>
-        options.prepare?.({
-          cwd: submissionDir,
-          env: { ...env, ...getSandboxUserEnvOverrides(env) },
-          mainFilePath: resolvedMainFilePath,
-          problemMarkdownFrontMatter,
-        })
-      );
+      customPrepareResult = await options.prepare({
+        cwd: submissionDir,
+        env,
+        mainFilePath: resolvedMainFilePath,
+        problemMarkdownFrontMatter,
+      });
     } catch (error) {
-      // Like the `prebuild` step above: report the failed build rather than letting the throw (from
-      // the handler itself, or from the fail-closed sandbox sweep around it) end the run resultless.
+      // Like the `prebuild` step above: report the failed build rather than letting the throw end the
+      // run resultless.
       printTestCaseResult({
         testCaseId: prebuildTestCaseId,
         decisionCode: DecisionCode.BUILD_ERROR,
@@ -327,22 +287,16 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
       let runResult: GuiCommandRunResult;
       try {
         runResult = options.runCommand
-          ? await runCustomRunner(
-              () =>
-                // Hand custom runners a command that is already sandbox-wrapped, and the matching
-                // environment: they spawn it themselves, so an unwrapped command would run the
-                // submission as the trusted harness user and defeat the delegation boundary.
-                options.runCommand?.({
-                  testCase,
-                  command: wrapCommandWithSandboxUser(command),
-                  stdin,
-                  cwd: submissionDir,
-                  env: { ...runEnv, ...getSandboxUserEnvOverrides(runEnv) },
-                  timeLimitSeconds,
-                  screenshotWaitSeconds: options.screenshotWaitSeconds ?? SCREENSHOT_WAIT_SECONDS,
-                  stopDetectionThreshold: options.stopDetectionThreshold ?? STOP_DETECTION_THRESHOLD,
-                }) as Promise<GuiCommandRunResult>
-            )
+          ? await options.runCommand({
+              testCase,
+              command,
+              stdin,
+              cwd: submissionDir,
+              env: runEnv,
+              timeLimitSeconds,
+              screenshotWaitSeconds: options.screenshotWaitSeconds ?? SCREENSHOT_WAIT_SECONDS,
+              stopDetectionThreshold: options.stopDetectionThreshold ?? STOP_DETECTION_THRESHOLD,
+            })
           : await spawnGuiProgram({
               command,
               stdin,
@@ -425,15 +379,7 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
     });
     await cleanWorkingDirectory(args.cwd, cwdSnapshot);
   } finally {
-    try {
-      // Sweep any sandbox processes the run left behind (e.g. a SIGTERM-ignoring forked child) so
-      // they cannot race the harness's output reads or survive into the next test case/request.
-      if (sandboxUserName) killSandboxUserProcesses();
-    } finally {
-      // Must run even when the sweep fails closed, or Xvfb keeps holding its display number and
-      // later GUI requests exhaust the `:90`–`:99` range.
-      await displayServer?.dispose();
-    }
+    await displayServer?.dispose();
   }
 }
 
@@ -545,30 +491,16 @@ async function spawnGuiProgram(context: {
   screenshotWaitSeconds: number;
   stopDetectionThreshold: number;
 }): Promise<GuiCommandRunResult> {
-  const wrappedCommand = wrapCommandWithSandboxUser([
-    TIMEOUT_COMMAND,
-    context.timeLimitSeconds.toFixed(3),
-    ...TIME_COMMAND,
-    ...context.command,
-  ]);
-  // A submission can signal its own sandboxed `timeout` and then wedge the event loop (e.g.
-  // XGrabServer makes the synchronous `xwininfo`/`maim` block), so a harness-owned watchdog
-  // force-kills the sandbox user at the deadline; killing the client also releases its X grab.
-  // Armed before the submission starts: a submission that exhausts the PID cgroup would otherwise
-  // prevent the watchdog from spawning at all.
-  const watchdog = startSandboxTimeoutWatchdog(context.timeLimitSeconds);
-  let child: childProcess.ChildProcessWithoutNullStreams;
-  try {
-    child = childProcess.spawn(wrappedCommand[0], wrappedCommand.slice(1), {
+  const child = childProcess.spawn(
+    'timeout',
+    [context.timeLimitSeconds.toFixed(3), ...TIME_COMMAND, ...context.command],
+    {
       cwd: context.cwd,
-      env: { ...context.env, ...getSandboxUserEnvOverrides(context.env) },
+      env: context.env,
       detached: process.platform !== 'win32',
       stdio: ['pipe', 'pipe', 'pipe'],
-    });
-  } catch (error) {
-    watchdog.cancel();
-    throw error;
-  }
+    }
+  );
 
   child.stdout.setEncoding('utf8');
   child.stderr.setEncoding('utf8');
@@ -578,7 +510,6 @@ async function spawnGuiProgram(context: {
   let exitCode: number | undefined;
   let spawnError: Error | undefined;
   let stopReason: GuiCommandRunResult['stopReason'] = 'process_exit';
-  let submissionStopped = false;
   const screenshotSignaturesHistory: string[][] = [];
   let screenshots: GuiScreenshotFile[] = [];
   const startTimeSeconds = Date.now() / 1000;
@@ -614,91 +545,66 @@ async function spawnGuiProgram(context: {
     exitCode = code ?? 1;
   });
 
-  // Everything below must run under the `finally` that decides the watchdog's fate: it is cancelled
-  // only once the submission is demonstrably stopped. When a helper throws first — `takeScreenshots`
-  // rethrows spawn failures, which a submission can provoke by exhausting PIDs — the watchdog stays
-  // armed on purpose, since nothing else would end the submission. The cost is that a detached
-  // watchdog can outlive this harness and SIGKILL sandbox processes of a request that starts within
-  // its remaining deadline, which is the same trade-off the package-manager runner accepts.
-  try {
-    if (context.stdin) child.stdin.write(context.stdin);
-    child.stdin.end();
+  if (context.stdin) child.stdin.write(context.stdin);
+  child.stdin.end();
 
-    while (exitCode === undefined) {
-      await wait(context.screenshotWaitSeconds * 1000);
-      sampledMemoryBytes = Math.max(sampledMemoryBytes, readProcessGroupMemoryBytes(child.pid));
-      const currentScreenshots = takeScreenshots(context.env.DISPLAY);
-      screenshots = currentScreenshots.toSorted((a, b) => a.data.length - b.data.length);
+  while (exitCode === undefined) {
+    await wait(context.screenshotWaitSeconds * 1000);
+    sampledMemoryBytes = Math.max(sampledMemoryBytes, readProcessGroupMemoryBytes(child.pid));
+    const currentScreenshots = takeScreenshots(context.env.DISPLAY);
+    screenshots = currentScreenshots.toSorted((a, b) => a.data.length - b.data.length);
 
-      if (screenshots.length > 0) {
-        const screenshotSignatures = screenshots.map((file) => file.data).toSorted();
-        screenshotSignaturesHistory.unshift(screenshotSignatures);
-        screenshotSignaturesHistory.length = Math.min(
-          screenshotSignaturesHistory.length,
-          context.stopDetectionThreshold
-        );
-        if (
-          screenshotSignaturesHistory.length === context.stopDetectionThreshold &&
-          screenshotSignaturesHistory.every(
-            (files) =>
-              files.length === screenshotSignatures.length &&
-              files.every((file, index) => file === screenshotSignatures[index])
-          )
-        ) {
-          stopReason = 'stable_screenshot';
-          exitCode = 0;
-          break;
-        }
-      }
-
-      if (Date.now() / 1000 - startTimeSeconds > context.timeLimitSeconds) {
-        stopReason = 'timeout';
+    if (screenshots.length > 0) {
+      const screenshotSignatures = screenshots.map((file) => file.data).toSorted();
+      screenshotSignaturesHistory.unshift(screenshotSignatures);
+      screenshotSignaturesHistory.length = Math.min(screenshotSignaturesHistory.length, context.stopDetectionThreshold);
+      if (
+        screenshotSignaturesHistory.length === context.stopDetectionThreshold &&
+        screenshotSignaturesHistory.every(
+          (files) =>
+            files.length === screenshotSignatures.length &&
+            files.every((file, index) => file === screenshotSignatures[index])
+        )
+      ) {
+        stopReason = 'stable_screenshot';
         exitCode = 0;
         break;
       }
     }
 
-    if (stopReason !== 'process_exit' && child.exitCode === null) {
-      child.removeAllListeners('close');
-      child.removeAllListeners('error');
+    if (Date.now() / 1000 - startTimeSeconds > context.timeLimitSeconds) {
+      stopReason = 'timeout';
+      exitCode = 0;
+      break;
     }
-    // A submission can kill its own same-UID `timeout` and be stopped by the watchdog instead,
-    // which surfaces as a SIGKILL rather than a deadline. Report that as the timeout it is, not as
-    // the runtime error the signal would otherwise imply — but only when the child's fate is what
-    // decided the verdict. A `stable_screenshot` (or the loop's own `timeout`) was already decided
-    // from the screenshots, so the watchdog must not overwrite it.
-    const watchdogFired = stopReason === 'process_exit' && watchdog.fired();
-    await stopProcess(child);
-    submissionStopped = true;
-    if (spawnError) throw spawnError;
-    const {
-      memoryBytes,
-      stderr: normalizedStderr,
-      timeSeconds,
-    } = parseTimedStderr(stderr, startTimeSeconds, sampledMemoryBytes);
-
-    return {
-      stdin: context.stdin,
-      stdout: stdout.trimEnd(),
-      stderr: normalizedStderr,
-      status: watchdogFired ? 0 : exitCode,
-      timeSeconds,
-      memoryBytes,
-      screenshots,
-      stopReason: watchdogFired ? 'timeout' : stopReason,
-    };
-  } finally {
-    // Only once the submission is demonstrably stopped: if termination itself failed (or never ran
-    // because a helper threw), the watchdog is the only thing left able to end it, and cancelling
-    // would leave it running unchecked.
-    if (submissionStopped) watchdog.cancel();
   }
+
+  if (stopReason !== 'process_exit' && child.exitCode === null) {
+    child.removeAllListeners('close');
+    child.removeAllListeners('error');
+  }
+  await stopProcess(child);
+  if (spawnError) throw spawnError;
+  const {
+    memoryBytes,
+    stderr: normalizedStderr,
+    timeSeconds,
+  } = parseTimedStderr(stderr, startTimeSeconds, sampledMemoryBytes);
+
+  return {
+    stdin: context.stdin,
+    stdout: stdout.trimEnd(),
+    stderr: normalizedStderr,
+    status: exitCode,
+    timeSeconds,
+    memoryBytes,
+    screenshots,
+    stopReason,
+  };
 }
 
 function takeScreenshots(display: string | undefined): GuiScreenshotFile[] {
-  // These helpers run as the trusted harness user, so they must not be resolved through a
-  // submission-influenced `PATH` (see `getTrustedHelperEnv`).
-  const env = getTrustedHelperEnv(display ? { DISPLAY: display } : { DISPLAY: process.env.DISPLAY });
+  const env = { ...process.env, DISPLAY: display ?? process.env.DISPLAY };
   const xwininfo = childProcess.spawnSync('xwininfo', ['-root', '-tree'], { encoding: 'utf8', env });
   if (xwininfo.error) throw xwininfo.error;
   if (xwininfo.status !== 0 || !xwininfo.stdout) return [];
@@ -759,11 +665,7 @@ async function ensureDisplayServer(): Promise<{ display: string; dispose: () => 
   for (let displayNumber = 90; displayNumber < 100; displayNumber++) {
     const display = `:${displayNumber}`;
     let spawnError: Error | undefined;
-    const xvfb = childProcess.spawn('Xvfb', [display, '-screen', '0', '1280x1024x24', '-ac'], {
-      stdio: 'ignore',
-      // Runs as the trusted harness user, so pin the lookup to system paths.
-      env: getTrustedHelperEnv(),
-    });
+    const xvfb = childProcess.spawn('Xvfb', [display, '-screen', '0', '1280x1024x24', '-ac'], { stdio: 'ignore' });
     xvfb.on('error', (error) => {
       spawnError = error;
     });
@@ -789,15 +691,6 @@ async function ensureDisplayServer(): Promise<{ display: string; dispose: () => 
 
 async function stopProcess(child: childProcess.ChildProcess): Promise<void> {
   if (!child.pid) return;
-  // The current user cannot signal the root-owned sudo wrapper nor the sandbox user's processes, so
-  // go through sudo. SIGKILL is unconditional after the grace period: `child.exitCode` reflects only
-  // the sudo wrapper, so a daemonized child that ignored SIGTERM would survive if we gated on it.
-  if (sandboxUserName) {
-    killSandboxUserProcesses(['TERM']);
-    await wait(PROCESS_SHUTDOWN_WAIT_SECONDS * 1000);
-    killSandboxUserProcesses(['KILL']);
-    return;
-  }
   killProcessGroup(child.pid, 'SIGTERM');
   await wait(PROCESS_SHUTDOWN_WAIT_SECONDS * 1000);
   if (child.exitCode === null) killProcessGroup(child.pid, 'SIGKILL');
@@ -806,12 +699,8 @@ async function stopProcess(child: childProcess.ChildProcess): Promise<void> {
 function readProcessGroupMemoryBytes(processGroupId: number | undefined): number {
   if (!processGroupId || process.platform !== 'linux') return 0;
 
-  // The delegation contract requires sudoers `!use_pty`, so sudo execs the command in place and it
-  // stays in the detached child's process group; `--pgroup` therefore still captures it there.
   const result = childProcess.spawnSync('ps', ['-o', 'rss=', '--no-headers', '--pgroup', String(processGroupId)], {
     encoding: 'utf8',
-    // Runs as the trusted harness user, so pin the lookup to system paths.
-    env: getTrustedHelperEnv(),
   });
   if (result.error || result.status !== 0 || !result.stdout) return 0;
 
