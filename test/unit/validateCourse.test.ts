@@ -84,6 +84,13 @@ describe('validateCourseDirectory', () => {
     expect(result.errors).toEqual([expect.stringContaining('duplicate problem IDs: a_plus_b')]);
   });
 
+  test('rejects a duplicate problem link whose text spans lines', async () => {
+    const courseDir = await copyCourseFixture();
+    await appendFile(join(courseDir, 'lecture_1', '10_intro.md'), '\n[もう\n一度](problems/a_plus_b)\n');
+    const result = await validateCourse(courseDir);
+    expect(result.errors).toEqual([expect.stringContaining('duplicate problem IDs: a_plus_b')]);
+  });
+
   test('rejects an explicit question link that repeats a question block', async () => {
     const courseDir = await copyCourseFixture();
     await appendFile(join(courseDir, 'lecture_1', '10_intro.md'), '\n@[question](intro_select_1)\n');

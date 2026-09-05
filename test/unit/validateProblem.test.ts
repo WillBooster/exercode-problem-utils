@@ -163,6 +163,18 @@ describe('validateProblemDirectory', () => {
     expect(result.warnings).toEqual([]);
   });
 
+  test('warns about a .gitkeep placeholder inside .fout', async () => {
+    const problemDir = await copyProblemFixture();
+    await rm(join(problemDir, 'test_cases', 'test_2.out'));
+    await mkdir(join(problemDir, 'test_cases', 'test_2.fout'));
+    await writeFile(join(problemDir, 'test_cases', 'test_2.fout', '.gitkeep'), '');
+    const result = await validateProblemDirectory(problemDir);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([
+      expect.stringContaining('test_2.fout/.gitkeep is compared as an expected output file'),
+    ]);
+  });
+
   test('rejects an empty .fout directory', async () => {
     const problemDir = await copyProblemFixture();
     await rm(join(problemDir, 'test_cases', 'test_1.in'));

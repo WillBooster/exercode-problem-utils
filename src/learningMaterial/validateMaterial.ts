@@ -18,8 +18,11 @@ const QUESTION_CODE_BLOCK_REGEX = /(?:^|\n)(?<fence>`{3,}|~{3,})ya?ml +question\
 // question-looking blocks the judge parser would silently skip surface as leftover openers.
 const QUESTION_CODE_BLOCK_OPENER_REGEX = /^[ \t]*(?:`{3,}|~{3,})[ \t]*ya?ml[ \t]+question[ \t]*\r?$/gm;
 const PROBLEM_LINK_REGEX = /\[.*?]\(problems\/([0-9_a-z-]+?)\)/g;
+// Exercode's duplicate-assignment check scans the body with these patterns, whose link text may
+// span lines (unlike the judge's reference collection above).
+const PROBLEM_ASSIGNMENT_REGEX = /\[[^\]]*]\(problems\/([0-9_a-z-]+)\)/g;
 const QUESTION_LINK_REGEX = /@\[question]\(([0-9_a-z-]+)\)/g;
-const TURTLE_GRAPHICS_QUESTION_LINK_REGEX = /\[.*?]\(turtle-graphics-questions\/([0-9_a-z-]+?)\)/g;
+const TURTLE_GRAPHICS_ASSIGNMENT_REGEX = /\[[^\]]*]\(turtle-graphics-questions\/([0-9_a-z-]+)\)/g;
 const CHAT_MARKER = '<!-- chat -->';
 // exercode only counts the marker when it stands alone on a line, so fenced or inline mentions don't count.
 const STANDALONE_CHAT_MARKER_REGEX = /(^|\r?\n)<!-- chat -->[ \t]*(?=\r?\n|$)/g;
@@ -108,16 +111,24 @@ export async function validateMaterialFile(
   reportDuplicateIds(
     [
       ...(frontmatter?.turtleGraphicsQuestions ?? []).map((question) => question.id),
-      ...collectLinkedIds(bodyWithoutQuestionBlocks, TURTLE_GRAPHICS_QUESTION_LINK_REGEX),
+      ...collectLinkedIds(bodyWithoutQuestionBlocks, TURTLE_GRAPHICS_ASSIGNMENT_REGEX),
     ],
     'turtleGraphicsQuestion',
     errors
   );
+  reportDuplicateIds(
+    [
+      ...(frontmatter?.problems ?? []).map((problem) => problem.id),
+      ...collectLinkedIds(bodyWithoutQuestionBlocks, PROBLEM_ASSIGNMENT_REGEX),
+    ],
+    'problem',
+    errors
+  );
+  // Only the links the judge collects become references whose targets must exist.
   const problemIds = [
     ...(frontmatter?.problems ?? []).map((problem) => problem.id),
     ...collectLinkedIds(bodyWithoutQuestionBlocks, PROBLEM_LINK_REGEX),
   ];
-  reportDuplicateIds(problemIds, 'problem', errors);
   reportForeignProblemCourseIds(frontmatter?.problems ?? [], options.courseId, errors);
   if (options.availableProblemIds !== undefined) {
     for (const problemId of new Set(problemIds)) {

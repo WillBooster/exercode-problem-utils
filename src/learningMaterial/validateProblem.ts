@@ -57,8 +57,8 @@ const IMPORTER_MAX_STDOUT_LENGTH = 100_000;
 // `_shared.fin/` holds files copied for every test case; it is not a test case itself.
 const SHARED_FILE_INPUT_NAME = '_shared';
 // The importer leaves generated artifacts out of the packaged problem, so a directory holding only
-// these is as good as empty; `.gitkeep` is a placeholder that git keeps but no program reads.
-const IGNORED_TEST_CASE_ENTRY_NAMES: ReadonlySet<string> = new Set(['.DS_Store', '.gitkeep', '__pycache__']);
+// these is as good as empty. Any other file counts, even a `.gitkeep` placeholder.
+const IGNORED_TEST_CASE_ENTRY_NAMES: ReadonlySet<string> = new Set(['.DS_Store', '__pycache__']);
 
 interface ModelAnswer {
   id: string;
@@ -308,6 +308,14 @@ async function readFileTestCases(
       continue;
     }
     testCase.hasFileOutput = true;
+    // The importer keeps a placeholder like any file, so the stdio judge would require the program to write it.
+    for (const filePath of filePaths) {
+      if (basename(filePath) === '.gitkeep') {
+        warnings.push(
+          `test case ${testCaseId}: ${dirent.name}/${relative(join(testCasesDirectoryPath, dirent.name), filePath)} is compared as an expected output file; delete the placeholder`
+        );
+      }
+    }
     // The stdio judge compares each expected file and refuses one above its limit (the importer rejects
     // the problem); a custom judge.ts reads the directory under its own contract.
     if (!hasCustomJudgeTs) {
