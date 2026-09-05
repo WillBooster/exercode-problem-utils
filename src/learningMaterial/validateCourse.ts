@@ -49,7 +49,8 @@ export async function validateCourseDirectory(
   }
 
   const parsedCourseFile = await parseCourseFile(absoluteDirectoryPath, errors);
-  const problemsDirectoryPath = options.problemsDirectoryPath ?? absoluteDirectoryPath;
+  // Messages name the course directory because that is what discovery searches (see collectAvailableProblemIds).
+  const problemsDirectoryPath = absoluteDirectoryPath;
   const availableProblemIds = await collectAvailableProblemIds(absoluteDirectoryPath, options, errors);
 
   if (!parsedCourseFile) return result;
