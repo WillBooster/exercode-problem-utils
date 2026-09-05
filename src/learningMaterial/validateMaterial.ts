@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { parse as parseYaml } from 'yaml';
+import { collectProblemDefinitions, reportProblemDefinitionIssues } from './fsHelpers.js';
 import { parseFrontmatter } from './frontmatter.js';
 import {
   LEARNING_MATERIAL_ID_REGEX,
@@ -35,9 +36,9 @@ export interface SubmissionPeriods {
 }
 
 export interface MaterialValidationOptions {
-  /** When set, every referenced problem ID must be one of these (the problems discovered for the course). */
+  /** Problem IDs already collected for the enclosing course; collected from `problemsDirectoryPath` otherwise. */
   availableProblemIds?: ReadonlySet<string>;
-  /** Where `availableProblemIds` were collected from, for messages. */
+  /** When set, every referenced problem ID must be a problem discovered under this path. */
   problemsDirectoryPath?: string;
   /** Enclosing course ID; the judge rejects problem references whose `courseId` differs from it. */
   courseId?: string;
@@ -133,10 +134,16 @@ export async function validateMaterialFile(
   ];
   reportDuplicateIds(problemIds, 'problem', errors);
   reportForeignProblemCourseIds(frontmatter?.problems ?? [], options.courseId, errors);
-  if (options.availableProblemIds !== undefined) {
+  let availableProblemIds = options.availableProblemIds;
+  if (availableProblemIds === undefined && options.problemsDirectoryPath !== undefined) {
+    const definitionPathsById = await collectProblemDefinitions(options.problemsDirectoryPath);
+    reportProblemDefinitionIssues(definitionPathsById, errors);
+    availableProblemIds = new Set(definitionPathsById.keys());
+  }
+  if (availableProblemIds !== undefined) {
     const location = options.problemsDirectoryPath === undefined ? '' : ` under ${options.problemsDirectoryPath}`;
     for (const problemId of new Set(problemIds)) {
-      if (!options.availableProblemIds.has(problemId)) {
+      if (!availableProblemIds.has(problemId)) {
         errors.push(`problem "${problemId}" is referenced but does not exist${location}`);
       }
     }

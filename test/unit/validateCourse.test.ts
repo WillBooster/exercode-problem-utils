@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { appendFile, cp, mkdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { validateCourseDirectory } from '../../src/learningMaterial/validateCourse.js';
+import { validateMaterialFile } from '../../src/learningMaterial/validateMaterial.js';
 import {
   cleanupTempDirs,
   copyFixtureToTempDir,
@@ -11,6 +12,18 @@ import {
 
 const problemsDir = join(learningMaterialFixturesDir, 'courses', 'example_course', 'problems');
 const validCourseDir = join(learningMaterialFixturesDir, 'courses', 'example_course');
+
+describe('validateMaterialFile', () => {
+  test('resolves problem references from problemsDirectoryPath on its own', async () => {
+    const result = await validateMaterialFile(join(validCourseDir, 'lecture_1', '10_intro.md'), {
+      problemsDirectoryPath: join(learningMaterialFixturesDir, 'contests'),
+    });
+    expect(result.errors).toEqual([
+      expect.stringContaining('problem "a_plus_b" is referenced but does not exist'),
+      expect.stringContaining('problem "arithmetic_subtraction" is referenced but does not exist'),
+    ]);
+  });
+});
 
 describe('validateCourseDirectory', () => {
   afterEach(cleanupTempDirs);
