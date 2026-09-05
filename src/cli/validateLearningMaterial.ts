@@ -17,7 +17,9 @@ export async function validateLearningMaterial(
 ): Promise<number> {
   const { targets, problemsDir } = parseValidateArgs(args);
   if (targets.length === 0) throw new Error(`${subcommand} requires at least one path`);
-  if (subcommand !== 'validate-problem' && targets.length > 1) {
+  if (subcommand === 'validate-problem') {
+    if (problemsDir !== undefined) throw new Error(`${subcommand} does not take --problems-dir`);
+  } else if (targets.length > 1) {
     throw new Error(`${subcommand} accepts exactly one path, but got ${targets.length}`);
   }
 
