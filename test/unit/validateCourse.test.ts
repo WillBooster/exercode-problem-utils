@@ -98,6 +98,17 @@ describe('validateCourseDirectory', () => {
     expect(result.errors).toEqual([expect.stringContaining('duplicate question link IDs: intro_select_1')]);
   });
 
+  test('rejects a problem reference that resolves only through a symbolic link', async () => {
+    const tempDir = await createTempDir();
+    await cp(validCourseDir, join(tempDir, 'example_course'), { recursive: true });
+    await mkdir(join(tempDir, 'problems'));
+    await symlink(join(problemsDir, 'a_plus_b'), join(tempDir, 'problems', 'a_plus_b'));
+    const result = await validateCourseDirectory(join(tempDir, 'example_course'), {
+      problemsDirectoryPath: join(tempDir, 'problems'),
+    });
+    expect(result.errors).toEqual([expect.stringContaining('problem "a_plus_b" is referenced but does not exist')]);
+  });
+
   test('rejects a dangling problem reference in a material body', async () => {
     const courseDir = await copyCourseFixture();
     await replaceInMaterial(courseDir, '(problems/a_plus_b)', '(problems/missing_problem)');

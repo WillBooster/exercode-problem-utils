@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { parseFrontmatter } from './frontmatter.js';
-import { isFile } from './fsHelpers.js';
+import { isRegularDirectory, isRegularFile } from './fsHelpers.js';
 import {
   LEARNING_MATERIAL_ID_REGEX,
   materialFrontmatterSchema,
@@ -159,11 +159,13 @@ export function mergeSubmissionPeriods(
  * so a bare directory without a statement file is not a problem and references to it are dangling.
  */
 export async function problemDefinitionExists(problemsDirectoryPath: string, problemId: string): Promise<boolean> {
-  return (
-    (await isFile(join(problemsDirectoryPath, problemId, 'problem.md'))) ||
-    (await isFile(join(problemsDirectoryPath, problemId, `${problemId}.problem.md`))) ||
-    (await isFile(join(problemsDirectoryPath, `${problemId}.problem.md`)))
-  );
+  // Discovery neither traverses a symbolic-link directory nor accepts a symbolic-link statement.
+  const problemDirectoryPath = join(problemsDirectoryPath, problemId);
+  if (await isRegularDirectory(problemDirectoryPath)) {
+    if (await isRegularFile(join(problemDirectoryPath, 'problem.md'))) return true;
+    if (await isRegularFile(join(problemDirectoryPath, `${problemId}.problem.md`))) return true;
+  }
+  return isRegularFile(join(problemsDirectoryPath, `${problemId}.problem.md`));
 }
 
 /** exercode rejects more than one standalone chat delimiter line in material and problem bodies. */

@@ -41,6 +41,16 @@ export async function isRegularFile(path: string): Promise<boolean> {
   }
 }
 
+/** Whether the path is a directory that is not a symbolic link, which the judge's discovery does not traverse. */
+export async function isRegularDirectory(path: string): Promise<boolean> {
+  try {
+    const stats = await lstat(path);
+    return stats.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 export async function isDirectory(path: string): Promise<boolean> {
   try {
     const stats = await stat(path);
