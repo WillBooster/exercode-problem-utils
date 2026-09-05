@@ -1,0 +1,7 @@
+name: サンプルコース
+description: 検証用の最小コースです。
+isPublic: false
+lectures:
+  - id: lecture_1
+    name: 第1回 加算と減算
+    description: 標準入力から整数を読み取り、四則演算の結果を出力します。

@@ -59,6 +59,7 @@
     "@ai-sdk/xai": "4.0.49",
     "ai": "7.0.84",
     "front-matter": "4.0.2",
+    "yaml": "2.9.0",
     "zod": "4.5.2"
   },
   "devDependencies": {

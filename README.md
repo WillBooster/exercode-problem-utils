@@ -31,6 +31,29 @@ The all-problem check judges serially by default because time limits are measure
 
 A standard stdin/stdout problem must NOT commit a `judge.ts` or `debug.ts` that is identical to the default stdio harness: the absence of `judge.ts` marks the problem as standard, and committed copies would drift from the server's defaults. The CLI rejects such files; a file kept intentionally (e.g. to demonstrate the default harness) can add an explanatory comment to be treated as custom.
 
+## Validators
+
+The CLI also validates learning-material files without running any program, mirroring the checks the Exercode importer applies:
+
+```bash
+# Validate problem directories (problem.md frontmatter, test_cases, model_answers, templates, judge.ts / debug.ts).
+bun x exercode-problem validate-problem <problemDir>...
+# Validate a course directory (course.yaml, lecture materials with embedded questions, problem references).
+bun x exercode-problem validate-course <courseDir> [--problems-dir <dir>]
+# Validate a contest (*.contest.yaml) file.
+bun x exercode-problem validate-contest <contestYamlPath> [--problems-dir <dir>]
+```
+
+Each target prints `OK` or `NG` followed by its errors and warnings; the command exits 1 when any target has an error. `--problems-dir` points to the directory holding the referenced problems (for a course it defaults to the course directory itself, since Exercode links a material to the problems inside its course at any depth). The validators are also exported (`validateProblemDirectory`, `validateCourseDirectory`, `validateContestFile`, `validateMaterialFile`).
+
+## Agent skills
+
+The [`skills/`](skills/) directory holds skills for AI coding agents that author and review Exercode learning content: `generate-learning-content` (entry point), `generate-course-materials`, `generate-judge-problems`, `generate-judge-contest`, `review-learning-content`, and `setup-exercode-course-repository`. Agents working in this repository load them through the symlinks under `.claude/skills/`; install them elsewhere with the [skills](https://github.com/vercel-labs/skills) CLI:
+
+```bash
+bun x skills add WillBooster/exercode-problem-utils --agent claude-code --agent codex
+```
+
 ## Test cases
 
 A problem keeps its test cases under `test_cases/`. A test case id is the shared name of the following entries, and each entry is optional:
