@@ -107,17 +107,13 @@ export async function validateProblemDirectory(problemDirectoryPath: string): Pr
     frontmatter !== undefined && frontmatter.isManualScoringRequired !== true && frontmatter.type !== 'prompt_study';
   validateHarnessFiles(harness, frontmatter !== undefined, errors, warnings);
 
-  const hasSolutionDirectory = await isDirectory(join(absoluteDirectoryPath, 'solution'));
   const modelAnswers = await readModelAnswers(absoluteDirectoryPath, errors, warnings);
-  // An empty solution/ directory or whitespace-only files still produce entries, so presence
-  // requires at least one non-empty source file rather than a non-empty answer list.
+  // Whitespace-only files still produce entries, so presence requires at least one non-empty
+  // source file rather than a non-empty answer list.
   const usableModelAnswers = modelAnswers.filter((answer) => answer.files.some((file) => file.data.trim().length > 0));
   if (usableModelAnswers.length === 0 && isScoredAutomatically) {
-    // solution/ shadows model_answers/ in the judge, so "add model_answers/" would be unactionable then.
     errors.push(
-      hasSolutionDirectory
-        ? 'solution/ exists but has no non-empty source files; add files under solution/ or remove it to use model_answers/'
-        : 'no model answers found; add at least one model_answers/<languageId>/ directory with non-empty source files'
+      'no model answers found; add at least one model_answers/<languageId>/ directory with non-empty source files'
     );
   }
   if (frontmatter) {
@@ -456,17 +452,6 @@ async function readModelAnswers(
   errors: string[],
   warnings: string[]
 ): Promise<ModelAnswer[]> {
-  // Special judges keep the single model answer in `solution/`; the judge ignores model_answers/ then.
-  const solutionDirectoryPath = join(problemDirectoryPath, 'solution');
-  if (await isDirectory(solutionDirectoryPath)) {
-    if (await isDirectory(join(problemDirectoryPath, 'model_answers'))) {
-      warnings.push(
-        'both solution/ and model_answers/ exist; the judge ignores model_answers/ when solution/ is present'
-      );
-    }
-    return [{ id: 'default', files: await readSourceFilesRecursively(solutionDirectoryPath) }];
-  }
-
   const modelAnswersDirectoryPath = join(problemDirectoryPath, 'model_answers');
   if (!(await isDirectory(modelAnswersDirectoryPath))) return [];
 

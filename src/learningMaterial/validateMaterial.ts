@@ -268,10 +268,11 @@ function validateQuestion(question: MaterialQuestion, errors: string[]): void {
   }
   // Mirrors the judge heuristic: a pattern that doesn't match itself likely uses RegExp syntax,
   // so a modelAnswer is required to prove that some concrete answer is accepted.
-  if (question.modelAnswer === undefined && !rawAnswerRegExp.test(answerPattern)) {
+  // Like the judge, an empty modelAnswer counts as missing.
+  if (!question.modelAnswer && !rawAnswerRegExp.test(answerPattern)) {
     errors.push(`question ${question.id}: \`answerPattern\` seems a RegExp but \`modelAnswer\` is missing`);
   }
-  if (question.modelAnswer !== undefined && !answerRegExp.test(question.modelAnswer.trim())) {
+  if (question.modelAnswer && !answerRegExp.test(question.modelAnswer.trim())) {
     errors.push(`question ${question.id}: \`modelAnswer\` doesn't match \`answerPattern\``);
   }
 }

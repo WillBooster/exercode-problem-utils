@@ -42,6 +42,16 @@ describe('validateCourseDirectory', () => {
     expect(result.warnings).toEqual([]);
   });
 
+  test('does not report the course-scoped problems directory as an orphan lecture with --problems-dir', async () => {
+    const tempDir = await createTempDir();
+    const courseDir = join(tempDir, 'example_course');
+    await cp(validCourseDir, courseDir, { recursive: true });
+    await cp(problemsDir, join(courseDir, 'problems'), { recursive: true });
+    const result = await validateCourseDirectory(courseDir, { problemsDirectoryPath: problemsDir });
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
+
   test('warns when no problems directory is available', async () => {
     const tempDir = await createTempDir();
     await cp(validCourseDir, join(tempDir, 'example_course'), { recursive: true });

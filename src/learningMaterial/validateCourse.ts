@@ -75,17 +75,19 @@ async function reportOrphanLectureDirectories(
   warnings: string[]
 ): Promise<void> {
   const lectureIds = new Set((courseFile.lectures ?? []).map((lecture) => lecture.id));
-  const courseProblemsDirectoryName =
-    problemsDirectoryPath && dirname(resolve(problemsDirectoryPath)) === courseDirectoryPath
-      ? basename(problemsDirectoryPath)
-      : undefined;
+  // The course's own `problems/` holds problems, never lecture materials, whichever problems
+  // directory the validation resolved to.
+  const problemsDirectoryNames = new Set(['problems']);
+  if (problemsDirectoryPath && dirname(resolve(problemsDirectoryPath)) === courseDirectoryPath) {
+    problemsDirectoryNames.add(basename(problemsDirectoryPath));
+  }
   const dirents = await readdir(courseDirectoryPath, { withFileTypes: true });
   for (const dirent of dirents) {
     if (
       !dirent.isDirectory() ||
       dirent.name.startsWith('.') ||
       lectureIds.has(dirent.name) ||
-      dirent.name === courseProblemsDirectoryName
+      problemsDirectoryNames.has(dirent.name)
     )
       continue;
     warnings.push(
