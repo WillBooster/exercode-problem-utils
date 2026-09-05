@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'vitest';
-import { appendFile, cp, mkdir, readFile, rename, symlink, writeFile } from 'node:fs/promises';
+import { appendFile, cp, mkdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { validateCourseDirectory } from '../../src/learningMaterial/validateCourse.js';
 import {
@@ -101,7 +101,8 @@ describe('validateCourseDirectory', () => {
   test('rejects a problem reference that resolves only through a symbolic link', async () => {
     const tempDir = await createTempDir();
     await cp(validCourseDir, join(tempDir, 'example_course'), { recursive: true });
-    await mkdir(join(tempDir, 'problems'));
+    await cp(problemsDir, join(tempDir, 'problems'), { recursive: true });
+    await rm(join(tempDir, 'problems', 'a_plus_b'), { recursive: true });
     await symlink(join(problemsDir, 'a_plus_b'), join(tempDir, 'problems', 'a_plus_b'));
     const result = await validateCourseDirectory(join(tempDir, 'example_course'), {
       problemsDirectoryPath: join(tempDir, 'problems'),
