@@ -63,6 +63,15 @@ describe('validateCourseDirectory', () => {
     expect(result.errors).toEqual([expect.stringContaining('problem ID "a_plus_b" is defined more than once')]);
   });
 
+  test('still discovers course-wide problems when --problems-dir names a subdirectory', async () => {
+    const tempDir = await createTempDir();
+    const courseDir = join(tempDir, 'example_course');
+    await cp(validCourseDir, courseDir, { recursive: true });
+    await rename(join(courseDir, 'problems', 'a_plus_b'), join(courseDir, 'lecture_1', 'a_plus_b'));
+    const result = await validateCourseDirectory(courseDir, { problemsDirectoryPath: join(courseDir, 'problems') });
+    expect(result.errors).toEqual([]);
+  });
+
   test('warns when --problems-dir points outside the course', async () => {
     const tempDir = await createTempDir();
     await cp(validCourseDir, join(tempDir, 'example_course'), { recursive: true });

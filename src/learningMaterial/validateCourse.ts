@@ -52,9 +52,16 @@ export async function validateCourseDirectory(
   const problemsDirectoryPath = await resolveProblemsDirectoryPath(absoluteDirectoryPath, options, errors, warnings);
   let availableProblemIds: Set<string> | undefined;
   if (problemsDirectoryPath !== undefined) {
-    const definitionPathsById = await collectProblemDefinitions(problemsDirectoryPath);
+    // The judge always scopes every problem inside the course to it; an explicit directory outside
+    // the course only adds to that set (with the warning above).
+    const definitionPathsById = await collectProblemDefinitions(absoluteDirectoryPath);
     reportProblemDefinitionIssues(definitionPathsById, errors);
     availableProblemIds = new Set(definitionPathsById.keys());
+    if (relative(absoluteDirectoryPath, resolve(problemsDirectoryPath)).startsWith('..')) {
+      const extraDefinitionPathsById = await collectProblemDefinitions(problemsDirectoryPath);
+      reportProblemDefinitionIssues(extraDefinitionPathsById, errors);
+      for (const problemId of extraDefinitionPathsById.keys()) availableProblemIds.add(problemId);
+    }
   }
 
   if (!parsedCourseFile) return result;
