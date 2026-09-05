@@ -4,7 +4,7 @@ Write lecture material bodies (normally in Japanese) following all rules below.
 
 ## Structure
 
-- Start each material file with a `# ` title heading on the first line, then `## ` section headings following the course outline.
+- After the YAML frontmatter block, start the body with a `# ` title heading, then `## ` section headings following the course outline.
 - Cover only the topics assigned to the material; do not duplicate content from other lectures. When a material continues a previous one, continue without repeating.
 - Keep the whole material logically ordered and internally consistent.
 - Do NOT add a summary or conclusion section (e.g. 「まとめ」, 「結論」) at the end.
