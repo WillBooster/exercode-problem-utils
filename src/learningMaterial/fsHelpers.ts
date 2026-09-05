@@ -100,10 +100,20 @@ async function collectProblemDefinitionsInto(
       const definitionPaths = definitionPathsById.get(problemId) ?? [];
       definitionPaths.push(relative(rootDirectoryPath, join(directoryPath, dirent.name)));
       definitionPathsById.set(problemId, definitionPaths);
-    } else if (dirent.isDirectory() && dirent.name !== 'node_modules' && !dirent.name.startsWith('.')) {
+    } else if (dirent.isDirectory() && !isExcludedFromDiscovery(directoryPath, dirent.name)) {
       await collectProblemDefinitionsInto(rootDirectoryPath, join(directoryPath, dirent.name), definitionPathsById);
     }
   }
+}
+
+// The judge's discovery glob skips dot directories and these excludes.
+function isExcludedFromDiscovery(parentDirectoryPath: string, directoryName: string): boolean {
+  return (
+    directoryName.startsWith('.') ||
+    directoryName === 'node_modules' ||
+    directoryName === 'target' ||
+    (directoryName === 'temp' && basename(parentDirectoryPath) === 'judge-environments')
+  );
 }
 
 /**
