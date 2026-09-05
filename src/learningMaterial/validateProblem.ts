@@ -689,7 +689,7 @@ async function validateTemplates(
     for (const modelAnswer of modelAnswers) {
       const judgedFiles = modelAnswer.files.filter(
         (file) =>
-          file.data.trim().length > 0 && (hasCustomJudgeTs || findLanguageDefinitionByPath(file.path) !== undefined)
+          hasCustomJudgeTs || (file.data.trim().length > 0 && findLanguageDefinitionByPath(file.path) !== undefined)
       );
       if (judgedFiles.length > 0 && judgedFiles.every((file) => templateContentByPath.get(file.path) === file.data)) {
         warnings.push(

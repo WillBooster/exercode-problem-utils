@@ -1,7 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { collectProblemDefinitions, reportProblemDefinitionIssues } from './fsHelpers.js';
+import {
+  collectProblemDefinitions,
+  isDirectory,
+  isRegularDirectory,
+  reportProblemDefinitionIssues,
+} from './fsHelpers.js';
 import { parseFrontmatter } from './frontmatter.js';
 import {
   LEARNING_MATERIAL_ID_REGEX,
@@ -136,9 +141,17 @@ export async function validateMaterialFile(
   reportForeignProblemCourseIds(frontmatter?.problems ?? [], options.courseId, errors);
   let availableProblemIds = options.availableProblemIds;
   if (availableProblemIds === undefined && options.problemsDirectoryPath !== undefined) {
-    const definitionPathsById = await collectProblemDefinitions(options.problemsDirectoryPath);
-    reportProblemDefinitionIssues(definitionPathsById, errors);
-    availableProblemIds = new Set(definitionPathsById.keys());
+    if (!(await isRegularDirectory(options.problemsDirectoryPath))) {
+      errors.push(
+        (await isDirectory(options.problemsDirectoryPath))
+          ? `problems directory is a symbolic link, which the judge does not traverse: ${options.problemsDirectoryPath}`
+          : `problems directory not found: ${options.problemsDirectoryPath}`
+      );
+    } else {
+      const definitionPathsById = await collectProblemDefinitions(options.problemsDirectoryPath);
+      reportProblemDefinitionIssues(definitionPathsById, errors);
+      availableProblemIds = new Set(definitionPathsById.keys());
+    }
   }
   if (availableProblemIds !== undefined) {
     const location = options.problemsDirectoryPath === undefined ? '' : ` under ${options.problemsDirectoryPath}`;
