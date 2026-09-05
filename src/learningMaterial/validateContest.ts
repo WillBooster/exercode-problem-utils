@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { isDirectory, isFile, isRegularFile } from './fsHelpers.js';
+import { isDirectory, isFile, isRegularDirectory, isRegularFile } from './fsHelpers.js';
 import { CONTEST_MATERIAL_FILE_SUFFIX, contestFileSchema, LEARNING_MATERIAL_ID_REGEX } from './schemas.js';
 import {
   mergeSubmissionPeriods,
@@ -83,8 +83,12 @@ export async function validateContestFile(
     if (!options.isNestedInCourse) {
       warnings.push('no problems directory given (pass --problems-dir); problem references are not checked');
     }
-  } else if (!(await isDirectory(options.problemsDirectoryPath))) {
-    errors.push(`problems directory not found: ${options.problemsDirectoryPath}`);
+  } else if (!(await isRegularDirectory(options.problemsDirectoryPath))) {
+    errors.push(
+      (await isDirectory(options.problemsDirectoryPath))
+        ? `problems directory is a symbolic link, which the judge does not traverse: ${options.problemsDirectoryPath}`
+        : `problems directory not found: ${options.problemsDirectoryPath}`
+    );
   } else {
     for (const problem of parsed.data.problems) {
       if (!(await problemDefinitionExists(options.problemsDirectoryPath, problem.id))) {

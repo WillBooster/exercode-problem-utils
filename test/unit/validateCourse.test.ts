@@ -98,6 +98,15 @@ describe('validateCourseDirectory', () => {
     expect(result.errors).toEqual([expect.stringContaining('duplicate question link IDs: intro_select_1')]);
   });
 
+  test('rejects a symbolic link as the course-scoped problems directory', async () => {
+    const tempDir = await createTempDir();
+    const courseDir = join(tempDir, 'example_course');
+    await cp(validCourseDir, courseDir, { recursive: true });
+    await symlink(problemsDir, join(courseDir, 'problems'));
+    const result = await validateCourseDirectory(courseDir);
+    expect(result.errors).toEqual([expect.stringContaining('problems directory is a symbolic link')]);
+  });
+
   test('rejects a problem reference that resolves only through a symbolic link', async () => {
     const tempDir = await createTempDir();
     await cp(validCourseDir, join(tempDir, 'example_course'), { recursive: true });

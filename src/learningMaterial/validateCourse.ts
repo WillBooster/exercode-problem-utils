@@ -152,20 +152,24 @@ async function resolveProblemsDirectoryPath(
   errors: string[],
   warnings: string[]
 ): Promise<string | undefined> {
+  // Problem discovery does not traverse a symbolic link, so a linked problems directory imports nothing.
   if (options.problemsDirectoryPath !== undefined) {
-    if (!(await isDirectory(options.problemsDirectoryPath))) {
-      errors.push(`problems directory not found: ${options.problemsDirectoryPath}`);
+    if (!(await isRegularDirectory(options.problemsDirectoryPath))) {
+      errors.push(
+        (await isDirectory(options.problemsDirectoryPath))
+          ? `problems directory is a symbolic link, which the judge does not traverse: ${options.problemsDirectoryPath}`
+          : `problems directory not found: ${options.problemsDirectoryPath}`
+      );
       return undefined;
     }
     return options.problemsDirectoryPath;
   }
-  const courseProblemsDirectoryPath = join(courseDirectoryPath, 'problems');
-  if (await isDirectory(courseProblemsDirectoryPath)) {
-    return courseProblemsDirectoryPath;
-  }
-  const siblingProblemsDirectoryPath = join(courseDirectoryPath, '..', 'problems');
-  if (await isDirectory(siblingProblemsDirectoryPath)) {
-    return siblingProblemsDirectoryPath;
+  for (const candidatePath of [join(courseDirectoryPath, 'problems'), join(courseDirectoryPath, '..', 'problems')]) {
+    if (await isRegularDirectory(candidatePath)) return candidatePath;
+    if (await isDirectory(candidatePath)) {
+      errors.push(`problems directory is a symbolic link, which the judge does not traverse: ${candidatePath}`);
+      return undefined;
+    }
   }
   warnings.push('no problems directory found (pass --problems-dir); problem references are not checked');
   return undefined;
