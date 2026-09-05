@@ -14,6 +14,7 @@
     test_1.out
     ...
   model_answers/<languageId>/...   # at least one; e.g. python/main.py, javascript/main.mjs, java/Main.java
+  model_answers.fails/<id>/...     # optional answers that must fail at least one test case (checked by `bunx exercode-problem <problemsDir>`)
   templates/<languageId>/...       # optional starter code; templates/_default/ is the fallback for the other languages
 ```
 
@@ -33,7 +34,11 @@ is present, so it can customize debugging for a problem judged by the default st
 Only custom judges (GUI, LLM, command-based, and other special judging) provide a `judge.ts`, using
 helpers such as `commandJudgePreset`, `guiCommandJudgePreset`, and `llmJudgePreset` from
 `@exercode/problem-utils`. A custom judge should ship a `debug.ts` as well; without it the debug
-feature is unavailable for the problem.
+feature is unavailable for the problem. `judge.ts` and `debug.ts` may import only files inside the
+problem directory (put shared helper code in the problem directory and import it with `./...`):
+the judge server and `bunx exercode-problem <problemsDir>` judge a copy of the problem directory
+alone, so an import from the course or repository root breaks there even though
+`bunx exercode-problem judge` in the checked-out directory still works.
 
 To verify a problem's answers locally, run the `exercode-problem` CLI (shipped with
 `@exercode/problem-utils`) from the problem directory: `bunx exercode-problem judge <answerDir> [paramsJson]`. It judges the answer directory with the same harness the judge server uses — the

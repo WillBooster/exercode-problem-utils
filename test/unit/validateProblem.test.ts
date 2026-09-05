@@ -501,7 +501,30 @@ describe('validateProblemDirectory', () => {
     await mkdir(join(problemDir, 'model_answers', 'python'), { recursive: true });
     await writeFile(join(problemDir, 'model_answers', 'python', 'README.md'), '# notes\n');
     const result = await validateProblemDirectory(problemDir);
-    expect(result.errors).toEqual([expect.stringContaining('no model answers found')]);
+    expect(result.errors).toEqual([
+      expect.stringContaining('no model answer has a source file of a supported language'),
+    ]);
+  });
+
+  test('accepts a data-file model answer for a custom judge and checks its required files', async () => {
+    const problemDir = await copyProblemFixture();
+    await setProblemFrontmatter(problemDir, 'name: Evaluation\nrequiredSubmissionFilePaths: [submission.csv]');
+    await rm(join(problemDir, 'test_cases'), { recursive: true });
+    await writeFile(join(problemDir, 'judge.ts'), "import { parseArgs } from '@exercode/problem-utils';\n// custom\n");
+    await writeFile(join(problemDir, 'debug.ts'), "import { parseArgs } from '@exercode/problem-utils';\n// custom\n");
+    await rm(join(problemDir, 'model_answers'), { recursive: true });
+    await mkdir(join(problemDir, 'model_answers', 'default'), { recursive: true });
+    await writeFile(join(problemDir, 'model_answers', 'default', 'submission.csv'), 'id,value\n1,2\n');
+    const acceptedResult = await validateProblemDirectory(problemDir);
+    expect(acceptedResult.errors).toEqual([]);
+    await rename(
+      join(problemDir, 'model_answers', 'default', 'submission.csv'),
+      join(problemDir, 'model_answers', 'default', 'notes.csv')
+    );
+    const missingResult = await validateProblemDirectory(problemDir);
+    expect(missingResult.errors).toEqual([
+      expect.stringContaining('required submission file "submission.csv" is missing'),
+    ]);
   });
 
   test('rejects an empty model answer directory', async () => {
