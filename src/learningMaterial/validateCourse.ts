@@ -50,7 +50,7 @@ export async function validateCourseDirectory(
 
   const parsedCourseFile = await parseCourseFile(absoluteDirectoryPath, errors);
   const problemsDirectoryPath = options.problemsDirectoryPath ?? absoluteDirectoryPath;
-  const availableProblemIds = await collectAvailableProblemIds(absoluteDirectoryPath, options, errors, warnings);
+  const availableProblemIds = await collectAvailableProblemIds(absoluteDirectoryPath, options, errors);
 
   if (!parsedCourseFile) return result;
   const { courseFile, courseFileName } = parsedCourseFile;
@@ -167,13 +167,12 @@ async function findFirst<T>(items: readonly T[], predicate: (item: T) => Promise
 
 /**
  * The judge scopes every problem inside the course directory (at any depth) to the course, so the
- * course is always searched; an explicit directory outside the course only adds to that set.
+ * course is always searched; an explicit directory must lie inside it.
  */
 async function collectAvailableProblemIds(
   courseDirectoryPath: string,
   options: CourseValidationOptions,
-  errors: string[],
-  warnings: string[]
+  errors: string[]
 ): Promise<Set<string>> {
   const definitionPathsById = await collectProblemDefinitions(courseDirectoryPath);
   reportProblemDefinitionIssues(definitionPathsById, errors);
@@ -193,12 +192,10 @@ async function collectAvailableProblemIds(
         : `problems directory not found: ${options.problemsDirectoryPath}`
     );
   } else if (relative(courseDirectoryPath, resolve(options.problemsDirectoryPath)).startsWith('..')) {
-    warnings.push(
+    // Exercode links a material only to problems inside its course, so outside problems never count.
+    errors.push(
       `problems directory ${options.problemsDirectoryPath} is outside the course directory; Exercode links a material only to problems inside the course, so move them under the course`
     );
-    const extraDefinitionPathsById = await collectProblemDefinitions(options.problemsDirectoryPath);
-    reportProblemDefinitionIssues(extraDefinitionPathsById, errors);
-    for (const problemId of extraDefinitionPathsById.keys()) availableProblemIds.add(problemId);
   }
   return availableProblemIds;
 }

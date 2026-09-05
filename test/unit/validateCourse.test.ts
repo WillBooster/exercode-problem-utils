@@ -99,15 +99,18 @@ describe('validateCourseDirectory', () => {
     ]);
   });
 
-  test('warns when --problems-dir points outside the course', async () => {
+  test('rejects --problems-dir outside the course and does not count its problems', async () => {
     const tempDir = await createTempDir();
     await cp(validCourseDir, join(tempDir, 'example_course'), { recursive: true });
     await rename(join(tempDir, 'example_course', 'problems'), join(tempDir, 'problems'));
     const result = await validateCourseDirectory(join(tempDir, 'example_course'), {
       problemsDirectoryPath: join(tempDir, 'problems'),
     });
-    expect(result.errors).toEqual([]);
-    expect(result.warnings).toEqual([expect.stringContaining('is outside the course directory')]);
+    expect(result.errors).toEqual([
+      expect.stringContaining('is outside the course directory'),
+      expect.stringContaining('problem "a_plus_b" is referenced but does not exist'),
+      expect.stringContaining('problem "arithmetic_subtraction" is referenced but does not exist'),
+    ]);
   });
 
   test('rejects references when the course contains no problems', async () => {
@@ -124,7 +127,7 @@ describe('validateCourseDirectory', () => {
   test('rejects a missing course.yaml', async () => {
     const tempDir = await createTempDir();
     await mkdir(join(tempDir, 'empty_course'));
-    const result = await validateCourseDirectory(join(tempDir, 'empty_course'), { problemsDirectoryPath: problemsDir });
+    const result = await validateCourseDirectory(join(tempDir, 'empty_course'));
     expect(result.errors).toEqual([expect.stringContaining('course.yaml not found')]);
   });
 
@@ -336,8 +339,9 @@ async function copyCourseFixture(): Promise<string> {
   return copyFixtureToTempDir(join('courses', 'example_course'), 'example_course');
 }
 
+/** Validates a copied course fixture, whose problems live under its own `problems/`. */
 async function validateCourse(courseDir: string): ReturnType<typeof validateCourseDirectory> {
-  return validateCourseDirectory(courseDir, { problemsDirectoryPath: problemsDir });
+  return validateCourseDirectory(courseDir);
 }
 
 async function replaceInMaterial(courseDir: string, search: string, replacement: string): Promise<void> {
