@@ -4,10 +4,7 @@ import { basename, join, relative, resolve } from 'node:path';
 import { MAX_COMPARED_FILE_BYTES } from '../helpers/compareExpectedOutputFiles.js';
 import { findDefaultStdioHarnessFiles, type HarnessFileName } from '../helpers/defaultStdioHarness.js';
 import { findLanguageDefinitionByPath } from '../helpers/findLanguageDefinitionByPath.js';
-import {
-  judgesTestCasesWithoutExpectations,
-  judgesWithoutTestCases,
-} from '../helpers/readProblemMarkdownFrontMatter.js';
+import { judgesTestCasesWithoutExpectations } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { removeCommentsInSourceCode } from '../helpers/removeCommentsInSourceCode.js';
 import { EXAMPLE_TEST_CASE_ID_PATTERN, MAX_STDOUT_LENGTH } from '../helpers/stdioJudgeRules.js';
 import { type CodeRule, normalizeCodeRule } from '../types/problem.js';
@@ -466,10 +463,10 @@ function validateTestCasePresence(
   errors: string[],
   warnings: string[]
 ): void {
-  // The judge grants no exemption for `type: prompt_study`, so the type must not relax this check;
-  // static-analysis rules and manual scoring judge a problem without test cases (the same rule the
-  // `judge` subcommand and the all-problem check apply).
-  if (fileTestCases.length === 0 && (frontmatter === undefined || !judgesWithoutTestCases(frontmatter))) {
+  // Exercode's import requires test cases, a judge.ts or isManualScoringRequired and grants no
+  // exemption for `type: prompt_study` or static-analysis rules (this package's `judge` subcommand
+  // runs a rules-only problem, but it cannot be imported).
+  if (fileTestCases.length === 0 && frontmatter?.isManualScoringRequired !== true) {
     // The judge only rejects a case-less problem when judge.ts is also missing; a special judge
     // may compute results itself, but the stdio presets need test_cases/, hence the warning.
     if (hasCustomJudgeTs) {
@@ -478,7 +475,7 @@ function validateTestCasePresence(
       );
     } else {
       errors.push(
-        'no test cases found; add test cases with an expected output (test_cases/<id>.out or <id>.fout/, plus <id>.in or <id>.fin/ when the program reads input; at least one example_* and one hidden test_*), static-analysis rules (e.g. requiredRegExpsInCode), or isManualScoringRequired: true'
+        'no test cases found; add test cases with an expected output (test_cases/<id>.out or <id>.fout/, plus <id>.in or <id>.fin/ when the program reads input; at least one example_* and one hidden test_*), or set isManualScoringRequired: true'
       );
     }
   }

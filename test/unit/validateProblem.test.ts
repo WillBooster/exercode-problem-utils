@@ -219,12 +219,12 @@ describe('validateProblemDirectory', () => {
     expect(result.errors).toContainEqual(expect.stringContaining('no test cases found'));
   });
 
-  test('accepts a case-less problem judged by static-analysis rules', async () => {
+  test('rejects a case-less problem even when static-analysis rules are declared', async () => {
     const problemDir = await copyProblemFixture();
     await rm(join(problemDir, 'test_cases'), { recursive: true });
     await setProblemFrontmatter(problemDir, "name: A + B\nrequiredRegExpsInCode: ['\\+']");
     const result = await validateProblemDirectory(problemDir);
-    expect(result.errors).toEqual([]);
+    expect(result.errors).toEqual([expect.stringContaining('no test cases found')]);
   });
 
   test('accepts a CRLF problem.md like the judge does', async () => {
