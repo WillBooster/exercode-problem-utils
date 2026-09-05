@@ -13,7 +13,7 @@ import { validateMaterialFile, validateSubmissionPeriods, type MaterialValidatio
 import { formatZodIssues, reportDuplicateIds, type ValidationResult } from './validationResult.js';
 
 export interface CourseValidationOptions {
-  /** Problems directory referenced by materials; defaults to `problems` inside the course, then the whole course directory. */
+  /** Problems directory referenced by materials; defaults to the course directory (problems at any depth inside it). */
   problemsDirectoryPath?: string;
 }
 
@@ -171,11 +171,10 @@ async function resolveProblemsDirectoryPath(
     }
     return options.problemsDirectoryPath;
   }
-  // Only problems inside the course directory import as the course's problems, so the default is
-  // `problems/` when present and otherwise the course directory itself (problems at any depth).
+  // Every problem inside the course directory, at any depth, imports as the course's problem (real
+  // courses keep some next to their materials), so the default scope is the whole course directory.
   const courseProblemsDirectoryPath = join(courseDirectoryPath, 'problems');
-  if (await isRegularDirectory(courseProblemsDirectoryPath)) return courseProblemsDirectoryPath;
-  if (await isDirectory(courseProblemsDirectoryPath)) {
+  if (!(await isRegularDirectory(courseProblemsDirectoryPath)) && (await isDirectory(courseProblemsDirectoryPath))) {
     errors.push(
       `problems directory is a symbolic link, which the judge does not traverse: ${courseProblemsDirectoryPath}`
     );

@@ -44,7 +44,7 @@ bun x exercode-problem validate-course <courseDir> [--problems-dir <dir>]
 bun x exercode-problem validate-contest <contestYamlPath> [--problems-dir <dir>]
 ```
 
-Each target prints `OK` or `NG` followed by its errors and warnings; the command exits 1 when any target has an error. `--problems-dir` points to the directory holding the referenced problems (for a course it defaults to `<courseDir>/problems`, then the course directory itself; Exercode links a material only to problems inside its course). The validators are also exported (`validateProblemDirectory`, `validateCourseDirectory`, `validateContestFile`, `validateMaterialFile`).
+Each target prints `OK` or `NG` followed by its errors and warnings; the command exits 1 when any target has an error. `--problems-dir` points to the directory holding the referenced problems (for a course it defaults to the course directory itself, since Exercode links a material to the problems inside its course at any depth). The validators are also exported (`validateProblemDirectory`, `validateCourseDirectory`, `validateContestFile`, `validateMaterialFile`).
 
 ## Agent skills
 
