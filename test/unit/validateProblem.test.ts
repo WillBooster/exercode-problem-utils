@@ -204,6 +204,15 @@ describe('validateProblemDirectory', () => {
     expect(result.errors).toEqual([]);
   });
 
+  test('accepts a CRLF problem.md like the judge does', async () => {
+    const problemDir = await copyProblemFixture();
+    const problemPath = join(problemDir, 'problem.md');
+    const problemMarkdown = await readFile(problemPath, 'utf8');
+    await writeFile(problemPath, problemMarkdown.replaceAll('\n', '\r\n'));
+    const result = await validateProblemDirectory(problemDir);
+    expect(result.errors).toEqual([]);
+  });
+
   test('rejects the frontmatter keys removed with the v1 judge', async () => {
     const problemDir = await copyProblemFixture();
     await setProblemFrontmatter(

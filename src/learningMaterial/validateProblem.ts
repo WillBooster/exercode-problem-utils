@@ -2,7 +2,7 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { basename, join, relative, resolve } from 'node:path';
 
 import { MAX_COMPARED_FILE_BYTES } from '../helpers/compareExpectedOutputFiles.js';
-import { HARNESS_FILE_PRESETS, isDefaultStdioHarnessSource } from '../helpers/defaultStdioHarness.js';
+import { findDefaultStdioHarnessFiles, type HarnessFileName } from '../helpers/defaultStdioHarness.js';
 import { findLanguageDefinitionByPath } from '../helpers/findLanguageDefinitionByPath.js';
 import {
   judgesTestCasesWithoutExpectations,
@@ -130,25 +130,19 @@ export async function validateProblemDirectory(problemDirectoryPath: string): Pr
 
 interface HarnessFiles {
   hasDebugTs: boolean;
-  hasDefaultJudgeTs: boolean;
-  hasDefaultDebugTs: boolean;
+  rejectedDefaultHarnessFileNames: readonly HarnessFileName[];
   hasCustomJudgeTs: boolean;
 }
 
 async function readHarnessFiles(absoluteDirectoryPath: string): Promise<HarnessFiles> {
-  const judgeTsPath = join(absoluteDirectoryPath, 'judge.ts');
-  const debugTsPath = join(absoluteDirectoryPath, 'debug.ts');
-  const hasJudgeTs = await isFile(judgeTsPath);
-  const hasDebugTs = await isFile(debugTsPath);
-  const hasDefaultJudgeTs =
-    hasJudgeTs && isDefaultStdioHarnessSource(await readFile(judgeTsPath, 'utf8'), HARNESS_FILE_PRESETS['judge.ts']);
-  const hasDefaultDebugTs =
-    hasDebugTs && isDefaultStdioHarnessSource(await readFile(debugTsPath, 'utf8'), HARNESS_FILE_PRESETS['debug.ts']);
+  const hasJudgeTs = await isFile(join(absoluteDirectoryPath, 'judge.ts'));
+  // The same policy the `judge` subcommand and the all-problem check apply: a default judge.ts is
+  // always rejected, and a default debug.ts is rejected unless it accompanies a custom judge.ts.
+  const defaultHarnessFileNames = await findDefaultStdioHarnessFiles(absoluteDirectoryPath);
   return {
-    hasDebugTs,
-    hasDefaultJudgeTs,
-    hasDefaultDebugTs,
-    hasCustomJudgeTs: hasJudgeTs && !hasDefaultJudgeTs,
+    hasDebugTs: await isFile(join(absoluteDirectoryPath, 'debug.ts')),
+    rejectedDefaultHarnessFileNames: defaultHarnessFileNames,
+    hasCustomJudgeTs: hasJudgeTs && !defaultHarnessFileNames.includes('judge.ts'),
   };
 }
 
@@ -164,14 +158,12 @@ function validateHarnessFiles(
   errors: string[],
   warnings: string[]
 ): void {
-  if (harness.hasDefaultJudgeTs) {
+  if (harness.rejectedDefaultHarnessFileNames.includes('judge.ts')) {
     errors.push(
       'judge.ts only calls stdioJudgePreset; delete it — the judge auto-generates it, and only a problem without judge.ts is treated as a standard stdio problem (which enables the default debug runner)'
     );
   }
-  // A custom judge.ts may legitimately reuse the stdio debug preset, so a default debug.ts is
-  // redundant only when the judge.ts is absent or itself default (i.e. about to be deleted).
-  if (harness.hasDefaultDebugTs && !harness.hasCustomJudgeTs) {
+  if (harness.rejectedDefaultHarnessFileNames.includes('debug.ts')) {
     errors.push(
       'debug.ts only calls stdioDebugPreset; delete it — the judge auto-generates it for problems without judge.ts'
     );
