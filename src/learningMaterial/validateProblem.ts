@@ -46,6 +46,8 @@ interface FileTestCase {
   hasJudgeConfig: boolean;
 }
 
+// The importer rejects a longer expected stdout whichever judge the problem has.
+const IMPORTER_MAX_STDOUT_LENGTH = 100_000;
 // `_shared.fin/` holds files copied for every test case; it is not a test case itself.
 const SHARED_FILE_INPUT_NAME = '_shared';
 // The importer leaves generated artifacts out of the packaged problem, so a directory holding only
@@ -55,8 +57,6 @@ const IGNORED_TEST_CASE_ENTRY_NAMES: ReadonlySet<string> = new Set(['.DS_Store',
 interface ModelAnswer {
   id: string;
   files: SourceFile[];
-  /** Every file of the answer directory (relative paths), as the judge's static analysis lists them. */
-  allFilePaths: string[];
 }
 
 /**
@@ -356,9 +356,13 @@ async function readFileTestCases(
     }
     // The stdio judge rejects a run whose raw stdout exceeds the limit, so a longer expectation can
     // never match (a program may still print exactly the limit without a trailing newline).
-    if (testCase.stdout !== undefined && testCase.stdout.length > MAX_STDOUT_LENGTH) {
+    // A custom judge.ts reads `.out` under its own contract, so only the importer's limit applies to it.
+    const maxStdoutLength = hasCustomJudgeTs ? IMPORTER_MAX_STDOUT_LENGTH : MAX_STDOUT_LENGTH;
+    if (testCase.stdout !== undefined && testCase.stdout.length > maxStdoutLength) {
       errors.push(
-        `test case ${testCase.id}: .out is too large (length: ${testCase.stdout.length}); the stdio judge rejects a run that prints more than ${MAX_STDOUT_LENGTH} characters`
+        hasCustomJudgeTs
+          ? `test case ${testCase.id}: .out is too large (length: ${testCase.stdout.length} > ${maxStdoutLength})`
+          : `test case ${testCase.id}: .out is too large (length: ${testCase.stdout.length}); the stdio judge rejects a run that prints more than ${maxStdoutLength} characters`
       );
     }
     // The judge accepts an empty `.out` (the program must print nothing or an empty line), but it is
@@ -476,14 +480,8 @@ async function readModelAnswers(
         `model answer directory name "${dirent.name}" is not a known language ID (${availableLanguageIds.join(', ')})`
       );
     }
-    const answerDirectoryPath = join(modelAnswersDirectoryPath, dirent.name);
-    const files = await readSourceFilesRecursively(answerDirectoryPath);
-    if (files.length === 0) continue;
-    const allDirents = await readdir(answerDirectoryPath, { recursive: true, withFileTypes: true });
-    const allFilePaths = allDirents
-      .filter((entry) => entry.isFile())
-      .map((entry) => relative(answerDirectoryPath, join(entry.parentPath, entry.name)));
-    modelAnswers.push({ id: dirent.name, files, allFilePaths });
+    const files = await readSourceFilesRecursively(join(modelAnswersDirectoryPath, dirent.name));
+    if (files.length > 0) modelAnswers.push({ id: dirent.name, files });
   }
   return modelAnswers;
 }
@@ -543,14 +541,17 @@ function validateCodePatterns(
   }
 }
 
-/** The judge rejects a submission missing a required file before running it, so every model answer must ship them. */
+/**
+ * The judge rejects a submission missing a required file before running it, so every model answer
+ * must ship them among the files the importer keeps (the same filter as `readSourceFilesRecursively`).
+ */
 function validateRequiredSubmissionFiles(
   frontmatter: ProblemFrontmatter,
   modelAnswers: ModelAnswer[],
   errors: string[]
 ): void {
   for (const modelAnswer of modelAnswers) {
-    const filePathSet = new Set(modelAnswer.allFilePaths);
+    const filePathSet = new Set(modelAnswer.files.map((file) => file.path));
     for (const requiredPath of frontmatter.requiredSubmissionFilePaths) {
       if (!filePathSet.has(requiredPath)) {
         errors.push(

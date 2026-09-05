@@ -8,7 +8,7 @@
   judge.ts                    # custom judges ONLY — omit for standard stdin/stdout problems
   debug.ts                    # custom debug harness — usually pairs with a custom judge.ts, but may also stand alone
   test_cases/
-    example_1.in              # ids starting with "example" are shown on the problem page
+    example_1.in              # ids containing "example" are shown on the problem page
     example_1.out
     test_1.in                 # hidden test case
     test_1.out
@@ -64,7 +64,7 @@ YAML frontmatter followed by the markdown statement. The schema is strict: unkno
 - `type`: only `'prompt_study'` is allowed (optional; omit for normal problems)
 - `timeLimitMs`: integer >= 0; `memoryLimitByte`: integer >= 0
 - `requiredRegExpsInCode`, `forbiddenRegExpsInCode`, `forbiddenTextsInCode`: arrays whose entries are a pattern string or `{ pattern, message }` (a single-line learner-facing message shown instead of the pattern on violation)
-  - Required regexps must match every model answer's main source (comments stripped); forbidden regexps/texts must match none.
+  - Each required regexp must match at least one recognized source file of every model answer (comments stripped); forbidden regexps/texts must match no file.
   - The patterns apply to submissions in every available language, so use patterns every target language's idiomatic solution satisfies (e.g. `\bfor\b`), never language-specific ones (e.g. `range\(`). If the learning target is language-specific, keep the constraint in the statement prose and restrict `availableLanguageIds` on the material instead.
   - Never forbid patterns that could match input-parsing helpers (`Scanner`, `map`, `int`, `split`, regexes) — learners could not pass otherwise.
   - Every regexp must compile.
