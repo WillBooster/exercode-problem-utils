@@ -63,8 +63,9 @@ export async function isDirectory(path: string): Promise<boolean> {
 /**
  * Collects the problem definitions under a directory the way the judge discovers them: `problem.md`
  * names its directory and `<id>.problem.md` names itself, at any depth, without traversing symbolic
- * links. The result maps each problem ID to the paths of its definitions (relative to the root); the
- * judge rejects an ID defined more than once.
+ * links or a nested course (whose problems belong to that nearer course). The result maps each
+ * problem ID to the paths of its definitions (relative to the root); the judge rejects an ID
+ * defined more than once.
  */
 export async function collectProblemDefinitions(rootDirectoryPath: string): Promise<Map<string, string[]>> {
   const definitionPathsById = new Map<string, string[]>();
@@ -77,7 +78,14 @@ async function collectProblemDefinitionsInto(
   directoryPath: string,
   definitionPathsById: Map<string, string[]>
 ): Promise<void> {
-  for (const dirent of await readdir(directoryPath, { withFileTypes: true })) {
+  const dirents = await readdir(directoryPath, { withFileTypes: true });
+  if (
+    directoryPath !== rootDirectoryPath &&
+    dirents.some((dirent) => dirent.isFile() && (dirent.name === 'course.yaml' || dirent.name === 'course.yml'))
+  ) {
+    return;
+  }
+  for (const dirent of dirents) {
     if (dirent.isFile()) {
       const problemId =
         dirent.name === 'problem.md'

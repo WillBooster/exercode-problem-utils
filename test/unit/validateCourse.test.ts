@@ -31,6 +31,20 @@ describe('validateCourseDirectory', () => {
     expect(result.warnings).toEqual([]);
   });
 
+  test("does not count problems of a nested course as the enclosing course's", async () => {
+    const tempDir = await createTempDir();
+    const courseDir = join(tempDir, 'example_course');
+    await cp(validCourseDir, courseDir, { recursive: true });
+    await mkdir(join(courseDir, 'lecture_1', 'nested_course'));
+    await writeFile(join(courseDir, 'lecture_1', 'nested_course', 'course.yaml'), 'name: nested\ndescription: d\n');
+    await rename(join(courseDir, 'problems'), join(courseDir, 'lecture_1', 'nested_course', 'problems'));
+    const result = await validateCourseDirectory(courseDir);
+    expect(result.errors).toEqual([
+      expect.stringContaining('problem "a_plus_b" is referenced but does not exist'),
+      expect.stringContaining('problem "arithmetic_subtraction" is referenced but does not exist'),
+    ]);
+  });
+
   test('rejects a problem ID defined twice inside the course', async () => {
     const courseDir = await copyCourseFixture();
     await mkdir(join(courseDir, 'lecture_1', 'extra'));
