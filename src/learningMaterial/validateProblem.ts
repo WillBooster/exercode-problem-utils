@@ -76,10 +76,13 @@ export async function validateProblemDirectory(problemDirectoryPath: string): Pr
   if (!LEARNING_MATERIAL_ID_REGEX.test(problemId)) {
     errors.push(`problem ID "${problemId}" (directory name) must match ${LEARNING_MATERIAL_ID_REGEX}`);
   }
-  if (await isFile(join(absoluteDirectoryPath, `${problemId}.problem.md`))) {
-    errors.push(
-      `found v1 problem file ${problemId}.problem.md; use the v2 layout with a file named exactly problem.md`
-    );
+  // The judge's front-matter reader takes the first `problem.md` or `*.problem.md` it finds, so a
+  // leftover v1 file can be judged instead of problem.md.
+  const problemDirents = await readdir(absoluteDirectoryPath, { withFileTypes: true });
+  for (const dirent of problemDirents.toSorted((d1, d2) => d1.name.localeCompare(d2.name))) {
+    if (dirent.isFile() && dirent.name.endsWith('.problem.md')) {
+      errors.push(`found v1 problem file ${dirent.name}; use the v2 layout with a file named exactly problem.md`);
+    }
   }
 
   const problemFilePath = join(absoluteDirectoryPath, 'problem.md');

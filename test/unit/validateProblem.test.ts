@@ -42,8 +42,12 @@ describe('validateProblemDirectory', () => {
   test('rejects a v1 problem file layout', async () => {
     const problemDir = await copyProblemFixture();
     await writeFile(join(problemDir, 'a_plus_b.problem.md'), '---\nname: A + B\n---\n');
+    await writeFile(join(problemDir, 'old.problem.md'), '---\nname: A + B\n---\n');
     const result = await validateProblemDirectory(problemDir);
-    expect(result.errors).toEqual([expect.stringContaining('v1 problem file')]);
+    expect(result.errors).toEqual([
+      expect.stringContaining('v1 problem file a_plus_b.problem.md'),
+      expect.stringContaining('v1 problem file old.problem.md'),
+    ]);
   });
 
   test('rejects an unknown frontmatter key', async () => {
