@@ -154,7 +154,7 @@ async function executeCheckRun(run: CheckRun, cliEntryPath: string): Promise<str
       ['run', cliEntryPath, 'judge', path.relative(run.problemDir, run.answerDir)],
       {
         cwd: copiedProblemDir,
-        env: createHarnessEnv(),
+        env: process.env,
         timeoutMs: RUN_TIMEOUT_MS,
         maxOutputBytes: MAX_RUN_OUTPUT_BYTES,
         tempRoot,
@@ -209,15 +209,6 @@ function summarizeHarnessFailure(run: CheckRun, result: HarnessProcessResult): s
   return testCaseResults.every((result) => result.decisionCode === DecisionCode.ACCEPTED)
     ? 'expected at least one failing test case, but all test cases were accepted'
     : undefined;
-}
-
-// The all-problem check runs harnesses concurrently and has no sandbox-delegation contract, while the sandbox
-// helpers assume one harness at a time (their pkill targets every process of the sandbox user), so
-// never forward the sandbox user to judged runs.
-function createHarnessEnv(): NodeJS.ProcessEnv {
-  const env = { ...process.env };
-  delete env.EXERCODE_SANDBOX_USER;
-  return env;
 }
 
 function parseCheckArgs(args: readonly string[]): CheckOptions {
