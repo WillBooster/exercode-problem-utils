@@ -30,8 +30,16 @@ function countText(count: number, noun: string): string {
 
 export function formatZodIssues(error: z.ZodError, prefix: string): string[] {
   return error.issues.map(
-    (issue) => `${prefix}: ${issue.path.length > 0 ? `${issue.path.join('.')}: ` : ''}${issue.message}`
+    (issue) =>
+      `${prefix}: ${issue.path.length > 0 ? `${issue.path.join('.')}: ` : ''}${issue.message}${describeUnionBranches(issue)}`
   );
+}
+
+// A union reports only "Invalid input", hiding the branch messages that say what was expected.
+function describeUnionBranches(issue: z.core.$ZodIssue): string {
+  if (issue.code !== 'invalid_union') return '';
+  const branchMessages = [...new Set(issue.errors.flat().map((branchIssue) => branchIssue.message))];
+  return branchMessages.length > 0 ? ` (${branchMessages.join('; ')})` : '';
 }
 
 export function reportDuplicateIds(ids: string[], itemType: string, errors: string[]): void {
