@@ -3,6 +3,8 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+import { forciblyRemoveDirectory } from './temporaryProblemDirCopy.js';
+
 export type PackageManager = 'bun' | 'cargo' | 'go' | 'gradle' | 'maven' | 'npm' | 'pnpm' | 'ruby' | 'uv' | 'yarn';
 type PackageManagerInstallCommand = readonly [string, ...string[]];
 
@@ -158,7 +160,8 @@ export async function runCommandInTemporaryPackageManagerProject(
 
     return toPackageManagerCommandRunResult({ elapsedTimeSeconds, options, result });
   } finally {
-    await fs.rm(runDir, { force: true, recursive: true });
+    // The command may have left permission-locked entries (e.g. a mode-000 directory).
+    await forciblyRemoveDirectory(runDir);
   }
 }
 
