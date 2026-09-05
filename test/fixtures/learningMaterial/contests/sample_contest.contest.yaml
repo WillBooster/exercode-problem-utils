@@ -1,0 +1,24 @@
+name: サンプルコンテスト
+description: |
+  検証用のコンテストです。
+  制限時間内にできるだけ多くの問題を解いてください。
+showsProblemsAfterClose: true
+availableLanguageIds:
+  - python
+  - javascript
+divisions:
+  - id: main
+    name: 本戦
+    openedAt: '2026-01-01T10:00:00+09:00'
+    closedAt: '2026-01-01T12:00:00+09:00'
+  - id: makeup
+    name: 追試
+    openedAt: '2026-02-01T10:00:00+09:00'
+    closedAt: '2026-02-01T12:00:00+09:00'
+    password: secret
+problems:
+  - id: a_plus_b
+    score: 100
+  - id: arithmetic_subtraction
+    score: 200
+    isDebugHintDisabled: true
