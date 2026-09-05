@@ -162,8 +162,6 @@ export const materialFrontmatterSchema = z.strictObject({
   isRealtimeSurvey: z.boolean().optional(),
 });
 
-export type MaterialFrontmatter = z.infer<typeof materialFrontmatterSchema>;
-
 export const CONTEST_MATERIAL_FILE_SUFFIX = '.contest.yaml';
 
 const contestDivisionSchema = z
@@ -201,5 +199,3 @@ export const contestFileSchema = z.strictObject({
   divisions: z.array(contestDivisionSchema).min(1),
   problems: z.array(contestProblemSchema).min(1),
 });
-
-export type ContestFile = z.infer<typeof contestFileSchema>;

@@ -627,14 +627,19 @@ async function validateTemplates(
       );
     }
   }
-  // A template must be an incomplete starting point; a byte-identical copy of a model answer would pass the judge.
-  const modelAnswerFileContents = new Set(modelAnswers.flatMap((answer) => answer.files.map((file) => file.data)));
-  const templateFiles = await readSourceFilesRecursively(templatesDirectoryPath);
-  for (const templateFile of templateFiles) {
-    if (modelAnswerFileContents.has(templateFile.data)) {
-      warnings.push(
-        `template file templates/${templateFile.path} is identical to a model answer file; templates must not pass the judge`
-      );
+  // A template must be an incomplete starting point: a template directory that carries every file
+  // of a model answer unchanged would pass the judge. Helper modules shared by both are fine.
+  const directoryNames = entries.filter((dirent) => dirent.isDirectory()).map((dirent) => dirent.name);
+  const templateDirectoryNames = hasDirectories ? directoryNames : [''];
+  for (const templateDirectoryName of templateDirectoryNames) {
+    const templateFiles = await readSourceFilesRecursively(join(templatesDirectoryPath, templateDirectoryName));
+    const templateContentByPath = new Map(templateFiles.map((file) => [file.path, file.data]));
+    for (const modelAnswer of modelAnswers) {
+      if (modelAnswer.files.every((file) => templateContentByPath.get(file.path) === file.data)) {
+        warnings.push(
+          `templates/${templateDirectoryName} contains every file of model answer "${modelAnswer.id}" unchanged (identical to a model answer file); templates must not pass the judge`
+        );
+      }
     }
   }
 }
