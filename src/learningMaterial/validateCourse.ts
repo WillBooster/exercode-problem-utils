@@ -185,7 +185,13 @@ async function collectAvailableProblemIds(
       `problems directory is a symbolic link, which the judge does not traverse: ${courseProblemsDirectoryPath}`
     );
   }
-  if (options.problemsDirectoryPath === undefined) return availableProblemIds;
+  // The conventional directory was already checked above.
+  if (
+    options.problemsDirectoryPath === undefined ||
+    resolve(options.problemsDirectoryPath) === courseProblemsDirectoryPath
+  ) {
+    return availableProblemIds;
+  }
   if (!(await isRegularDirectory(options.problemsDirectoryPath))) {
     errors.push(
       (await isDirectory(options.problemsDirectoryPath))
