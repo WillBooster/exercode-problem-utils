@@ -259,7 +259,7 @@ function validateQuestion(question: MaterialQuestion, errors: string[]): void {
     answerRegExp = new RegExp(`^(?:${answerPattern})$`);
     // Compiled inside the same guard: a pattern like `a)(b` is valid only once wrapped above,
     // so an unguarded raw compile would crash the CLI instead of reporting an error.
-    rawAnswerRegExp = new RegExp(answerPattern);
+    rawAnswerRegExp = new RegExp(question.answerPattern);
   } catch {
     errors.push(
       `question ${question.id}: \`answerPattern\` is not a valid regular expression: ${question.answerPattern}`
@@ -269,7 +269,8 @@ function validateQuestion(question: MaterialQuestion, errors: string[]): void {
   // Mirrors the judge heuristic: a pattern that doesn't match itself likely uses RegExp syntax,
   // so a modelAnswer is required to prove that some concrete answer is accepted.
   // Like the judge, an empty modelAnswer counts as missing.
-  if (!question.modelAnswer && !rawAnswerRegExp.test(answerPattern)) {
+  // The judge runs this heuristic on the untrimmed pattern and trims only for the anchored match.
+  if (!question.modelAnswer && !rawAnswerRegExp.test(question.answerPattern)) {
     errors.push(`question ${question.id}: \`answerPattern\` seems a RegExp but \`modelAnswer\` is missing`);
   }
   if (question.modelAnswer && !answerRegExp.test(question.modelAnswer.trim())) {
