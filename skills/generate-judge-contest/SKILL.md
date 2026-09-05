@@ -7,7 +7,7 @@ description: Use when asked to generate an Exercode/Judge contest (Exercode/Judg
 
 Read [references/contest-format.md](references/contest-format.md) before authoring any file.
 
-1. Confirm the contest parameters: contest id and name, target course and lecture, divisions (each with open/close datetimes), which concepts the contest covers, the number of problems (4-6 is typical), and target programming language(s). The contest belongs at `<courseId>/<lectureId>/<contestId>.contest.yaml`, and its problems belong under the same course's `problems/` directory. If any are missing, ask before generating.
+1. Confirm the contest parameters: contest id and name, target course and lecture, divisions (each with open/close datetimes), which concepts the contest covers, the number of problems (4-6 is typical), and target programming language(s). The contest belongs at `<courseId>/<lectureId>/<contestId>.contest.yaml`, and its problems belong under the same course's `problems/` directory. If any are missing, ask before generating when the user is available; otherwise choose reasonable values from the context and list them as open decisions in the final report.
 2. Plan the problem set as drafts (id, name, overview, difficulty, score):
    - Use only concepts the learners have already studied in the covered materials.
    - Span difficulties from 初級 to harder levels so every participant can solve something and strong participants stay challenged; order problems from easy to hard.

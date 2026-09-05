@@ -11,7 +11,7 @@ Read these references before authoring any file:
 - [references/material-authoring.md](references/material-authoring.md) — pedagogical writing rules for lecture materials.
 - [references/question-authoring.md](references/question-authoring.md) — how to write embedded quiz questions.
 
-1. Confirm the course parameters with the user: topic, target audience, number of lectures, target programming language(s), and the output directory. If any are missing, ask before generating.
+1. Confirm the course parameters with the user: topic, target audience, number of lectures, target programming language(s), and the output directory. If any are missing, ask before generating when the user is available; otherwise choose reasonable values from the context and list them as open decisions in the final report.
 2. Write an outline first: a nested markdown bullet list covering all lectures, each bullet ending with a one-line summary. Show it to the user for approval when the user is available; otherwise proceed with your best outline.
 3. Create the course directory structure per [references/course-format.md](references/course-format.md):
    - `<courseId>/course.yaml` listing every lecture (`id`, `name`, `description`).

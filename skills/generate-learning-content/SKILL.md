@@ -5,7 +5,7 @@ description: Use when generating or improving Exercode learning content (Exercod
 
 # Generate or improve exercode learning content
 
-1. Inspect the requested outcome, repository instructions, and existing learning-content layout. Make reasonable decisions from the available context instead of pausing for confirmation.
+1. Inspect the requested outcome, repository instructions, and existing learning-content layout. When the user is unavailable (e.g. in an automated workflow), make reasonable decisions from the available context instead of pausing for confirmation; the confirmation steps of the workflows below then fall back to the same rule.
 2. If the repository is not prepared for Exercode course authoring, follow [setup-exercode-course-repository](../setup-exercode-course-repository/SKILL.md) before authoring.
 3. Follow every applicable authoring workflow:
    - [generate-course-materials](../generate-course-materials/SKILL.md) for courses, lecture texts, and embedded questions.
