@@ -35,7 +35,7 @@ describe('validateCourseDirectory', () => {
     const courseDir = await copyCourseFixture();
     await mkdir(join(courseDir, 'lecture_1', 'extra'));
     await writeFile(join(courseDir, 'lecture_1', 'extra', 'a_plus_b.problem.md'), '---\nname: dup\n---\n');
-    const result = await validateCourse(courseDir);
+    const result = await validateCourseDirectory(courseDir);
     expect(result.errors).toEqual([expect.stringContaining('problem ID "a_plus_b" is defined more than once')]);
   });
 
