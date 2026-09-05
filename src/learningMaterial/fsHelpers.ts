@@ -1,4 +1,4 @@
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { lstat, readdir, readFile, stat } from 'node:fs/promises';
 import { extname, join, relative } from 'node:path';
 
 // Files the judge importer skips when reading problem directories. The extension filter is ported
@@ -25,6 +25,16 @@ export interface SourceFile {
 export async function isFile(path: string): Promise<boolean> {
   try {
     const stats = await stat(path);
+    return stats.isFile();
+  } catch {
+    return false;
+  }
+}
+
+/** Whether the path is a regular file (not a symlink), as the judge's problem discovery requires. */
+export async function isRegularFile(path: string): Promise<boolean> {
+  try {
+    const stats = await lstat(path);
     return stats.isFile();
   } catch {
     return false;

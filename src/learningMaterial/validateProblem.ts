@@ -13,7 +13,7 @@ import { EXAMPLE_TEST_CASE_ID_PATTERN, MAX_STDOUT_LENGTH } from '../helpers/stdi
 import { type CodeRule, normalizeCodeRule } from '../types/problem.js';
 
 import { parseFrontmatter } from './frontmatter.js';
-import { isDirectory, isFile, readSourceFilesRecursively, type SourceFile } from './fsHelpers.js';
+import { isDirectory, isFile, isRegularFile, readSourceFilesRecursively, type SourceFile } from './fsHelpers.js';
 import {
   availableLanguageIds,
   LEARNING_MATERIAL_ID_REGEX,
@@ -88,8 +88,13 @@ export async function validateProblemDirectory(problemDirectoryPath: string): Pr
   }
 
   const problemFilePath = join(absoluteDirectoryPath, 'problem.md');
-  if (!(await isFile(problemFilePath))) {
-    errors.push('problem.md not found; a v2 problem directory must contain problem.md');
+  // The judge discovers problems by their problem.md and skips symbolic links.
+  if (!(await isRegularFile(problemFilePath))) {
+    errors.push(
+      (await isFile(problemFilePath))
+        ? 'problem.md is a symbolic link, which the judge ignores; commit a regular file'
+        : 'problem.md not found; a v2 problem directory must contain problem.md'
+    );
     return result;
   }
 
@@ -607,6 +612,12 @@ async function validateTemplates(
   const entries = dirents.filter((dirent) => dirent.name !== '__pycache__');
   if (entries.some((dirent) => dirent.name === '.DS_Store')) {
     warnings.push('templates/.DS_Store found; delete it (the judge treats it as a template file)');
+  }
+  // The importer accepts only regular files and directories under templates/.
+  for (const dirent of entries) {
+    if (!dirent.isFile() && !dirent.isDirectory()) {
+      errors.push(`templates/${dirent.name} must be a regular file or directory (symbolic links fail import)`);
+    }
   }
   const hasFiles = entries.some((dirent) => dirent.isFile());
   const hasDirectories = entries.some((dirent) => dirent.isDirectory());

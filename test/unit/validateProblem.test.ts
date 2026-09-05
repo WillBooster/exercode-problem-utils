@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'vitest';
-import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { validateProblemDirectory } from '../../src/learningMaterial/validateProblem.js';
 import { cleanupTempDirs, copyFixtureToTempDir, learningMaterialFixturesDir } from './learningMaterialTestHelpers.js';
@@ -37,6 +37,21 @@ describe('validateProblemDirectory', () => {
     await rm(join(problemDir, 'problem.md'));
     const result = await validateProblemDirectory(problemDir);
     expect(result.errors).toEqual([expect.stringContaining('problem.md not found')]);
+  });
+
+  test('rejects a problem.md symbolic link and a template symbolic link', async () => {
+    const problemDir = await copyProblemFixture();
+    await rename(join(problemDir, 'problem.md'), join(problemDir, 'statement.md'));
+    await symlink('statement.md', join(problemDir, 'problem.md'));
+    await symlink('../model_answers/python/main.py', join(problemDir, 'templates', 'link.py'));
+    const result = await validateProblemDirectory(problemDir);
+    expect(result.errors).toEqual([expect.stringContaining('problem.md is a symbolic link')]);
+    await rm(join(problemDir, 'problem.md'));
+    await rename(join(problemDir, 'statement.md'), join(problemDir, 'problem.md'));
+    const templateResult = await validateProblemDirectory(problemDir);
+    expect(templateResult.errors).toEqual([
+      expect.stringContaining('templates/link.py must be a regular file or directory'),
+    ]);
   });
 
   test('rejects a v1 problem file layout', async () => {
