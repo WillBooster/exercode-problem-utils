@@ -1,7 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { isDirectory, isFile } from './fsHelpers.js';
+import { isDirectory, isFile, isRegularFile } from './fsHelpers.js';
 import {
   CONTEST_MATERIAL_FILE_SUFFIX,
   courseFileSchema,
@@ -98,8 +98,13 @@ async function reportOrphanLectureDirectories(
 
 async function parseCourseFile(courseDirectoryPath: string, errors: string[]): Promise<CourseFile | undefined> {
   const courseFilePath = join(courseDirectoryPath, 'course.yaml');
-  if (!(await isFile(courseFilePath))) {
-    errors.push('course.yaml not found');
+  // The judge discovers courses by their course.yaml and skips symbolic links.
+  if (!(await isRegularFile(courseFilePath))) {
+    errors.push(
+      (await isFile(courseFilePath))
+        ? 'course.yaml is a symbolic link, which the judge ignores; commit a regular file'
+        : 'course.yaml not found'
+    );
     return undefined;
   }
   let rawContent: unknown;

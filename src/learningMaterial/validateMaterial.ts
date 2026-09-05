@@ -184,11 +184,14 @@ function parseQuestionCodeBlocks(body: string, errors: string[]): MaterialQuesti
   const matches = [...body.matchAll(QUESTION_CODE_BLOCK_REGEX)];
   // The judge silently renders unparsed question blocks as plain code blocks, so a block the
   // strict regex misses (CRLF line endings, or no newline after the closing fence) would break
-  // in production while looking fine here; flag it instead of validating a li.e.
-  const openerCount = [...body.matchAll(QUESTION_CODE_BLOCK_OPENER_REGEX)].length;
-  if (openerCount > matches.length) {
+  // in production while looking fine here; flag it instead of validating a lie. Openers inside a
+  // recognized block (e.g. an example fence in a question's text) are consumed with that block.
+  const leftoverOpenerCount = [
+    ...body.replaceAll(QUESTION_CODE_BLOCK_REGEX, '\n').matchAll(QUESTION_CODE_BLOCK_OPENER_REGEX),
+  ].length;
+  if (leftoverOpenerCount > 0) {
     errors.push(
-      `${openerCount - matches.length} question code block(s) will not be recognized by the judge parser; separate consecutive question blocks with a blank line, use LF line endings, no indentation or trailing whitespace on the fence line, and end the closing fence with a newline`
+      `${leftoverOpenerCount} question code block(s) will not be recognized by the judge parser; separate consecutive question blocks with a blank line, use LF line endings, no indentation or trailing whitespace on the fence line, and end the closing fence with a newline`
     );
   }
   for (const [blockIndex, match] of matches.entries()) {

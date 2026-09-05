@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'vitest';
-import { appendFile, cp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { appendFile, cp, mkdir, readFile, rename, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { validateCourseDirectory } from '../../src/learningMaterial/validateCourse.js';
 import {
@@ -155,6 +155,24 @@ describe('validateCourseDirectory', () => {
     await writeFile(materialPath, content.replace('---\n', '= yaml =\n').replace('\n---\n', '\n= yaml =\n'));
     const result = await validateCourse(courseDir);
     expect(result.errors).toEqual([]);
+  });
+
+  test('accepts an example question fence nested in a longer-fenced question block', async () => {
+    const courseDir = await copyCourseFixture();
+    await appendFile(
+      join(courseDir, 'lecture_1', '10_intro.md'),
+      "\n````yaml question\nid: intro_nested_1\ntype: text\nquestion: |\n  次の形式で書きます。\n  ```yaml question\n  id: sample\n  ```\nanswerPattern: 'ok'\n````\n"
+    );
+    const result = await validateCourse(courseDir);
+    expect(result.errors).toEqual([]);
+  });
+
+  test('rejects a course.yaml symbolic link', async () => {
+    const courseDir = await copyCourseFixture();
+    await rename(join(courseDir, 'course.yaml'), join(courseDir, 'course.real.yaml'));
+    await symlink('course.real.yaml', join(courseDir, 'course.yaml'));
+    const result = await validateCourse(courseDir);
+    expect(result.errors).toEqual([expect.stringContaining('course.yaml is a symbolic link')]);
   });
 
   test('rejects invalid YAML in an embedded question block', async () => {
