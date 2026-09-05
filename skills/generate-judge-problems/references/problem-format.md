@@ -87,4 +87,4 @@ Japanese, with these sections in order: `## 問題文`, `## 制約`, `## 入力`
 
 ## Templates
 
-Starter code under `templates/<languageId>/` (or `templates/_default/`; files placed directly under `templates/` also count as `_default`) must be incomplete: it must not solve the problem, and no template file may be identical to a model answer file. When a problem provides helper modules to learners (e.g. a module to import), ship them via templates.
+Starter code under `templates/<languageId>/` (or `templates/_default/`; files placed directly under `templates/` also count as `_default`) must be incomplete: it must not solve the problem, so no template directory may contain every file of a model answer unchanged. When a problem provides helper modules to learners (e.g. a module to import), ship them via templates; such helper files are expected to be identical in the templates and in the model answers.
