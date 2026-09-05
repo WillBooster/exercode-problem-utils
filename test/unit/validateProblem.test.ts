@@ -562,6 +562,15 @@ describe('validateProblemDirectory', () => {
     expect(result.errors).toEqual([expect.stringContaining('no model answers found')]);
   });
 
+  test('warns about a solved template even when the model answer has extra notes', async () => {
+    const problemDir = await copyProblemFixture();
+    await writeFile(join(problemDir, 'model_answers', 'python', 'README.md'), '# notes\n');
+    const mainSource = await readFile(join(problemDir, 'model_answers', 'python', 'main.py'), 'utf8');
+    await writeFile(join(problemDir, 'templates', '_default', 'main.py'), mainSource);
+    const result = await validateProblemDirectory(problemDir);
+    expect(result.warnings).toEqual([expect.stringContaining('identical to a model answer file')]);
+  });
+
   test('warns when a template file is identical to a model answer file', async () => {
     const problemDir = await copyProblemFixture();
     const modelAnswer = await readFile(join(problemDir, 'model_answers', 'python', 'main.py'), 'utf8');
