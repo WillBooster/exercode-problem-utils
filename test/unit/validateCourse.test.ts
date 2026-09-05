@@ -180,7 +180,11 @@ describe('validateCourseDirectory', () => {
     await rename(join(courseDir, 'problems'), join(tempDir, 'real_problems'));
     await symlink(join(tempDir, 'real_problems'), join(courseDir, 'problems'));
     const result = await validateCourseDirectory(courseDir);
-    expect(result.errors).toEqual([expect.stringContaining('problems directory is a symbolic link')]);
+    // The linked problems are not discovered, so the references dangle as well.
+    expect(result.errors[0]).toEqual(expect.stringContaining('problems directory is a symbolic link'));
+    expect(result.errors).toContainEqual(
+      expect.stringContaining('problem "a_plus_b" is referenced but does not exist')
+    );
   });
 
   test('rejects a problem reference that resolves only through a symbolic link', async () => {
