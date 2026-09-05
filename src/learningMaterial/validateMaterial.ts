@@ -18,6 +18,7 @@ const QUESTION_CODE_BLOCK_REGEX = /(?:^|\n)(?<fence>`{3,}|~{3,})ya?ml +question\
 // question-looking blocks the judge parser would silently skip surface as leftover openers.
 const QUESTION_CODE_BLOCK_OPENER_REGEX = /^[ \t]*(?:`{3,}|~{3,})[ \t]*ya?ml[ \t]+question[ \t]*\r?$/gm;
 const PROBLEM_LINK_REGEX = /\[.*?]\(problems\/([0-9_a-z-]+?)\)/g;
+const TURTLE_GRAPHICS_QUESTION_LINK_REGEX = /\[.*?]\(turtle-graphics-questions\/([0-9_a-z-]+?)\)/g;
 // Exercode's duplicate-assignment check scans the body with these patterns, whose link text may
 // span lines (unlike the judge's reference collection above).
 const PROBLEM_ASSIGNMENT_REGEX = /\[[^\]]*]\(problems\/([0-9_a-z-]+)\)/g;
@@ -96,39 +97,41 @@ export async function validateMaterialFile(
   // and exercode rejects duplicates in the merged list; deferred until after the question blocks
   // are removed below so links inside question text don't count.
 
-  // Exercode's import validation rejects a material whose body links the same problem, question
-  // or turtle-graphics question twice, and a material whose generated reference list (frontmatter
-  // entries plus the deduplicated body links) repeats an ID, so every occurrence counts here. The
-  // judge replaces recognized question blocks with @[question](id) links before collecting links,
-  // so links that appear only inside question text must not count, while each block counts as one
-  // question link next to explicit @[question](id) links.
+  // Exercode's import validation runs two checks: the body must not link the same problem,
+  // question or turtle-graphics question twice (every occurrence of the lax link pattern counts),
+  // and the generated reference list (frontmatter entries plus the judge's deduplicated body links)
+  // must not repeat an ID. The judge replaces recognized question blocks with @[question](id) links
+  // before collecting links, so links that appear only inside question text must not count, while
+  // each block counts as one question link next to explicit @[question](id) links.
   const bodyWithoutQuestionBlocks = body.replaceAll(QUESTION_CODE_BLOCK_REGEX, '\n');
   reportDuplicateIds(
     [...questionBlockIds, ...collectLinkedIds(bodyWithoutQuestionBlocks, QUESTION_LINK_REGEX)],
     'question link',
     errors
   );
+  reportDuplicateIds(collectLinkedIds(bodyWithoutQuestionBlocks, PROBLEM_ASSIGNMENT_REGEX), 'problem link', errors);
+  reportDuplicateIds(
+    collectLinkedIds(bodyWithoutQuestionBlocks, TURTLE_GRAPHICS_ASSIGNMENT_REGEX),
+    'turtle-graphics question link',
+    errors
+  );
+  const linkedTurtleGraphicsQuestionIds = new Set(
+    collectLinkedIds(bodyWithoutQuestionBlocks, TURTLE_GRAPHICS_QUESTION_LINK_REGEX)
+  );
   reportDuplicateIds(
     [
       ...(frontmatter?.turtleGraphicsQuestions ?? []).map((question) => question.id),
-      ...collectLinkedIds(bodyWithoutQuestionBlocks, TURTLE_GRAPHICS_ASSIGNMENT_REGEX),
+      ...linkedTurtleGraphicsQuestionIds,
     ],
     'turtleGraphicsQuestion',
     errors
   );
-  reportDuplicateIds(
-    [
-      ...(frontmatter?.problems ?? []).map((problem) => problem.id),
-      ...collectLinkedIds(bodyWithoutQuestionBlocks, PROBLEM_ASSIGNMENT_REGEX),
-    ],
-    'problem',
-    errors
-  );
-  // Only the links the judge collects become references whose targets must exist.
+  // Only the links the judge collects become references, and it deduplicates them before merging.
   const problemIds = [
     ...(frontmatter?.problems ?? []).map((problem) => problem.id),
-    ...collectLinkedIds(bodyWithoutQuestionBlocks, PROBLEM_LINK_REGEX),
+    ...new Set(collectLinkedIds(bodyWithoutQuestionBlocks, PROBLEM_LINK_REGEX)),
   ];
+  reportDuplicateIds(problemIds, 'problem', errors);
   reportForeignProblemCourseIds(frontmatter?.problems ?? [], options.courseId, errors);
   if (options.availableProblemIds !== undefined) {
     for (const problemId of new Set(problemIds)) {

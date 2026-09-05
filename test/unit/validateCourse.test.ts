@@ -103,12 +103,19 @@ describe('validateCourseDirectory', () => {
     const courseDir = await copyCourseFixture();
     await appendFile(join(courseDir, 'lecture_1', '10_intro.md'), '\n[もう一度](problems/a_plus_b)\n');
     const result = await validateCourse(courseDir);
-    expect(result.errors).toEqual([expect.stringContaining('duplicate problem IDs: a_plus_b')]);
+    expect(result.errors).toEqual([expect.stringContaining('duplicate problem link IDs: a_plus_b')]);
   });
 
   test('rejects a duplicate problem link whose text spans lines', async () => {
     const courseDir = await copyCourseFixture();
     await appendFile(join(courseDir, 'lecture_1', '10_intro.md'), '\n[もう\n一度](problems/a_plus_b)\n');
+    const result = await validateCourse(courseDir);
+    expect(result.errors).toEqual([expect.stringContaining('duplicate problem link IDs: a_plus_b')]);
+  });
+
+  test('rejects a frontmatter problem that the body links as well', async () => {
+    const courseDir = await copyCourseFixture();
+    await replaceInMaterial(courseDir, 'name: 導入\n', 'name: 導入\nproblems:\n  - id: a_plus_b\n');
     const result = await validateCourse(courseDir);
     expect(result.errors).toEqual([expect.stringContaining('duplicate problem IDs: a_plus_b')]);
   });
