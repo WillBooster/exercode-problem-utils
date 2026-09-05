@@ -45,6 +45,16 @@ describe('validateCourseDirectory', () => {
     ]);
   });
 
+  test('rejects a discovered problem whose ID is invalid', async () => {
+    const courseDir = await copyCourseFixture();
+    await mkdir(join(courseDir, 'problems', 'Bad-ID'));
+    await writeFile(join(courseDir, 'problems', 'Bad-ID', 'problem.md'), '---\nname: bad\n---\n');
+    const result = await validateCourseDirectory(courseDir);
+    expect(result.errors).toEqual([
+      expect.stringContaining('problem ID "Bad-ID" (problems/Bad-ID/problem.md) must match'),
+    ]);
+  });
+
   test('rejects a problem ID defined twice inside the course', async () => {
     const courseDir = await copyCourseFixture();
     await mkdir(join(courseDir, 'lecture_1', 'extra'));

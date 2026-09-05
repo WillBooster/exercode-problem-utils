@@ -7,7 +7,7 @@ import {
   isFile,
   isRegularDirectory,
   isRegularFile,
-  reportConflictingProblemDefinitions,
+  reportProblemDefinitionIssues,
 } from './fsHelpers.js';
 import { CONTEST_MATERIAL_FILE_SUFFIX, contestFileSchema, LEARNING_MATERIAL_ID_REGEX } from './schemas.js';
 import {
@@ -101,7 +101,7 @@ export async function validateContestFile(
     let availableProblemIds = options.availableProblemIds;
     if (availableProblemIds === undefined) {
       const definitionPathsById = await collectProblemDefinitions(options.problemsDirectoryPath);
-      reportConflictingProblemDefinitions(definitionPathsById, errors);
+      reportProblemDefinitionIssues(definitionPathsById, errors);
       availableProblemIds = new Set(definitionPathsById.keys());
     }
     for (const problem of parsed.data.problems) {

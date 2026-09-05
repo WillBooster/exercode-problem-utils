@@ -1,6 +1,8 @@
 import { lstat, readdir, readFile, stat } from 'node:fs/promises';
 import { basename, extname, join, relative } from 'node:path';
 
+import { LEARNING_MATERIAL_ID_REGEX } from './schemas.js';
+
 // Files the judge importer skips when reading problem directories. The extension filter is ported
 // from the judge's readSourceCodeFilesInDirectory so compile artifacts (e.g. Main.class next to
 // Main.java) are excluded from pattern checks exactly like the judge excludes them at import time;
@@ -104,12 +106,20 @@ async function collectProblemDefinitionsInto(
   }
 }
 
-/** Reports problem IDs defined more than once, which the judge rejects as a conflict. */
-export function reportConflictingProblemDefinitions(
+/**
+ * Reports discovered problem definitions the judge refuses: an ID that does not match the ID pattern
+ * aborts discovery of the whole repository, and an ID defined more than once is a conflict.
+ */
+export function reportProblemDefinitionIssues(
   definitionPathsById: ReadonlyMap<string, string[]>,
   errors: string[]
 ): void {
   for (const [problemId, definitionPaths] of definitionPathsById) {
+    if (!LEARNING_MATERIAL_ID_REGEX.test(problemId)) {
+      errors.push(
+        `problem ID "${problemId}" (${definitionPaths.join(', ')}) must match ${LEARNING_MATERIAL_ID_REGEX}; the judge aborts discovery on it`
+      );
+    }
     if (definitionPaths.length > 1) {
       errors.push(
         `problem ID "${problemId}" is defined more than once (${definitionPaths.join(', ')}); the judge rejects the conflict`

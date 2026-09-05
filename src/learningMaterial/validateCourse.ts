@@ -7,7 +7,7 @@ import {
   isFile,
   isRegularDirectory,
   isRegularFile,
-  reportConflictingProblemDefinitions,
+  reportProblemDefinitionIssues,
 } from './fsHelpers.js';
 import {
   CONTEST_MATERIAL_FILE_SUFFIX,
@@ -53,7 +53,7 @@ export async function validateCourseDirectory(
   let availableProblemIds: Set<string> | undefined;
   if (problemsDirectoryPath !== undefined) {
     const definitionPathsById = await collectProblemDefinitions(problemsDirectoryPath);
-    reportConflictingProblemDefinitions(definitionPathsById, errors);
+    reportProblemDefinitionIssues(definitionPathsById, errors);
     availableProblemIds = new Set(definitionPathsById.keys());
   }
 
