@@ -48,7 +48,7 @@ export async function validateCourseDirectory(
     errors.push(`course ID "${courseId}" (directory name) must match ${LEARNING_MATERIAL_ID_REGEX}`);
   }
 
-  const courseFile = await parseCourseFile(absoluteDirectoryPath, errors);
+  const parsedCourseFile = await parseCourseFile(absoluteDirectoryPath, errors);
   const problemsDirectoryPath = await resolveProblemsDirectoryPath(absoluteDirectoryPath, options, errors, warnings);
   let availableProblemIds: Set<string> | undefined;
   if (problemsDirectoryPath !== undefined) {
@@ -57,15 +57,16 @@ export async function validateCourseDirectory(
     availableProblemIds = new Set(definitionPathsById.keys());
   }
 
-  if (!courseFile) return result;
+  if (!parsedCourseFile) return result;
+  const { courseFile, courseFileName } = parsedCourseFile;
   const coursePeriodErrors: string[] = [];
   validateSubmissionPeriods(courseFile, coursePeriodErrors);
-  errors.push(...coursePeriodErrors.map((error) => `course.yaml: ${error}`));
+  errors.push(...coursePeriodErrors.map((error) => `${courseFileName}: ${error}`));
   // The importer treats a missing `lectures` as an empty list, so a course without lectures imports
   // nothing but is valid.
   const lectures = courseFile.lectures ?? [];
   if (lectures.length === 0) {
-    warnings.push('course.yaml declares no lectures, so no materials are imported');
+    warnings.push(`${courseFileName} declares no lectures, so no materials are imported`);
   }
   reportDuplicateIds(
     lectures.map((lecture) => lecture.id),
@@ -81,7 +82,13 @@ export async function validateCourseDirectory(
       warnings
     );
   }
-  await reportOrphanLectureDirectories(absoluteDirectoryPath, courseFile, problemsDirectoryPath, warnings);
+  await reportOrphanLectureDirectories(
+    absoluteDirectoryPath,
+    courseFile,
+    courseFileName,
+    problemsDirectoryPath,
+    warnings
+  );
   return result;
 }
 
@@ -89,6 +96,7 @@ export async function validateCourseDirectory(
 async function reportOrphanLectureDirectories(
   courseDirectoryPath: string,
   courseFile: CourseFile,
+  courseFileName: string,
   problemsDirectoryPath: string | undefined,
   warnings: string[]
 ): Promise<void> {
@@ -109,12 +117,15 @@ async function reportOrphanLectureDirectories(
     )
       continue;
     warnings.push(
-      `directory "${dirent.name}" is not listed as a lecture in course.yaml, so its materials are not imported`
+      `directory "${dirent.name}" is not listed as a lecture in ${courseFileName}, so its materials are not imported`
     );
   }
 }
 
-async function parseCourseFile(courseDirectoryPath: string, errors: string[]): Promise<CourseFile | undefined> {
+async function parseCourseFile(
+  courseDirectoryPath: string,
+  errors: string[]
+): Promise<{ courseFile: CourseFile; courseFileName: string } | undefined> {
   // The judge discovers courses by `course.yaml` or `course.yml` (rejecting a directory with both)
   // and skips symbolic links.
   const courseFileNames = ['course.yaml', 'course.yml'];
@@ -141,15 +152,15 @@ async function parseCourseFile(courseDirectoryPath: string, errors: string[]): P
   try {
     rawContent = parseYaml(await readFile(courseFilePath, 'utf8'));
   } catch (error) {
-    errors.push(`course.yaml: invalid YAML: ${error instanceof Error ? error.message : String(error)}`);
+    errors.push(`${courseFileName}: invalid YAML: ${error instanceof Error ? error.message : String(error)}`);
     return undefined;
   }
   const parsed = courseFileSchema.safeParse(rawContent);
   if (!parsed.success) {
-    errors.push(...formatZodIssues(parsed.error, 'course.yaml'));
+    errors.push(...formatZodIssues(parsed.error, courseFileName));
     return undefined;
   }
-  return parsed.data;
+  return { courseFile: parsed.data, courseFileName };
 }
 
 async function findFirst<T>(items: readonly T[], predicate: (item: T) => Promise<boolean>): Promise<T | undefined> {
