@@ -102,6 +102,13 @@ describe('validateCourseDirectory', () => {
     expect(result.errors).toEqual([]);
   });
 
+  test('reports a missing conventional problems directory named by --problems-dir', async () => {
+    const courseDir = await copyCourseFixture();
+    await rename(join(courseDir, 'problems'), join(courseDir, 'exercises'));
+    const result = await validateCourseDirectory(courseDir, { problemsDirectoryPath: join(courseDir, 'problems') });
+    expect(result.errors).toEqual([expect.stringContaining('problems directory not found')]);
+  });
+
   test('still checks course-internal references when --problems-dir does not exist', async () => {
     const courseDir = await copyCourseFixture();
     const result = await validateCourseDirectory(courseDir, { problemsDirectoryPath: join(courseDir, 'missing') });

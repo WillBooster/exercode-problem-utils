@@ -185,19 +185,16 @@ async function collectAvailableProblemIds(
   const availableProblemIds = new Set(definitionPathsById.keys());
   // Discovery does not traverse a symbolic link, so a linked problems directory imports nothing.
   const courseProblemsDirectoryPath = join(courseDirectoryPath, 'problems');
-  if (await isDirectory(courseProblemsDirectoryPath)) {
+  const explicitProblemsDirectoryPath =
+    options.problemsDirectoryPath === undefined ? undefined : resolve(options.problemsDirectoryPath);
+  const namesConventionalDirectory = explicitProblemsDirectoryPath === courseProblemsDirectoryPath;
+  if (namesConventionalDirectory || (await isDirectory(courseProblemsDirectoryPath))) {
     await isUsableProblemsDirectory(courseProblemsDirectoryPath, errors);
   }
-  // The conventional directory was already checked above.
+  if (explicitProblemsDirectoryPath === undefined || namesConventionalDirectory) return availableProblemIds;
   if (
-    options.problemsDirectoryPath === undefined ||
-    resolve(options.problemsDirectoryPath) === courseProblemsDirectoryPath
-  ) {
-    return availableProblemIds;
-  }
-  if (
-    (await isUsableProblemsDirectory(options.problemsDirectoryPath, errors)) &&
-    relative(courseDirectoryPath, resolve(options.problemsDirectoryPath)).startsWith('..')
+    (await isUsableProblemsDirectory(explicitProblemsDirectoryPath, errors)) &&
+    relative(courseDirectoryPath, explicitProblemsDirectoryPath).startsWith('..')
   ) {
     // Exercode links a material only to problems inside its course, so outside problems never count.
     errors.push(
