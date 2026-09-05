@@ -1,11 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { isDirectory, isFile, isRegularDirectory, isRegularFile } from './fsHelpers.js';
+import { collectProblemIds, isDirectory, isFile, isRegularDirectory, isRegularFile } from './fsHelpers.js';
 import { CONTEST_MATERIAL_FILE_SUFFIX, contestFileSchema, LEARNING_MATERIAL_ID_REGEX } from './schemas.js';
 import {
   mergeSubmissionPeriods,
-  problemDefinitionExists,
   reportForeignProblemCourseIds,
   validateSubmissionPeriods,
   type SubmissionPeriods,
@@ -13,8 +12,10 @@ import {
 import { formatZodIssues, reportDuplicateIds, type ValidationResult } from './validationResult.js';
 
 export interface ContestValidationOptions {
-  /** When set, every contest problem ID must resolve to a problem directory under this path. */
+  /** When set, every contest problem ID must be a problem discovered under this path. */
   problemsDirectoryPath?: string;
+  /** Problem IDs already collected for the enclosing course; collected from `problemsDirectoryPath` otherwise. */
+  availableProblemIds?: ReadonlySet<string>;
   /** Enclosing course ID; the judge rejects problem references whose `courseId` differs from it. */
   courseId?: string;
   /** Course-level submission periods; the judge merges them as `material[field] ?? course[field]`. */
@@ -90,8 +91,9 @@ export async function validateContestFile(
         : `problems directory not found: ${options.problemsDirectoryPath}`
     );
   } else {
+    const availableProblemIds = options.availableProblemIds ?? (await collectProblemIds(options.problemsDirectoryPath));
     for (const problem of parsed.data.problems) {
-      if (!(await problemDefinitionExists(options.problemsDirectoryPath, problem.id))) {
+      if (!availableProblemIds.has(problem.id)) {
         errors.push(`problem "${problem.id}" is referenced but does not exist under ${options.problemsDirectoryPath}`);
       }
     }

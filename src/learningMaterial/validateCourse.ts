@@ -1,7 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { isDirectory, isFile, isRegularDirectory, isRegularFile } from './fsHelpers.js';
+import { collectProblemIds, isDirectory, isFile, isRegularDirectory, isRegularFile } from './fsHelpers.js';
 import {
   CONTEST_MATERIAL_FILE_SUFFIX,
   courseFileSchema,
@@ -13,7 +13,7 @@ import { validateMaterialFile, validateSubmissionPeriods, type MaterialValidatio
 import { formatZodIssues, reportDuplicateIds, type ValidationResult } from './validationResult.js';
 
 export interface CourseValidationOptions {
-  /** Problems directory referenced by materials; defaults to `problems` inside the course, then its legacy sibling. */
+  /** Problems directory referenced by materials; defaults to `problems` inside the course, then the whole course directory. */
   problemsDirectoryPath?: string;
 }
 
@@ -43,6 +43,8 @@ export async function validateCourseDirectory(
 
   const courseFile = await parseCourseFile(absoluteDirectoryPath, errors);
   const problemsDirectoryPath = await resolveProblemsDirectoryPath(absoluteDirectoryPath, options, errors, warnings);
+  const availableProblemIds =
+    problemsDirectoryPath === undefined ? undefined : await collectProblemIds(problemsDirectoryPath);
 
   if (!courseFile) return result;
   const coursePeriodErrors: string[] = [];
@@ -62,7 +64,7 @@ export async function validateCourseDirectory(
   for (const lecture of lectures) {
     await validateLectureDirectory(
       absoluteDirectoryPath,
-      { courseId, courseSubmissionPeriods: courseFile, problemsDirectoryPath },
+      { courseId, courseSubmissionPeriods: courseFile, problemsDirectoryPath, availableProblemIds },
       lecture.id,
       errors,
       warnings
@@ -162,17 +164,24 @@ async function resolveProblemsDirectoryPath(
       );
       return undefined;
     }
+    if (relative(courseDirectoryPath, resolve(options.problemsDirectoryPath)).startsWith('..')) {
+      warnings.push(
+        `problems directory ${options.problemsDirectoryPath} is outside the course directory; Exercode links a material only to problems inside the course, so move them under the course`
+      );
+    }
     return options.problemsDirectoryPath;
   }
-  for (const candidatePath of [join(courseDirectoryPath, 'problems'), join(courseDirectoryPath, '..', 'problems')]) {
-    if (await isRegularDirectory(candidatePath)) return candidatePath;
-    if (await isDirectory(candidatePath)) {
-      errors.push(`problems directory is a symbolic link, which the judge does not traverse: ${candidatePath}`);
-      return undefined;
-    }
+  // Only problems inside the course directory import as the course's problems, so the default is
+  // `problems/` when present and otherwise the course directory itself (problems at any depth).
+  const courseProblemsDirectoryPath = join(courseDirectoryPath, 'problems');
+  if (await isRegularDirectory(courseProblemsDirectoryPath)) return courseProblemsDirectoryPath;
+  if (await isDirectory(courseProblemsDirectoryPath)) {
+    errors.push(
+      `problems directory is a symbolic link, which the judge does not traverse: ${courseProblemsDirectoryPath}`
+    );
+    return undefined;
   }
-  warnings.push('no problems directory found (pass --problems-dir); problem references are not checked');
-  return undefined;
+  return courseDirectoryPath;
 }
 
 async function validateLectureDirectory(

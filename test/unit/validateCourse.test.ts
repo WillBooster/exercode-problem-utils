@@ -9,7 +9,7 @@ import {
   learningMaterialFixturesDir,
 } from './learningMaterialTestHelpers.js';
 
-const problemsDir = join(learningMaterialFixturesDir, 'problems');
+const problemsDir = join(learningMaterialFixturesDir, 'courses', 'example_course', 'problems');
 const validCourseDir = join(learningMaterialFixturesDir, 'courses', 'example_course');
 
 describe('validateCourseDirectory', () => {
@@ -21,43 +21,36 @@ describe('validateCourseDirectory', () => {
     expect(result.warnings).toEqual([]);
   });
 
-  test('resolves the sibling problems directory by default', async () => {
-    const tempDir = await createTempDir();
-    await cp(validCourseDir, join(tempDir, 'example_course'), { recursive: true });
-    await cp(problemsDir, join(tempDir, 'problems'), { recursive: true });
-    const result = await validateCourseDirectory(join(tempDir, 'example_course'));
-    expect(result.errors).toEqual([]);
-    expect(result.warnings).toEqual([]);
-  });
-
-  test('resolves a course-scoped problems directory without reporting it as an orphan lecture', async () => {
+  test('resolves problems nested anywhere inside the course by default', async () => {
     const tempDir = await createTempDir();
     const courseDir = join(tempDir, 'example_course');
     await cp(validCourseDir, courseDir, { recursive: true });
-    await cp(problemsDir, join(courseDir, 'problems'), { recursive: true });
-
+    await rename(join(courseDir, 'problems'), join(courseDir, 'lecture_1', 'nested_problems'));
     const result = await validateCourseDirectory(courseDir);
-
     expect(result.errors).toEqual([]);
     expect(result.warnings).toEqual([]);
   });
 
-  test('does not report the course-scoped problems directory as an orphan lecture with --problems-dir', async () => {
-    const tempDir = await createTempDir();
-    const courseDir = join(tempDir, 'example_course');
-    await cp(validCourseDir, courseDir, { recursive: true });
-    await cp(problemsDir, join(courseDir, 'problems'), { recursive: true });
-    const result = await validateCourseDirectory(courseDir, { problemsDirectoryPath: problemsDir });
-    expect(result.errors).toEqual([]);
-    expect(result.warnings).toEqual([]);
-  });
-
-  test('warns when no problems directory is available', async () => {
+  test('warns when --problems-dir points outside the course', async () => {
     const tempDir = await createTempDir();
     await cp(validCourseDir, join(tempDir, 'example_course'), { recursive: true });
-    const result = await validateCourseDirectory(join(tempDir, 'example_course'));
+    await rename(join(tempDir, 'example_course', 'problems'), join(tempDir, 'problems'));
+    const result = await validateCourseDirectory(join(tempDir, 'example_course'), {
+      problemsDirectoryPath: join(tempDir, 'problems'),
+    });
     expect(result.errors).toEqual([]);
-    expect(result.warnings).toEqual([expect.stringContaining('problem references are not checked')]);
+    expect(result.warnings).toEqual([expect.stringContaining('is outside the course directory')]);
+  });
+
+  test('rejects references when the course contains no problems', async () => {
+    const tempDir = await createTempDir();
+    await cp(validCourseDir, join(tempDir, 'example_course'), { recursive: true });
+    await rm(join(tempDir, 'example_course', 'problems'), { recursive: true });
+    const result = await validateCourseDirectory(join(tempDir, 'example_course'));
+    expect(result.errors).toEqual([
+      expect.stringContaining('problem "a_plus_b" is referenced but does not exist'),
+      expect.stringContaining('problem "arithmetic_subtraction" is referenced but does not exist'),
+    ]);
   });
 
   test('rejects a missing course.yaml', async () => {
@@ -102,20 +95,19 @@ describe('validateCourseDirectory', () => {
     const tempDir = await createTempDir();
     const courseDir = join(tempDir, 'example_course');
     await cp(validCourseDir, courseDir, { recursive: true });
-    await symlink(problemsDir, join(courseDir, 'problems'));
+    await rename(join(courseDir, 'problems'), join(tempDir, 'real_problems'));
+    await symlink(join(tempDir, 'real_problems'), join(courseDir, 'problems'));
     const result = await validateCourseDirectory(courseDir);
     expect(result.errors).toEqual([expect.stringContaining('problems directory is a symbolic link')]);
   });
 
   test('rejects a problem reference that resolves only through a symbolic link', async () => {
     const tempDir = await createTempDir();
-    await cp(validCourseDir, join(tempDir, 'example_course'), { recursive: true });
-    await cp(problemsDir, join(tempDir, 'problems'), { recursive: true });
-    await rm(join(tempDir, 'problems', 'a_plus_b'), { recursive: true });
-    await symlink(join(problemsDir, 'a_plus_b'), join(tempDir, 'problems', 'a_plus_b'));
-    const result = await validateCourseDirectory(join(tempDir, 'example_course'), {
-      problemsDirectoryPath: join(tempDir, 'problems'),
-    });
+    const courseDir = join(tempDir, 'example_course');
+    await cp(validCourseDir, courseDir, { recursive: true });
+    await rm(join(courseDir, 'problems', 'a_plus_b'), { recursive: true });
+    await symlink(join(problemsDir, 'a_plus_b'), join(courseDir, 'problems', 'a_plus_b'));
+    const result = await validateCourseDirectory(courseDir);
     expect(result.errors).toEqual([expect.stringContaining('problem "a_plus_b" is referenced but does not exist')]);
   });
 

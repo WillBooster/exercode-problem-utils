@@ -8,21 +8,25 @@ describe('validateProblemDirectory', () => {
   afterEach(cleanupTempDirs);
 
   test('accepts the valid a_plus_b fixture', async () => {
-    const result = await validateProblemDirectory(join(learningMaterialFixturesDir, 'problems', 'a_plus_b'));
+    const result = await validateProblemDirectory(
+      join(learningMaterialFixturesDir, 'courses', 'example_course', 'problems', 'a_plus_b')
+    );
     expect(result.errors).toEqual([]);
     expect(result.warnings).toEqual([]);
   });
 
   test('accepts the valid arithmetic_subtraction fixture', async () => {
     const result = await validateProblemDirectory(
-      join(learningMaterialFixturesDir, 'problems', 'arithmetic_subtraction')
+      join(learningMaterialFixturesDir, 'courses', 'example_course', 'problems', 'arithmetic_subtraction')
     );
     expect(result.errors).toEqual([]);
     expect(result.warnings).toEqual([]);
   });
 
   test('rejects a directory that does not exist', async () => {
-    const result = await validateProblemDirectory(join(learningMaterialFixturesDir, 'problems', 'no_such_problem'));
+    const result = await validateProblemDirectory(
+      join(learningMaterialFixturesDir, 'courses', 'example_course', 'problems', 'no_such_problem')
+    );
     expect(result.errors).toEqual([expect.stringContaining('problem directory not found')]);
   });
 
@@ -598,7 +602,7 @@ describe('validateProblemDirectory', () => {
 });
 
 async function copyProblemFixture(targetName = 'a_plus_b'): Promise<string> {
-  return copyFixtureToTempDir(join('problems', 'a_plus_b'), targetName);
+  return copyFixtureToTempDir(join('courses', 'example_course', 'problems', 'a_plus_b'), targetName);
 }
 
 /** Rewrites the fixture problem.md frontmatter while keeping the Markdown body intact. */

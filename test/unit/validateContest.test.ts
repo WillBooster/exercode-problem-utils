@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { validateContestFile } from '../../src/learningMaterial/validateContest.js';
 import { cleanupTempDirs, createTempDir, learningMaterialFixturesDir } from './learningMaterialTestHelpers.js';
 
-const problemsDir = join(learningMaterialFixturesDir, 'problems');
+const problemsDir = join(learningMaterialFixturesDir, 'courses', 'example_course', 'problems');
 const validContestPath = join(learningMaterialFixturesDir, 'contests', 'sample_contest.contest.yaml');
 
 describe('validateContestFile', () => {

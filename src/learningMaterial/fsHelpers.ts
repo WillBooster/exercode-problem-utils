@@ -1,5 +1,5 @@
 import { lstat, readdir, readFile, stat } from 'node:fs/promises';
-import { extname, join, relative } from 'node:path';
+import { basename, extname, join, relative } from 'node:path';
 
 // Files the judge importer skips when reading problem directories. The extension filter is ported
 // from the judge's readSourceCodeFilesInDirectory so compile artifacts (e.g. Main.class next to
@@ -57,6 +57,28 @@ export async function isDirectory(path: string): Promise<boolean> {
     return stats.isDirectory();
   } catch {
     return false;
+  }
+}
+
+/**
+ * Collects the IDs of the problem definitions under a directory the way the judge discovers them:
+ * `problem.md` names its directory and `<id>.problem.md` names itself, at any depth, without
+ * traversing symbolic links.
+ */
+export async function collectProblemIds(rootDirectoryPath: string): Promise<Set<string>> {
+  const problemIds = new Set<string>();
+  await collectProblemIdsInto(rootDirectoryPath, problemIds);
+  return problemIds;
+}
+
+async function collectProblemIdsInto(directoryPath: string, problemIds: Set<string>): Promise<void> {
+  for (const dirent of await readdir(directoryPath, { withFileTypes: true })) {
+    if (dirent.isFile()) {
+      if (dirent.name === 'problem.md') problemIds.add(basename(directoryPath));
+      else if (dirent.name.endsWith('.problem.md')) problemIds.add(dirent.name.slice(0, -'.problem.md'.length));
+    } else if (dirent.isDirectory() && dirent.name !== 'node_modules' && !dirent.name.startsWith('.')) {
+      await collectProblemIdsInto(join(directoryPath, dirent.name), problemIds);
+    }
   }
 }
 

@@ -1,8 +1,7 @@
 import { readFile } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { basename } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { parseFrontmatter } from './frontmatter.js';
-import { isRegularDirectory, isRegularFile } from './fsHelpers.js';
 import {
   LEARNING_MATERIAL_ID_REGEX,
   materialFrontmatterSchema,
@@ -32,7 +31,9 @@ export interface SubmissionPeriods {
 }
 
 export interface MaterialValidationOptions {
-  /** When set, every referenced problem ID must resolve to a directory under this path. */
+  /** When set, every referenced problem ID must be one of these (the problems discovered for the course). */
+  availableProblemIds?: ReadonlySet<string>;
+  /** Where `availableProblemIds` were collected from, for messages. */
   problemsDirectoryPath?: string;
   /** Enclosing course ID; the judge rejects problem references whose `courseId` differs from it. */
   courseId?: string;
@@ -118,9 +119,9 @@ export async function validateMaterialFile(
   ];
   reportDuplicateIds(problemIds, 'problem', errors);
   reportForeignProblemCourseIds(frontmatter?.problems ?? [], options.courseId, errors);
-  if (options.problemsDirectoryPath !== undefined) {
+  if (options.availableProblemIds !== undefined) {
     for (const problemId of new Set(problemIds)) {
-      if (!(await problemDefinitionExists(options.problemsDirectoryPath, problemId))) {
+      if (!options.availableProblemIds.has(problemId)) {
         errors.push(`problem "${problemId}" is referenced but does not exist under ${options.problemsDirectoryPath}`);
       }
     }
@@ -152,20 +153,6 @@ export function mergeSubmissionPeriods(
     submissionSoftClosedAt: own.submissionSoftClosedAt ?? courseDefaults?.submissionSoftClosedAt,
     submissionHardClosedAt: own.submissionHardClosedAt ?? courseDefaults?.submissionHardClosedAt,
   };
-}
-
-/**
- * The judge discovers problems by globbing for `problem.md` (v2) or `<id>.problem.md` (v1) files,
- * so a bare directory without a statement file is not a problem and references to it are dangling.
- */
-export async function problemDefinitionExists(problemsDirectoryPath: string, problemId: string): Promise<boolean> {
-  // Discovery neither traverses a symbolic-link directory nor accepts a symbolic-link statement.
-  const problemDirectoryPath = join(problemsDirectoryPath, problemId);
-  if (await isRegularDirectory(problemDirectoryPath)) {
-    if (await isRegularFile(join(problemDirectoryPath, 'problem.md'))) return true;
-    if (await isRegularFile(join(problemDirectoryPath, `${problemId}.problem.md`))) return true;
-  }
-  return isRegularFile(join(problemsDirectoryPath, `${problemId}.problem.md`));
 }
 
 /** exercode rejects more than one standalone chat delimiter line in material and problem bodies. */
