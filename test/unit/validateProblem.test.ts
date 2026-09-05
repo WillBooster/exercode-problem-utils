@@ -481,11 +481,34 @@ describe('validateProblemDirectory', () => {
     await writeFile(join(problemDir, 'test_cases', 'test_1.in'), example1);
     await writeFile(join(problemDir, 'test_cases', 'test_1.out'), '');
     const result = await validateProblemDirectory(problemDir);
-    expect(result.errors).toEqual([expect.stringContaining('test_1: .out is empty')]);
+    expect(result.errors).toEqual([]);
     expect(result.warnings).toEqual([
+      expect.stringContaining('test_1: .out is empty'),
       expect.stringContaining('example_1 and test_1 have identical input'),
       expect.stringContaining('only 3 test cases found'),
     ]);
+  });
+
+  test('rejects a .fout that holds only an empty subdirectory or an oversized expected file', async () => {
+    const problemDir = await copyProblemFixture();
+    await rm(join(problemDir, 'test_cases', 'test_1.out'));
+    await mkdir(join(problemDir, 'test_cases', 'test_1.fout', 'nested'), { recursive: true });
+    await rm(join(problemDir, 'test_cases', 'test_2.out'));
+    await mkdir(join(problemDir, 'test_cases', 'test_2.fout'));
+    await writeFile(join(problemDir, 'test_cases', 'test_2.fout', 'big.txt'), Buffer.alloc(8 * 1024 * 1024 + 1));
+    const result = await validateProblemDirectory(problemDir);
+    expect(result.errors).toEqual([
+      expect.stringContaining('test_1.fout/ is empty'),
+      expect.stringContaining('test_2.fout/big.txt is larger than'),
+      expect.stringContaining('test_1.out (or test_1.fout/) is missing'),
+    ]);
+  });
+
+  test('rejects an expected stdout the stdio judge could never accept', async () => {
+    const problemDir = await copyProblemFixture();
+    await writeFile(join(problemDir, 'test_cases', 'test_1.out'), 'x'.repeat(50_000));
+    const result = await validateProblemDirectory(problemDir);
+    expect(result.errors).toEqual([expect.stringContaining('test_1: .out is too large (length: 50000)')]);
   });
 });
 

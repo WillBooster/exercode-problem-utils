@@ -19,6 +19,7 @@ import {
 } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases } from '../helpers/readTestCases.js';
 import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
+import { EXAMPLE_TEST_CASE_ID_PATTERN, MAX_STDOUT_LENGTH } from '../helpers/stdioJudgeRules.js';
 import {
   copyProblemDirToTemporaryRoot,
   forciblyRemoveDirectory,
@@ -29,10 +30,6 @@ import { DecisionCode } from '../types/decisionCode.js';
 const BUILD_TIMEOUT_SECONDS = 10;
 const JUDGE_DEFAULT_TIMEOUT_SECONDS = 2;
 const DEBUG_DEFAULT_TIMEOUT_SECONDS = 10;
-
-const MAX_STDOUT_LENGTH = 50_000;
-// The judge server shows a test case on the problem page when its id contains `example`.
-const EXAMPLE_TEST_CASE_ID_PATTERN = /example/;
 
 const judgeParamsSchema = z.object({
   language: z.union([z.string(), z.array(z.string())]).optional(),

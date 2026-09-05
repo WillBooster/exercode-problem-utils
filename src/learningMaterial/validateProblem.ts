@@ -1,10 +1,15 @@
-import { readdir, readFile } from 'node:fs/promises';
-import { basename, join, resolve } from 'node:path';
+import { readdir, readFile, stat } from 'node:fs/promises';
+import { basename, join, relative, resolve } from 'node:path';
 
+import { MAX_COMPARED_FILE_BYTES } from '../helpers/compareExpectedOutputFiles.js';
 import { HARNESS_FILE_PRESETS, isDefaultStdioHarnessSource } from '../helpers/defaultStdioHarness.js';
 import { findLanguageDefinitionByPath } from '../helpers/findLanguageDefinitionByPath.js';
-import { judgesWithoutTestCases } from '../helpers/readProblemMarkdownFrontMatter.js';
+import {
+  judgesTestCasesWithoutExpectations,
+  judgesWithoutTestCases,
+} from '../helpers/readProblemMarkdownFrontMatter.js';
 import { removeCommentsInSourceCode } from '../helpers/removeCommentsInSourceCode.js';
+import { EXAMPLE_TEST_CASE_ID_PATTERN, MAX_STDOUT_LENGTH } from '../helpers/stdioJudgeRules.js';
 import { type CodeRule, normalizeCodeRule } from '../types/problem.js';
 
 import { parseFrontmatter } from './frontmatter.js';
@@ -18,9 +23,6 @@ import {
 import { reportExcessChatMarkers } from './validateMaterial.js';
 import { formatZodIssues, type ValidationResult } from './validationResult.js';
 
-// Same pattern the judge uses to decide which test cases appear on the problem page.
-const EXAMPLE_TEST_CASE_ID_REGEX = /(\d+_)?example(_\d+)?/;
-const MAX_STDOUT_LENGTH = 100_000;
 const RECOMMENDED_MIN_TEST_CASE_COUNT = 4;
 // Forbidden patterns must not restrict classes/functions commonly needed just to parse stdin (from gen-em).
 // Instead of a substring check on the pattern source ("print" contains "int"), each forbidden
@@ -46,8 +48,9 @@ interface FileTestCase {
 
 // `_shared.fin/` holds files copied for every test case; it is not a test case itself.
 const SHARED_FILE_INPUT_NAME = '_shared';
-// A directory holding only these is as good as empty: `.DS_Store` is ignored by git and `.gitkeep` is a placeholder.
-const PLACEHOLDER_FILE_NAMES: ReadonlySet<string> = new Set(['.DS_Store', '.gitkeep']);
+// The importer leaves generated artifacts out of the packaged problem, so a directory holding only
+// these is as good as empty; `.gitkeep` is a placeholder that git keeps but no program reads.
+const IGNORED_TEST_CASE_ENTRY_NAMES: ReadonlySet<string> = new Set(['.DS_Store', '.gitkeep', '__pycache__']);
 
 interface ModelAnswer {
   id: string;
@@ -87,12 +90,7 @@ export async function validateProblemDirectory(problemDirectoryPath: string): Pr
 
   const frontmatter = await parseProblemFrontmatter(problemFilePath, errors);
   const harness = await readHarnessFiles(absoluteDirectoryPath);
-  // The stdio judge compares outputs unless the front matter judges every test case otherwise
-  // (manual scoring or the presence of required output files); code rules and required submission
-  // files check the submission once and only add to the comparison.
-  const requiresExpectedOutput =
-    frontmatter === undefined ||
-    (frontmatter.isManualScoringRequired !== true && frontmatter.requiredOutputFilePaths.length === 0);
+  const requiresExpectedOutput = frontmatter === undefined || !judgesTestCasesWithoutExpectations(frontmatter);
   const fileTestCases = await readFileTestCases(
     absoluteDirectoryPath,
     { hasCustomJudgeTs: harness.hasCustomJudgeTs, requiresExpectedOutput },
@@ -251,7 +249,8 @@ async function readFileTestCases(
       } else if (!dirent.isDirectory()) {
         errors.push(`test_cases/${dirent.name} must be a directory`);
       } else {
-        if (!(await hasEntries(join(testCasesDirectoryPath, dirent.name)))) {
+        const sharedFilePaths = await listFilesRecursively(join(testCasesDirectoryPath, dirent.name));
+        if (sharedFilePaths.length === 0) {
           errors.push(`test_cases/${dirent.name}/ is empty; put at least one shared input file in it`);
         }
       }
@@ -274,18 +273,30 @@ async function readFileTestCases(
       continue;
     }
     // git does not track an empty directory, so an empty `.fin/` or `.fout/` would silently vanish on
-    // commit; it is an error and does not make the id a test case. Only the top level is listed: any entry
-    // (file, symlink or subdirectory) other than a placeholder counts, and no tree is walked, so a symlink
-    // cycle inside cannot break validation.
-    if (!(await hasEntries(join(testCasesDirectoryPath, dirent.name)))) {
+    // commit, and the importer counts only real files that are not generated artifacts (an empty
+    // subdirectory does not count); such a directory is an error and does not make the id a test case.
+    const filePaths = await listFilesRecursively(join(testCasesDirectoryPath, dirent.name));
+    if (filePaths.length === 0) {
       errors.push(`test case ${testCaseId}: ${dirent.name}/ is empty; put at least one file in it or delete it`);
       continue;
     }
     const testCase = getTestCase(testCaseId);
     if (dirent.name.endsWith('.fin')) {
       testCase.hasFileInput = true;
-    } else {
-      testCase.hasFileOutput = true;
+      continue;
+    }
+    testCase.hasFileOutput = true;
+    // The stdio judge compares each expected file and refuses one above its limit (the importer rejects
+    // the problem); a custom judge.ts reads the directory under its own contract.
+    if (!hasCustomJudgeTs) {
+      for (const filePath of filePaths) {
+        const fileStats = await stat(filePath);
+        if (fileStats.size > MAX_COMPARED_FILE_BYTES) {
+          errors.push(
+            `test case ${testCaseId}: ${dirent.name}/${relative(join(testCasesDirectoryPath, dirent.name), filePath)} is larger than ${MAX_COMPARED_FILE_BYTES} bytes, which the stdio judge cannot compare`
+          );
+        }
+      }
     }
   }
   // `_shared.*` files were already reported by the entry loop above.
@@ -349,16 +360,18 @@ async function readFileTestCases(
         );
       }
     }
-    if (testCase.stdout !== undefined && testCase.stdout.length > MAX_STDOUT_LENGTH) {
+    // The stdio judge rejects a run whose raw stdout exceeds the limit, and a program prints at least
+    // a trailing newline after the trimmed expectation, so an expectation at the limit can never match.
+    if (testCase.stdout !== undefined && testCase.stdout.length >= MAX_STDOUT_LENGTH) {
       errors.push(
-        `test case ${testCase.id}: .out is too large (length: ${testCase.stdout.length} > ${MAX_STDOUT_LENGTH})`
+        `test case ${testCase.id}: .out is too large (length: ${testCase.stdout.length}); the stdio judge rejects a run that prints ${MAX_STDOUT_LENGTH} or more characters`
       );
     }
-    // An empty `.out` is either a program that prints nothing (forbidden by the authoring rules) or a
-    // stray file of a case whose stdout is not compared; both are authoring mistakes.
+    // The judge accepts an empty `.out` (the program must print nothing or an empty line), but it is
+    // usually a stray file of a case whose stdout is not compared.
     if (testCase.stdout !== undefined && testCase.stdout.length === 0) {
-      errors.push(
-        `test case ${testCase.id}: .out is empty; make the program print something, or delete .out when stdout is not compared`
+      warnings.push(
+        `test case ${testCase.id}: .out is empty, so only a program that prints nothing (or an empty line) is accepted; delete .out when stdout is not compared`
       );
     }
   }
@@ -379,9 +392,19 @@ async function readFileTestCases(
   return testCases;
 }
 
-async function hasEntries(directoryPath: string): Promise<boolean> {
-  const entryNames = await readdir(directoryPath);
-  return entryNames.some((name) => !PLACEHOLDER_FILE_NAMES.has(name));
+/** Lists the real files under a test case directory, leaving out generated artifacts like the importer. */
+async function listFilesRecursively(directoryPath: string): Promise<string[]> {
+  const filePaths: string[] = [];
+  for (const dirent of await readdir(directoryPath, { withFileTypes: true })) {
+    if (IGNORED_TEST_CASE_ENTRY_NAMES.has(dirent.name)) continue;
+    const entryPath = join(directoryPath, dirent.name);
+    if (dirent.isFile()) {
+      filePaths.push(entryPath);
+    } else if (dirent.isDirectory()) {
+      filePaths.push(...(await listFilesRecursively(entryPath)));
+    }
+  }
+  return filePaths;
 }
 
 function hasExpectedOutput(testCase: FileTestCase): boolean {
@@ -421,12 +444,10 @@ function reportTestCaseCompositionIssues(
   errors: string[],
   warnings: string[]
 ): void {
-  if (!testCases.some((testCase) => EXAMPLE_TEST_CASE_ID_REGEX.test(testCase.id))) {
-    errors.push(
-      'no example test case found; add at least one test case whose ID starts with "example" (e.g. example_1)'
-    );
+  if (!testCases.some((testCase) => EXAMPLE_TEST_CASE_ID_PATTERN.test(testCase.id))) {
+    errors.push('no example test case found; add at least one test case whose ID contains "example" (e.g. example_1)');
   }
-  if (testCases.every((testCase) => EXAMPLE_TEST_CASE_ID_REGEX.test(testCase.id))) {
+  if (testCases.every((testCase) => EXAMPLE_TEST_CASE_ID_PATTERN.test(testCase.id))) {
     errors.push(
       'no hidden test case found; add at least one test case whose ID does not contain "example" (e.g. test_1)'
     );
