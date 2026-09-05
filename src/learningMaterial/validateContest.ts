@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { isDirectory, isFile } from './fsHelpers.js';
+import { isDirectory, isFile, isRegularFile } from './fsHelpers.js';
 import { CONTEST_MATERIAL_FILE_SUFFIX, contestFileSchema, LEARNING_MATERIAL_ID_REGEX } from './schemas.js';
 import {
   mergeSubmissionPeriods,
@@ -32,8 +32,13 @@ export async function validateContestFile(
   const warnings: string[] = [];
   const result = { errors, warnings };
 
-  if (!(await isFile(contestFilePath))) {
-    errors.push(`contest file not found: ${contestFilePath}`);
+  // The judge lists lecture entries as regular files, so a symbolic link is skipped at import time.
+  if (!(await isRegularFile(contestFilePath))) {
+    errors.push(
+      (await isFile(contestFilePath))
+        ? `contest file is a symbolic link, which the judge ignores; commit a regular file: ${contestFilePath}`
+        : `contest file not found: ${contestFilePath}`
+    );
     return result;
   }
   const fileName = basename(contestFilePath);

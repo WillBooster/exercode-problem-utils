@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'vitest';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { validateContestFile } from '../../src/learningMaterial/validateContest.js';
 import { cleanupTempDirs, createTempDir, learningMaterialFixturesDir } from './learningMaterialTestHelpers.js';
@@ -19,6 +19,14 @@ describe('validateContestFile', () => {
   test('rejects a missing contest file', async () => {
     const result = await validateContestFile(join(learningMaterialFixturesDir, 'contests', 'missing.contest.yaml'));
     expect(result.errors).toEqual([expect.stringContaining('contest file not found')]);
+  });
+
+  test('rejects a symbolic link to a contest file', async () => {
+    const tempDir = await createTempDir();
+    const contestPath = join(tempDir, 'linked.contest.yaml');
+    await symlink(validContestPath, contestPath);
+    const result = await validateContestFile(contestPath);
+    expect(result.errors).toEqual([expect.stringContaining('contest file is a symbolic link')]);
   });
 
   test('rejects a file name without the .contest.yaml suffix', async () => {
