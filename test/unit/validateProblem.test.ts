@@ -588,9 +588,12 @@ describe('validateProblemDirectory', () => {
 
   test('rejects an expected stdout the stdio judge could never accept', async () => {
     const problemDir = await copyProblemFixture();
-    await writeFile(join(problemDir, 'test_cases', 'test_1.out'), 'x'.repeat(50_001));
+    await writeFile(join(problemDir, 'test_cases', 'test_1.out'), `${'x'.repeat(50_000)}\n`);
     const result = await validateProblemDirectory(problemDir);
-    expect(result.errors).toEqual([expect.stringContaining('test_1: .out is too large (length: 50001)')]);
+    expect(result.errors).toEqual([expect.stringContaining('test_1: .out is too large (length: 50001')]);
+    await writeFile(join(problemDir, 'test_cases', 'test_1.out'), 'x'.repeat(50_000));
+    const boundaryResult = await validateProblemDirectory(problemDir);
+    expect(boundaryResult.errors).toEqual([]);
   });
 });
 

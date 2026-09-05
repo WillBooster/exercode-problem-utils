@@ -38,6 +38,8 @@ interface FileTestCase {
   id: string;
   stdin?: string;
   stdout?: string;
+  /** Length of `<id>.out` as committed (trailing newline included), which a matching run must print. */
+  rawStdoutLength?: number;
   /** Whether `<id>.fin/` (input files copied into the working directory) exists and holds at least one file. */
   hasFileInput: boolean;
   /** Whether `<id>.fout/` (expected output files) exists and holds at least one file. */
@@ -327,6 +329,7 @@ async function readFileTestCases(
       testCase.stdin = content.trimEnd();
     } else if (fileName.endsWith('.out')) {
       testCase.stdout = content.trimEnd();
+      testCase.rawStdoutLength = content.length;
     } else {
       // The presets ignore `.json`; only a custom judge.ts reads it, with a shape of its own.
       testCase.hasJudgeConfig = true;
@@ -371,13 +374,18 @@ async function readFileTestCases(
     // The stdio judge rejects a run whose raw stdout exceeds the limit, so a longer expectation can
     // never match (a program may still print exactly the limit without a trailing newline).
     // A custom judge.ts reads `.out` under its own contract, so only the importer's limit applies to it.
-    const maxStdoutLength = hasCustomJudgeTs ? IMPORTER_MAX_STDOUT_LENGTH : MAX_STDOUT_LENGTH;
-    if (testCase.stdout !== undefined && testCase.stdout.length > maxStdoutLength) {
-      errors.push(
-        hasCustomJudgeTs
-          ? `test case ${testCase.id}: .out is too large (length: ${testCase.stdout.length} > ${maxStdoutLength})`
-          : `test case ${testCase.id}: .out is too large (length: ${testCase.stdout.length}); the stdio judge rejects a run that prints more than ${maxStdoutLength} characters`
-      );
+    // The importer measures the trimmed expectation, while the stdio judge measures the raw output
+    // a run prints, which a model answer reproducing the committed `.out` matches byte for byte.
+    if (testCase.stdout !== undefined && testCase.rawStdoutLength !== undefined) {
+      if (hasCustomJudgeTs && testCase.stdout.length > IMPORTER_MAX_STDOUT_LENGTH) {
+        errors.push(
+          `test case ${testCase.id}: .out is too large (length: ${testCase.stdout.length} > ${IMPORTER_MAX_STDOUT_LENGTH})`
+        );
+      } else if (!hasCustomJudgeTs && testCase.rawStdoutLength > MAX_STDOUT_LENGTH) {
+        errors.push(
+          `test case ${testCase.id}: .out is too large (length: ${testCase.rawStdoutLength} including the trailing newline); the stdio judge rejects a run that prints more than ${MAX_STDOUT_LENGTH} characters`
+        );
+      }
     }
     // The judge accepts an empty `.out` (the program must print nothing or an empty line), but it is
     // usually a stray file of a case whose stdout is not compared.
