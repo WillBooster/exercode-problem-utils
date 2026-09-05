@@ -479,6 +479,16 @@ describe('validateProblemDirectory', () => {
     expect(withDebug.warnings).toEqual([]);
   });
 
+  test('rejects model answers that hold no runnable source file', async () => {
+    const problemDir = await copyProblemFixture();
+    await setProblemFrontmatter(problemDir, 'name: A + B');
+    await rm(join(problemDir, 'model_answers'), { recursive: true });
+    await mkdir(join(problemDir, 'model_answers', 'python'), { recursive: true });
+    await writeFile(join(problemDir, 'model_answers', 'python', 'README.md'), '# notes\n');
+    const result = await validateProblemDirectory(problemDir);
+    expect(result.errors).toEqual([expect.stringContaining('no model answers found')]);
+  });
+
   test('rejects an empty model answer directory', async () => {
     const problemDir = await copyProblemFixture();
     await rm(join(problemDir, 'model_answers', 'javascript', 'main.mjs'));

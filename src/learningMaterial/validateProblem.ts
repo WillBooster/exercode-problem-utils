@@ -113,12 +113,14 @@ export async function validateProblemDirectory(problemDirectoryPath: string): Pr
   validateHarnessFiles(harness, frontmatter !== undefined, errors, warnings);
 
   const modelAnswers = await readModelAnswers(absoluteDirectoryPath, errors, warnings);
-  // Whitespace-only files still produce entries, so presence requires at least one non-empty
-  // source file rather than a non-empty answer list.
-  const usableModelAnswers = modelAnswers.filter((answer) => answer.files.some((file) => file.data.trim().length > 0));
+  // The judge needs a non-empty file of a known language to run, so notes or whitespace-only
+  // files do not make an answer usable.
+  const usableModelAnswers = modelAnswers.filter((answer) =>
+    answer.files.some((file) => findLanguageDefinitionByPath(file.path) !== undefined && file.data.trim().length > 0)
+  );
   if (usableModelAnswers.length === 0 && isScoredAutomatically) {
     errors.push(
-      'no model answers found; add at least one model_answers/<languageId>/ directory with non-empty source files'
+      'no model answers found; add at least one model_answers/<languageId>/ directory with a non-empty source file of a supported language'
     );
   }
   if (frontmatter) {
