@@ -82,7 +82,7 @@ export async function validateCourseDirectory(
     absoluteDirectoryPath,
     courseFile,
     courseFileName,
-    problemsDirectoryPath,
+    options.problemsDirectoryPath,
     warnings
   );
   return result;
@@ -97,8 +97,8 @@ async function reportOrphanLectureDirectories(
   warnings: string[]
 ): Promise<void> {
   const lectureIds = new Set((courseFile.lectures ?? []).map((lecture) => lecture.id));
-  // The course's own `problems/` holds problems, never lecture materials, whichever problems
-  // directory the validation resolved to.
+  // The course's own `problems/` holds problems, never lecture materials, and so does an explicitly
+  // named problems directory inside the course.
   const problemsDirectoryNames = new Set(['problems']);
   if (problemsDirectoryPath && dirname(resolve(problemsDirectoryPath)) === courseDirectoryPath) {
     problemsDirectoryNames.add(basename(problemsDirectoryPath));

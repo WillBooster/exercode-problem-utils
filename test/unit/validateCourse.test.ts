@@ -85,6 +85,14 @@ describe('validateCourseDirectory', () => {
     expect(result.errors).toEqual([expect.stringContaining('problem ID "a_plus_b" is defined more than once')]);
   });
 
+  test('does not report an explicitly named course-internal problems directory as an orphan lecture', async () => {
+    const courseDir = await copyCourseFixture();
+    await rename(join(courseDir, 'problems'), join(courseDir, 'exercises'));
+    const result = await validateCourseDirectory(courseDir, { problemsDirectoryPath: join(courseDir, 'exercises') });
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
+
   test('still discovers course-wide problems when --problems-dir names a subdirectory', async () => {
     const tempDir = await createTempDir();
     const courseDir = join(tempDir, 'example_course');
