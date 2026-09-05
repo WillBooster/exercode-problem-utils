@@ -134,9 +134,10 @@ export async function validateMaterialFile(
   reportDuplicateIds(problemIds, 'problem', errors);
   reportForeignProblemCourseIds(frontmatter?.problems ?? [], options.courseId, errors);
   if (options.availableProblemIds !== undefined) {
+    const location = options.problemsDirectoryPath === undefined ? '' : ` under ${options.problemsDirectoryPath}`;
     for (const problemId of new Set(problemIds)) {
       if (!options.availableProblemIds.has(problemId)) {
-        errors.push(`problem "${problemId}" is referenced but does not exist under ${options.problemsDirectoryPath}`);
+        errors.push(`problem "${problemId}" is referenced but does not exist${location}`);
       }
     }
   }
