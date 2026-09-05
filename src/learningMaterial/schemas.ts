@@ -189,6 +189,8 @@ export const contestFileSchema = z.strictObject({
   ...materialConfigShape,
   name: z.string().min(1),
   description: z.string().optional(),
+  // Exercode reads the contest administrators itself and strips the key before the judge's strict schema.
+  adminEmails: z.array(z.string().trim().email()).optional(),
   showsProblemsAfterClose: z.boolean().optional(),
   divisions: z.array(contestDivisionSchema).min(1),
   problems: z.array(contestProblemSchema).min(1),

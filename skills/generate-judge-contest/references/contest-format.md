@@ -7,6 +7,7 @@ A contest is a `<contestId>.contest.yaml` file (id = filename without `.contest.
 - `name` (required)
 - `description` (optional, markdown)
 - `showsProblemsAfterClose` (optional boolean)
+- `adminEmails` (optional): array of e-mail addresses of registered Exercode accounts that administer this contest
 - `divisions` (required, min 1): array of `{ id, name, openedAt, closedAt, password? }`
   - `openedAt` / `closedAt`: ISO datetimes with offset (e.g. `2025-01-01T00:00:00+09:00`), `openedAt < closedAt`
   - Division ids must be unique.

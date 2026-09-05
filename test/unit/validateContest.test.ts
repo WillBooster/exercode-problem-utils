@@ -29,6 +29,21 @@ describe('validateContestFile', () => {
     expect(result.errors).toEqual([expect.stringContaining('contest file is a symbolic link')]);
   });
 
+  test('accepts adminEmails and rejects a malformed address', async () => {
+    const contestPath = await copyContestFixture(
+      'sample_contest.contest.yaml',
+      (content) => `${content}adminEmails:\n  - admin@example.com\n`
+    );
+    const result = await validateContestFile(contestPath, { problemsDirectoryPath: problemsDir });
+    expect(result.errors).toEqual([]);
+    const malformedPath = await copyContestFixture(
+      'sample_contest.contest.yaml',
+      (content) => `${content}adminEmails:\n  - not-an-email\n`
+    );
+    const malformedResult = await validateContestFile(malformedPath);
+    expect(malformedResult.errors).toEqual([expect.stringContaining('adminEmails')]);
+  });
+
   test('rejects a file name without the .contest.yaml suffix', async () => {
     const contestPath = await copyContestFixture('sample_contest.yaml');
     const result = await validateContestFile(contestPath);
