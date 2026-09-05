@@ -136,18 +136,17 @@ export async function validateProblemDirectory(problemDirectoryPath: string): Pr
   // its judge runs: a custom judge defines that itself (e.g. a CSV submission), while the stdio
   // judge needs a non-empty file of a supported language as its entry point.
   const usableModelAnswers = modelAnswers.filter((answer) => {
-    const hasContent = answer.files.some((file) => file.data.trim().length > 0);
+    // A custom judge may accept an empty data file, so only the stdio judge needs content.
+    if (harness.hasCustomJudgeTs) return true;
     const isRunnable = answer.files.some(
       (file) => findLanguageDefinitionByPath(file.path) !== undefined && file.data.trim().length > 0
     );
-    if (!hasContent) {
-      errors.push(`model answer directory "${answer.id}" has only empty files; add the answer or delete it`);
-    } else if (!harness.hasCustomJudgeTs && !isRunnable) {
+    if (!isRunnable) {
       errors.push(
-        `model answer directory "${answer.id}" has no source file of a supported language, which the stdio judge needs as its entry point`
+        `model answer directory "${answer.id}" has no non-empty source file of a supported language, which the stdio judge needs as its entry point`
       );
     }
-    return hasContent;
+    return isRunnable;
   });
   if (isScoredAutomatically && modelAnswers.length === 0) {
     errors.push('no model answers found; add at least one model_answers/<languageId>/ directory with non-empty files');
@@ -658,12 +657,6 @@ async function validateTemplates(
   const entries = dirents.filter((dirent) => dirent.name !== '__pycache__');
   if (entries.some((dirent) => dirent.name === '.DS_Store')) {
     warnings.push('templates/.DS_Store found; delete it (the judge treats it as a template file)');
-  }
-  // The importer accepts only regular files and directories under templates/.
-  for (const dirent of entries) {
-    if (!dirent.isFile() && !dirent.isDirectory()) {
-      errors.push(`templates/${dirent.name} must be a regular file or directory (symbolic links fail import)`);
-    }
   }
   const hasFiles = entries.some((dirent) => dirent.isFile());
   const hasDirectories = entries.some((dirent) => dirent.isDirectory());

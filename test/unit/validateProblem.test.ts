@@ -56,10 +56,7 @@ describe('validateProblemDirectory', () => {
     await rm(join(problemDir, 'problem.md'));
     await rename(join(problemDir, 'statement.md'), join(problemDir, 'problem.md'));
     const templateResult = await validateProblemDirectory(problemDir);
-    expect(templateResult.errors).toEqual([
-      expect.stringContaining('templates/link.py is a symbolic link'),
-      expect.stringContaining('templates/link.py must be a regular file or directory'),
-    ]);
+    expect(templateResult.errors).toEqual([expect.stringContaining('templates/link.py is a symbolic link')]);
   });
 
   test('rejects a v1 problem file layout', async () => {
@@ -522,7 +519,7 @@ describe('validateProblemDirectory', () => {
     await writeFile(join(problemDir, 'model_answers', 'python', 'README.md'), '# notes\n');
     const result = await validateProblemDirectory(problemDir);
     expect(result.errors).toEqual([
-      expect.stringContaining('model answer directory "python" has no source file of a supported language'),
+      expect.stringContaining('model answer directory "python" has no non-empty source file of a supported language'),
     ]);
   });
 
