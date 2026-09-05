@@ -3,6 +3,7 @@ import { basename, join, resolve } from 'node:path';
 
 import { HARNESS_FILE_PRESETS, isDefaultStdioHarnessSource } from '../helpers/defaultStdioHarness.js';
 import { findLanguageDefinitionByPath } from '../helpers/findLanguageDefinitionByPath.js';
+import { judgesWithoutTestCases } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { removeCommentsInSourceCode } from '../helpers/removeCommentsInSourceCode.js';
 import { type CodeRule, normalizeCodeRule } from '../types/problem.js';
 
@@ -394,9 +395,10 @@ function validateTestCasePresence(
   errors: string[],
   warnings: string[]
 ): void {
-  // The judge requires isManualScoringRequired for case-less problems without judge.ts and grants
-  // no exemption for `type: prompt_study`, so the type must not relax this check.
-  if (fileTestCases.length === 0 && frontmatter?.isManualScoringRequired !== true) {
+  // The judge grants no exemption for `type: prompt_study`, so the type must not relax this check;
+  // static-analysis rules and manual scoring judge a problem without test cases (the same rule the
+  // `judge` subcommand and the all-problem check apply).
+  if (fileTestCases.length === 0 && (frontmatter === undefined || !judgesWithoutTestCases(frontmatter))) {
     // The judge only rejects a case-less problem when judge.ts is also missing; a special judge
     // may compute results itself, but the stdio presets need test_cases/, hence the warning.
     if (hasCustomJudgeTs) {
@@ -405,7 +407,7 @@ function validateTestCasePresence(
       );
     } else {
       errors.push(
-        'no test cases found; add test cases with an expected output (test_cases/<id>.out or <id>.fout/, plus <id>.in or <id>.fin/ when the program reads input; at least one example_* and one hidden test_*), or set isManualScoringRequired: true'
+        'no test cases found; add test cases with an expected output (test_cases/<id>.out or <id>.fout/, plus <id>.in or <id>.fin/ when the program reads input; at least one example_* and one hidden test_*), static-analysis rules (e.g. requiredRegExpsInCode), or isManualScoringRequired: true'
       );
     }
   }

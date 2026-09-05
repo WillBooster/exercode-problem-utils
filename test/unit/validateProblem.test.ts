@@ -196,6 +196,14 @@ describe('validateProblemDirectory', () => {
     expect(result.errors).toContainEqual(expect.stringContaining('no test cases found'));
   });
 
+  test('accepts a case-less problem judged by static-analysis rules', async () => {
+    const problemDir = await copyProblemFixture();
+    await rm(join(problemDir, 'test_cases'), { recursive: true });
+    await setProblemFrontmatter(problemDir, "name: A + B\nrequiredRegExpsInCode: ['\\+']");
+    const result = await validateProblemDirectory(problemDir);
+    expect(result.errors).toEqual([]);
+  });
+
   test('rejects the frontmatter keys removed with the v1 judge', async () => {
     const problemDir = await copyProblemFixture();
     await setProblemFrontmatter(
@@ -388,6 +396,8 @@ describe('validateProblemDirectory', () => {
   test('reports the default judge.ts and the missing test cases in a single pass', async () => {
     const problemDir = await copyProblemFixture();
     await rm(join(problemDir, 'test_cases'), { recursive: true });
+    // The fixture's code rules would make the problem judgeable without test cases.
+    await setProblemFrontmatter(problemDir, 'name: A + B');
     await writeFile(
       join(problemDir, 'judge.ts'),
       "import { stdioJudgePreset } from '@exercode/problem-utils/presets/stdio';\n\nawait stdioJudgePreset(import.meta.dirname);\n"
