@@ -48,7 +48,7 @@ Each target prints `OK` or `NG` followed by its errors and warnings; the command
 
 ## Agent skills
 
-The [`skills/`](skills/) directory holds skills for AI coding agents that author and review Exercode learning content: `generate-learning-content` (entry point), `generate-course-materials`, `generate-judge-problems`, `generate-judge-contest`, `review-learning-content`, and `setup-exercode-course-repository`. Install them with the [skills](https://github.com/vercel-labs/skills) CLI:
+The [`skills/`](skills/) directory holds skills for AI coding agents that author and review Exercode learning content: `generate-learning-content` (entry point), `generate-course-materials`, `generate-judge-problems`, `generate-judge-contest`, `review-learning-content`, and `setup-exercode-course-repository`. Agents working in this repository load them through the symlinks under `.claude/skills/`; install them elsewhere with the [skills](https://github.com/vercel-labs/skills) CLI:
 
 ```bash
 bun x skills add WillBooster/exercode-problem-utils --agent claude-code --agent codex
