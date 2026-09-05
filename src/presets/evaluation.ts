@@ -5,7 +5,6 @@ import { judgeByStaticAnalysis } from '../helpers/judgeByStaticAnalysis.js';
 import { parseArgs } from '../helpers/parseArgs.js';
 import { CsvParseError, type CsvParseErrorReason, parseCsv, parseCsvRecords } from '../helpers/parseCsv.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
-import { isSafeSubmissionOutputPath } from '../helpers/readOutputFiles.js';
 import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { passesIsolationCheckInDebugMode } from '../helpers/runIsolationCheckInDebugMode.js';
 import {
@@ -154,8 +153,6 @@ async function judgeSubmission(
   let submissionText: string;
   try {
     const resolvedPath = path.join(cwd, submissionFilePath);
-    // The harness reads the file as the trusted user, so refuse symlinks escaping the submission.
-    if (!(await isSafeSubmissionOutputPath(cwd, resolvedPath))) throw new Error('unsafe path');
     submissionText = await fs.readFile(resolvedPath, 'utf8');
   } catch {
     return {

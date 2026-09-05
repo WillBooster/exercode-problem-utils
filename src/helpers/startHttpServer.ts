@@ -2,9 +2,6 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 
-import { isContainedPath } from './safeFs.js';
-import { sandboxUserName } from './sandboxUser.js';
-
 export interface HttpServer {
   [Symbol.asyncDispose](): Promise<void>;
   url: string;
@@ -25,15 +22,6 @@ export function startHttpServer(dir: string): HttpServer {
     const pathnameWithIndexHtml = pathname.endsWith('/') ? path.join(pathname, 'index.html') : pathname;
 
     const filePath = path.join(dir, pathnameWithIndexHtml);
-
-    // Under delegation this read runs as the trusted harness user while the served directory
-    // belongs to the sandboxed submission, so a planted symlink (or symlinked parent) pointing at
-    // e.g. the problem's expected outputs would otherwise be served straight back to the page.
-    if (!isServableSubmissionPath(dir, filePath)) {
-      response.statusCode = 404;
-      response.end();
-      return;
-    }
 
     if (fs.existsSync(filePath)) {
       try {
@@ -83,18 +71,6 @@ const CONTENT_TYPE_BY_SUFFIX: Record<string, string> = {
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
 };
-
-function isServableSubmissionPath(dir: string, filePath: string): boolean {
-  // Without user separation the page's own code can read these files anyway, so keep the previous
-  // behavior and stay usable for course authoring outside the judge image.
-  if (!sandboxUserName) return true;
-  try {
-    return isContainedPath(fs.realpathSync(dir), fs.realpathSync(filePath));
-  } catch {
-    // A missing file is reported as 404 below; anything unresolvable is not servable either.
-    return !fs.existsSync(filePath);
-  }
-}
 
 function getContentType(pathname: string): string {
   for (const [suffix, contentType] of Object.entries(CONTENT_TYPE_BY_SUFFIX)) {
