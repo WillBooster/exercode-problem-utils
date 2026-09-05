@@ -84,6 +84,13 @@ describe('validateCourseDirectory', () => {
     expect(result.errors).toEqual([expect.stringContaining('lecture "lecture_2": directory not found')]);
   });
 
+  test('accepts the same problem linked twice in a material body', async () => {
+    const courseDir = await copyCourseFixture();
+    await appendFile(join(courseDir, 'lecture_1', '10_intro.md'), '\n[もう一度](problems/a_plus_b)\n');
+    const result = await validateCourse(courseDir);
+    expect(result.errors).toEqual([]);
+  });
+
   test('rejects a dangling problem reference in a material body', async () => {
     const courseDir = await copyCourseFixture();
     await replaceInMaterial(courseDir, '(problems/a_plus_b)', '(problems/missing_problem)');

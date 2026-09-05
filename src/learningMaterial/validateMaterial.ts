@@ -89,27 +89,23 @@ export async function validateMaterialFile(
   // and exercode rejects duplicates in the merged list; deferred until after the question blocks
   // are removed below so links inside question text don't count.
 
-  // exercode's import rejects duplicate problem references whether they come from listing a
-  // problem twice, linking it twice in the body, or listing it in the frontmatter AND linking it
-  // in the body (the judge merges both sources without deduplication), so every occurrence counts.
+  // The judge deduplicates the links it collects from the body, then merges them with the
+  // frontmatter list without deduplication, so a problem listed twice in the frontmatter or listed
+  // there and linked in the body is a duplicate reference while linking it twice in prose is not.
   // The judge replaces recognized question blocks with @[question](id) links before collecting
-  // problem links, so links that appear only inside question text must not count here either.
+  // links, so links that appear only inside question text must not count here either.
   const bodyWithoutQuestionBlocks = body.replaceAll(QUESTION_CODE_BLOCK_REGEX, '\n');
   reportDuplicateIds(
     [
       ...(frontmatter?.turtleGraphicsQuestions ?? []).map((question) => question.id),
-      ...[...bodyWithoutQuestionBlocks.matchAll(TURTLE_GRAPHICS_QUESTION_LINK_REGEX)]
-        .map((match) => match[1])
-        .filter((id) => id !== undefined),
+      ...collectLinkedIds(bodyWithoutQuestionBlocks, TURTLE_GRAPHICS_QUESTION_LINK_REGEX),
     ],
     'turtleGraphicsQuestion',
     errors
   );
   const problemIds = [
     ...(frontmatter?.problems ?? []).map((problem) => problem.id),
-    ...[...bodyWithoutQuestionBlocks.matchAll(PROBLEM_LINK_REGEX)]
-      .map((match) => match[1])
-      .filter((id) => id !== undefined),
+    ...collectLinkedIds(bodyWithoutQuestionBlocks, PROBLEM_LINK_REGEX),
   ];
   reportDuplicateIds(problemIds, 'problem', errors);
   reportForeignProblemCourseIds(frontmatter?.problems ?? [], options.courseId, errors);
@@ -131,6 +127,10 @@ export async function validateMaterialFile(
     );
   }
   return result;
+}
+
+function collectLinkedIds(body: string, linkRegex: RegExp): string[] {
+  return [...new Set([...body.matchAll(linkRegex)].map((match) => match[1]).filter((id) => id !== undefined))];
 }
 
 /** Applies the judge's course→material config merge (`material[field] ?? course[field]`). */
