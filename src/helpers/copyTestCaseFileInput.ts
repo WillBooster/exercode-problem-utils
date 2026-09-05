@@ -1,5 +1,5 @@
-import fs from 'node:fs';
+import fs from 'node:fs/promises';
 
 export async function copyTestCaseFileInput(fileInputPath: string, cwd: string): Promise<void> {
-  await fs.promises.cp(fileInputPath, cwd, { force: true, recursive: true });
+  await fs.cp(fileInputPath, cwd, { force: true, recursive: true });
 }
