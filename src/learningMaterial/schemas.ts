@@ -75,7 +75,7 @@ export const courseFileSchema = z.strictObject({
         description: z.string(),
       })
     )
-    .min(1),
+    .optional(),
 });
 
 export type CourseFile = z.infer<typeof courseFileSchema>;

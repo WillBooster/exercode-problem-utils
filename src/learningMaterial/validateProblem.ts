@@ -591,13 +591,6 @@ async function validateTemplates(
       );
     }
   }
-  // The judge special-cases templates/_default/ only when it is alone; with siblings it parses
-  // every directory name as a language ID and fails on "_default", so a mixed layout cannot import.
-  const directoryNames = entries.filter((dirent) => dirent.isDirectory()).map((dirent) => dirent.name);
-  if (directoryNames.includes('_default') && directoryNames.length > 1) {
-    errors.push('templates/_default/ cannot be mixed with language-ID template directories; use one layout');
-  }
-
   // A template must be an incomplete starting point; a byte-identical copy of a model answer would pass the judge.
   const modelAnswerFileContents = new Set(modelAnswers.flatMap((answer) => answer.files.map((file) => file.data)));
   const templateFiles = await readSourceFilesRecursively(templatesDirectoryPath);

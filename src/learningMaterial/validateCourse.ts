@@ -43,12 +43,18 @@ export async function validateCourseDirectory(
   const coursePeriodErrors: string[] = [];
   validateSubmissionPeriods(courseFile, coursePeriodErrors);
   errors.push(...coursePeriodErrors.map((error) => `course.yaml: ${error}`));
+  // The importer treats a missing `lectures` as an empty list, so a course without lectures imports
+  // nothing but is valid.
+  const lectures = courseFile.lectures ?? [];
+  if (lectures.length === 0) {
+    warnings.push('course.yaml declares no lectures, so no materials are imported');
+  }
   reportDuplicateIds(
-    courseFile.lectures.map((lecture) => lecture.id),
+    lectures.map((lecture) => lecture.id),
     'lecture',
     errors
   );
-  for (const lecture of courseFile.lectures) {
+  for (const lecture of lectures) {
     await validateLectureDirectory(
       absoluteDirectoryPath,
       { courseId, courseSubmissionPeriods: courseFile, problemsDirectoryPath },
@@ -68,7 +74,7 @@ async function reportOrphanLectureDirectories(
   problemsDirectoryPath: string | undefined,
   warnings: string[]
 ): Promise<void> {
-  const lectureIds = new Set(courseFile.lectures.map((lecture) => lecture.id));
+  const lectureIds = new Set((courseFile.lectures ?? []).map((lecture) => lecture.id));
   const courseProblemsDirectoryName =
     problemsDirectoryPath && dirname(resolve(problemsDirectoryPath)) === courseDirectoryPath
       ? basename(problemsDirectoryPath)

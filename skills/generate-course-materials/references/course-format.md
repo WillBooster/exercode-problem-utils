@@ -27,7 +27,7 @@ The schema is strict: unknown keys are errors.
 - `description` (required)
 - `author` (optional)
 - `isMotivationFeatureEnabled`, `isPublic` (optional booleans)
-- `lectures` (required): array of `{ id, name, description }`. Each lecture `id` must have a matching sibling directory.
+- `lectures`: array of `{ id, name, description }`. Each lecture `id` must have a matching sibling directory. Optional for the importer (a course without lectures imports no materials), but every generated course lists its lectures here.
 - Any shared material-config field (see below) as a course-wide default.
 
 Example:

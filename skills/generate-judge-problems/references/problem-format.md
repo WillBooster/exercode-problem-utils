@@ -14,7 +14,7 @@
     test_1.out
     ...
   model_answers/<languageId>/...   # at least one; e.g. python/main.py, javascript/main.mjs, java/Main.java
-  templates/<languageId>/...       # optional starter code; templates/_default/ applies to all languages
+  templates/<languageId>/...       # optional starter code; templates/_default/ is the fallback for the other languages
 ```
 
 ## judge.ts and debug.ts
