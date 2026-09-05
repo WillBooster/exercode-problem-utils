@@ -130,6 +130,16 @@ describe('validateCourseDirectory', () => {
     ]);
   });
 
+  test('accepts the = yaml = frontmatter delimiter the judge parser supports', async () => {
+    const courseDir = await copyCourseFixture();
+    const materialPath = join(courseDir, 'lecture_1', '10_intro.md');
+    const content = await readFile(materialPath, 'utf8');
+    expect(content.startsWith('---\n')).toBe(true);
+    await writeFile(materialPath, content.replace('---\n', '= yaml =\n').replace('\n---\n', '\n= yaml =\n'));
+    const result = await validateCourse(courseDir);
+    expect(result.errors).toEqual([]);
+  });
+
   test('rejects invalid YAML in an embedded question block', async () => {
     const courseDir = await copyCourseFixture();
     await replaceInMaterial(courseDir, 'answerIndex: 0', 'answerIndex: [0');
