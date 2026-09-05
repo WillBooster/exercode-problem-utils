@@ -91,13 +91,8 @@ const uniqueOptionsSchema = z
 // than a NaN that would surface as an out-of-bounds index.
 const answerIndexStringSchema = z
   .string()
-  .transform(Number)
-  .pipe(
-    z
-      .number({ error: 'must be a non-negative integer index (quoted numbers such as "0" are accepted)' })
-      .int()
-      .nonnegative()
-  );
+  .regex(/^\d+$/, { error: 'must be a non-negative integer index (quoted numbers such as "0" are accepted)' })
+  .transform(Number);
 
 const questionBaseShape = {
   id: learningMaterialIdSchema,
