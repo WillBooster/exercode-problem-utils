@@ -84,11 +84,18 @@ describe('validateCourseDirectory', () => {
     expect(result.errors).toEqual([expect.stringContaining('lecture "lecture_2": directory not found')]);
   });
 
-  test('accepts the same problem linked twice in a material body', async () => {
+  test('rejects the same problem linked twice in a material body', async () => {
     const courseDir = await copyCourseFixture();
     await appendFile(join(courseDir, 'lecture_1', '10_intro.md'), '\n[もう一度](problems/a_plus_b)\n');
     const result = await validateCourse(courseDir);
-    expect(result.errors).toEqual([]);
+    expect(result.errors).toEqual([expect.stringContaining('duplicate problem IDs: a_plus_b')]);
+  });
+
+  test('rejects an explicit question link that repeats a question block', async () => {
+    const courseDir = await copyCourseFixture();
+    await appendFile(join(courseDir, 'lecture_1', '10_intro.md'), '\n@[question](intro_select_1)\n');
+    const result = await validateCourse(courseDir);
+    expect(result.errors).toEqual([expect.stringContaining('duplicate question link IDs: intro_select_1')]);
   });
 
   test('rejects a dangling problem reference in a material body', async () => {
@@ -128,7 +135,10 @@ describe('validateCourseDirectory', () => {
       "\n```yaml question\nid: intro_select_1\ntype: select\nquestion: 重複した設問です。\noptions: ['a', 'b']\nanswerIndex: 1\n```\n"
     );
     const result = await validateCourse(courseDir);
-    expect(result.errors).toEqual([expect.stringContaining('duplicate question IDs: intro_select_1')]);
+    expect(result.errors).toEqual([
+      expect.stringContaining('duplicate question IDs: intro_select_1'),
+      expect.stringContaining('duplicate question link IDs: intro_select_1'),
+    ]);
   });
 
   test('rejects a modelAnswer that does not match answerPattern', async () => {

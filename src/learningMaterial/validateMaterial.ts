@@ -19,6 +19,7 @@ const QUESTION_CODE_BLOCK_REGEX = /(?:^|\n)(?<fence>`{3,}|~{3,})ya?ml +question\
 // question-looking blocks the judge parser would silently skip surface as leftover openers.
 const QUESTION_CODE_BLOCK_OPENER_REGEX = /^[ \t]*(?:`{3,}|~{3,})[ \t]*ya?ml[ \t]+question[ \t]*\r?$/gm;
 const PROBLEM_LINK_REGEX = /\[.*?]\(problems\/([0-9_a-z-]+?)\)/g;
+const QUESTION_LINK_REGEX = /@\[question]\(([0-9_a-z-]+)\)/g;
 const TURTLE_GRAPHICS_QUESTION_LINK_REGEX = /\[.*?]\(turtle-graphics-questions\/([0-9_a-z-]+?)\)/g;
 const CHAT_MARKER = '<!-- chat -->';
 // exercode only counts the marker when it stands alone on a line, so fenced or inline mentions don't count.
@@ -76,7 +77,9 @@ export async function validateMaterialFile(
   }
   const frontmatter = parsedFrontmatter.success ? parsedFrontmatter.data : undefined;
 
-  const questions = [...(frontmatter?.questions ?? []), ...parseQuestionCodeBlocks(body, errors)];
+  const questionsInCodeBlocks = parseQuestionCodeBlocks(body, errors);
+  const questionBlockIds = questionsInCodeBlocks.map((question) => question.id);
+  const questions = [...(frontmatter?.questions ?? []), ...questionsInCodeBlocks];
   for (const question of questions) {
     validateQuestion(question, errors);
   }
@@ -89,12 +92,18 @@ export async function validateMaterialFile(
   // and exercode rejects duplicates in the merged list; deferred until after the question blocks
   // are removed below so links inside question text don't count.
 
-  // The judge deduplicates the links it collects from the body, then merges them with the
-  // frontmatter list without deduplication, so a problem listed twice in the frontmatter or listed
-  // there and linked in the body is a duplicate reference while linking it twice in prose is not.
-  // The judge replaces recognized question blocks with @[question](id) links before collecting
-  // links, so links that appear only inside question text must not count here either.
+  // Exercode's import validation rejects a material whose body links the same problem, question
+  // or turtle-graphics question twice, and a material whose generated reference list (frontmatter
+  // entries plus the deduplicated body links) repeats an ID, so every occurrence counts here. The
+  // judge replaces recognized question blocks with @[question](id) links before collecting links,
+  // so links that appear only inside question text must not count, while each block counts as one
+  // question link next to explicit @[question](id) links.
   const bodyWithoutQuestionBlocks = body.replaceAll(QUESTION_CODE_BLOCK_REGEX, '\n');
+  reportDuplicateIds(
+    [...questionBlockIds, ...collectLinkedIds(bodyWithoutQuestionBlocks, QUESTION_LINK_REGEX)],
+    'question link',
+    errors
+  );
   reportDuplicateIds(
     [
       ...(frontmatter?.turtleGraphicsQuestions ?? []).map((question) => question.id),
@@ -130,7 +139,7 @@ export async function validateMaterialFile(
 }
 
 function collectLinkedIds(body: string, linkRegex: RegExp): string[] {
-  return [...new Set([...body.matchAll(linkRegex)].map((match) => match[1]).filter((id) => id !== undefined))];
+  return [...body.matchAll(linkRegex)].map((match) => match[1]).filter((id) => id !== undefined);
 }
 
 /** Applies the judge's course→material config merge (`material[field] ?? course[field]`). */
