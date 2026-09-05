@@ -12,8 +12,9 @@ export async function readOutputFiles(
   const outputFiles: NonNullable<TestCaseResult['outputFiles']> = [];
   for (const filePath of outputFilePaths) {
     try {
-      // A symlink is followed on purpose: the submission runs as the same OS user as this harness,
-      // so it can already read whatever the link points at.
+      // Read as-is on purpose: the submission runs as the same OS user as this harness, so a symlink
+      // only reaches what it can already read, and a planted FIFO only stalls its own run, which the
+      // judge server's request timeout ends.
       const buffer = await fs.promises.readFile(path.join(cwd, filePath));
       outputFiles.push(encodeFileForTestCaseResult(filePath, buffer));
     } catch {

@@ -8,18 +8,17 @@ export async function snapshotWorkingDirectory(cwd: string): Promise<ReadonlySet
 }
 
 export async function cleanWorkingDirectory(cwd: string, snapshot: ReadonlySet<string>): Promise<void> {
-  for (const entry of await fs.promises.readdir(cwd, { withFileTypes: true })) {
-    const entryPath = path.join(cwd, entry.name);
-    if (!snapshot.has(path.relative(cwd, entryPath))) {
-      // An unsnapshotted directory is removed whole, so its contents are never visited.
-      await fs.promises.rm(entryPath, { force: true, recursive: true });
-    } else if (entry.isDirectory()) {
-      await cleanWorkingDirectory(entryPath, prefixedSnapshot(snapshot, entry.name));
-    }
-  }
+  await cleanDirectory(cwd, '', snapshot);
 }
 
-function prefixedSnapshot(snapshot: ReadonlySet<string>, directoryName: string): ReadonlySet<string> {
-  const prefix = `${directoryName}${path.sep}`;
-  return new Set([...snapshot].filter((p) => p.startsWith(prefix)).map((p) => p.slice(prefix.length)));
+async function cleanDirectory(dir: string, relativePrefix: string, snapshot: ReadonlySet<string>): Promise<void> {
+  for (const entry of await fs.promises.readdir(dir, { withFileTypes: true })) {
+    const relativePath = relativePrefix ? `${relativePrefix}${path.sep}${entry.name}` : entry.name;
+    if (!snapshot.has(relativePath)) {
+      // An unsnapshotted directory is removed whole, so its contents are never visited.
+      await fs.promises.rm(path.join(dir, entry.name), { force: true, recursive: true });
+    } else if (entry.isDirectory()) {
+      await cleanDirectory(path.join(dir, entry.name), relativePath, snapshot);
+    }
+  }
 }

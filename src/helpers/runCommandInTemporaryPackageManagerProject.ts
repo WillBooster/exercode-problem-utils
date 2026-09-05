@@ -491,7 +491,9 @@ function isErrorWithCode(error: unknown, code: string): boolean {
 }
 
 async function readTimeResult(timeOutputPath: string): Promise<{ timeSeconds: number; memoryBytes: number }> {
-  // An absent file means "no measurement" (the command was killed before `time` wrote one).
+  // An absent file means "no measurement" (the command was killed before `time` wrote one). Anything
+  // else is read as-is: the submission shares this process's OS user, so a symlink or FIFO planted
+  // here only affects its own run, which the judge server's request timeout ends.
   let content: string;
   try {
     content = await fs.readFile(timeOutputPath, 'utf8');
