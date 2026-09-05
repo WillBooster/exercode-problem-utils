@@ -1,12 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import {
-  collectProblemDefinitions,
-  isDirectory,
-  isRegularDirectory,
-  reportProblemDefinitionIssues,
-} from './fsHelpers.js';
+import { collectProblemIdsFromDirectory, reportDanglingProblemReferences } from './fsHelpers.js';
 import { parseFrontmatter } from './frontmatter.js';
 import {
   LEARNING_MATERIAL_ID_REGEX,
@@ -139,27 +134,13 @@ export async function validateMaterialFile(
   ];
   reportDuplicateIds(problemIds, 'problem', errors);
   reportForeignProblemCourseIds(frontmatter?.problems ?? [], options.courseId, errors);
-  let availableProblemIds = options.availableProblemIds;
-  if (availableProblemIds === undefined && options.problemsDirectoryPath !== undefined) {
-    if (!(await isRegularDirectory(options.problemsDirectoryPath))) {
-      errors.push(
-        (await isDirectory(options.problemsDirectoryPath))
-          ? `problems directory is a symbolic link, which the judge does not traverse: ${options.problemsDirectoryPath}`
-          : `problems directory not found: ${options.problemsDirectoryPath}`
-      );
-    } else {
-      const definitionPathsById = await collectProblemDefinitions(options.problemsDirectoryPath);
-      reportProblemDefinitionIssues(definitionPathsById, errors);
-      availableProblemIds = new Set(definitionPathsById.keys());
-    }
-  }
+  const availableProblemIds =
+    options.availableProblemIds ??
+    (options.problemsDirectoryPath === undefined
+      ? undefined
+      : await collectProblemIdsFromDirectory(options.problemsDirectoryPath, errors));
   if (availableProblemIds !== undefined) {
-    const location = options.problemsDirectoryPath === undefined ? '' : ` under ${options.problemsDirectoryPath}`;
-    for (const problemId of new Set(problemIds)) {
-      if (!availableProblemIds.has(problemId)) {
-        errors.push(`problem "${problemId}" is referenced but does not exist${location}`);
-      }
-    }
+    reportDanglingProblemReferences(problemIds, availableProblemIds, options.problemsDirectoryPath, errors);
   }
 
   reportExcessChatMarkers(body, errors);

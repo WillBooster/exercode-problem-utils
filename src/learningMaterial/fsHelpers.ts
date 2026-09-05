@@ -138,6 +138,42 @@ export function reportProblemDefinitionIssues(
   }
 }
 
+/** Reports a problems directory the judge cannot search (missing, or a symbolic link); returns whether it is usable. */
+export async function isUsableProblemsDirectory(problemsDirectoryPath: string, errors: string[]): Promise<boolean> {
+  if (await isRegularDirectory(problemsDirectoryPath)) return true;
+  errors.push(
+    (await isDirectory(problemsDirectoryPath))
+      ? `problems directory is a symbolic link, which the judge does not traverse: ${problemsDirectoryPath}`
+      : `problems directory not found: ${problemsDirectoryPath}`
+  );
+  return false;
+}
+
+/** Collects the problem IDs a directory defines, reporting the issues the judge refuses; undefined when it cannot be searched. */
+export async function collectProblemIdsFromDirectory(
+  problemsDirectoryPath: string,
+  errors: string[]
+): Promise<Set<string> | undefined> {
+  if (!(await isUsableProblemsDirectory(problemsDirectoryPath, errors))) return undefined;
+  const definitionPathsById = await collectProblemDefinitions(problemsDirectoryPath);
+  reportProblemDefinitionIssues(definitionPathsById, errors);
+  return new Set(definitionPathsById.keys());
+}
+
+export function reportDanglingProblemReferences(
+  problemIds: Iterable<string>,
+  availableProblemIds: ReadonlySet<string>,
+  problemsDirectoryPath: string | undefined,
+  errors: string[]
+): void {
+  const location = problemsDirectoryPath === undefined ? '' : ` under ${problemsDirectoryPath}`;
+  for (const problemId of new Set(problemIds)) {
+    if (!availableProblemIds.has(problemId)) {
+      errors.push(`problem "${problemId}" is referenced but does not exist${location}`);
+    }
+  }
+}
+
 /** Reads all text files under a directory, with paths relative to the given root. */
 export async function readSourceFilesRecursively(rootDirectoryPath: string): Promise<SourceFile[]> {
   const files: SourceFile[] = [];

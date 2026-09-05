@@ -7,6 +7,7 @@ import {
   isFile,
   isRegularDirectory,
   isRegularFile,
+  isUsableProblemsDirectory,
   reportProblemDefinitionIssues,
 } from './fsHelpers.js';
 import {
@@ -20,7 +21,11 @@ import { validateMaterialFile, validateSubmissionPeriods, type MaterialValidatio
 import { formatZodIssues, reportDuplicateIds, type ValidationResult } from './validationResult.js';
 
 export interface CourseValidationOptions {
-  /** Problems directory referenced by materials; defaults to the course directory (problems at any depth inside it). */
+  /**
+   * Optional extra check only: problem references always resolve against the problems discovered
+   * inside the course directory, so a given directory must lie inside it (an outside or missing one
+   * is an error).
+   */
   problemsDirectoryPath?: string;
 }
 
@@ -180,10 +185,8 @@ async function collectAvailableProblemIds(
   const availableProblemIds = new Set(definitionPathsById.keys());
   // Discovery does not traverse a symbolic link, so a linked problems directory imports nothing.
   const courseProblemsDirectoryPath = join(courseDirectoryPath, 'problems');
-  if (!(await isRegularDirectory(courseProblemsDirectoryPath)) && (await isDirectory(courseProblemsDirectoryPath))) {
-    errors.push(
-      `problems directory is a symbolic link, which the judge does not traverse: ${courseProblemsDirectoryPath}`
-    );
+  if (await isDirectory(courseProblemsDirectoryPath)) {
+    await isUsableProblemsDirectory(courseProblemsDirectoryPath, errors);
   }
   // The conventional directory was already checked above.
   if (
@@ -192,13 +195,10 @@ async function collectAvailableProblemIds(
   ) {
     return availableProblemIds;
   }
-  if (!(await isRegularDirectory(options.problemsDirectoryPath))) {
-    errors.push(
-      (await isDirectory(options.problemsDirectoryPath))
-        ? `problems directory is a symbolic link, which the judge does not traverse: ${options.problemsDirectoryPath}`
-        : `problems directory not found: ${options.problemsDirectoryPath}`
-    );
-  } else if (relative(courseDirectoryPath, resolve(options.problemsDirectoryPath)).startsWith('..')) {
+  if (
+    (await isUsableProblemsDirectory(options.problemsDirectoryPath, errors)) &&
+    relative(courseDirectoryPath, resolve(options.problemsDirectoryPath)).startsWith('..')
+  ) {
     // Exercode links a material only to problems inside its course, so outside problems never count.
     errors.push(
       `problems directory ${options.problemsDirectoryPath} is outside the course directory; Exercode links a material only to problems inside the course, so move them under the course`

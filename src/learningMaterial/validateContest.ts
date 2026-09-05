@@ -1,14 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import {
-  collectProblemDefinitions,
-  isDirectory,
-  isFile,
-  isRegularDirectory,
-  isRegularFile,
-  reportProblemDefinitionIssues,
-} from './fsHelpers.js';
+import { collectProblemIdsFromDirectory, isFile, isRegularFile, reportDanglingProblemReferences } from './fsHelpers.js';
 import { CONTEST_MATERIAL_FILE_SUFFIX, contestFileSchema, LEARNING_MATERIAL_ID_REGEX } from './schemas.js';
 import {
   mergeSubmissionPeriods,
@@ -93,25 +86,17 @@ export async function validateContestFile(
       if (!options.isNestedInCourse) {
         warnings.push('no problems directory given (pass --problems-dir); problem references are not checked');
       }
-    } else if (!(await isRegularDirectory(options.problemsDirectoryPath))) {
-      errors.push(
-        (await isDirectory(options.problemsDirectoryPath))
-          ? `problems directory is a symbolic link, which the judge does not traverse: ${options.problemsDirectoryPath}`
-          : `problems directory not found: ${options.problemsDirectoryPath}`
-      );
     } else {
-      const definitionPathsById = await collectProblemDefinitions(options.problemsDirectoryPath);
-      reportProblemDefinitionIssues(definitionPathsById, errors);
-      availableProblemIds = new Set(definitionPathsById.keys());
+      availableProblemIds = await collectProblemIdsFromDirectory(options.problemsDirectoryPath, errors);
     }
   }
   if (availableProblemIds !== undefined) {
-    const location = options.problemsDirectoryPath === undefined ? '' : ` under ${options.problemsDirectoryPath}`;
-    for (const problem of parsed.data.problems) {
-      if (!availableProblemIds.has(problem.id)) {
-        errors.push(`problem "${problem.id}" is referenced but does not exist${location}`);
-      }
-    }
+    reportDanglingProblemReferences(
+      parsed.data.problems.map((problem) => problem.id),
+      availableProblemIds,
+      options.problemsDirectoryPath,
+      errors
+    );
   }
   return result;
 }
