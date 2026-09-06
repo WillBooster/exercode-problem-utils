@@ -130,48 +130,38 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
   const mainFilePath = prebuiltMainFilePath ?? originalMainFilePath;
 
   if (languageDefinition.buildCommand) {
-    try {
-      const buildCommand = languageDefinition.buildCommand(mainFilePath);
+    const buildCommand = languageDefinition.buildCommand(mainFilePath);
 
-      const buildSpawnResult = await spawnWithTimeout(
-        buildCommand[0],
-        buildCommand.slice(1),
-        { cwd: args.cwd, env },
-        BUILD_TIMEOUT_SECONDS
-      );
+    // A build that cannot even be run is the judge's failure and ends the run without a verdict.
+    const buildSpawnResult = await spawnWithTimeout(
+      buildCommand[0],
+      buildCommand.slice(1),
+      { cwd: args.cwd, env },
+      BUILD_TIMEOUT_SECONDS
+    );
 
-      let decisionCode: DecisionCode = DecisionCode.ACCEPTED;
+    let decisionCode: DecisionCode = DecisionCode.ACCEPTED;
 
-      if (buildSpawnResult.status !== 0) {
-        decisionCode = DecisionCode.BUILD_ERROR;
-      } else if (buildSpawnResult.timeSeconds > BUILD_TIMEOUT_SECONDS) {
-        decisionCode = DecisionCode.BUILD_TIME_LIMIT_EXCEEDED;
-      } else if (
-        buildSpawnResult.stdout.length > MAX_STDOUT_LENGTH ||
-        buildSpawnResult.stderr.length > MAX_STDOUT_LENGTH
-      ) {
-        decisionCode = DecisionCode.BUILD_OUTPUT_SIZE_LIMIT_EXCEEDED;
-      }
+    if (buildSpawnResult.status !== 0) {
+      decisionCode = DecisionCode.BUILD_ERROR;
+    } else if (buildSpawnResult.timeSeconds > BUILD_TIMEOUT_SECONDS) {
+      decisionCode = DecisionCode.BUILD_TIME_LIMIT_EXCEEDED;
+    } else if (
+      buildSpawnResult.stdout.length > MAX_STDOUT_LENGTH ||
+      buildSpawnResult.stderr.length > MAX_STDOUT_LENGTH
+    ) {
+      decisionCode = DecisionCode.BUILD_OUTPUT_SIZE_LIMIT_EXCEEDED;
+    }
 
-      if (decisionCode !== DecisionCode.ACCEPTED) {
-        printTestCaseResult({
-          testCaseId: testCases[0]?.id ?? 'build',
-          decisionCode,
-          exitStatus: buildSpawnResult.status ?? undefined,
-          stdout: buildSpawnResult.stdout.slice(0, MAX_STDOUT_LENGTH) || undefined,
-          stderr: buildSpawnResult.stderr.slice(0, MAX_STDOUT_LENGTH) || undefined,
-          timeSeconds: buildSpawnResult.timeSeconds,
-          memoryBytes: buildSpawnResult.memoryBytes,
-        });
-        return;
-      }
-    } catch (error) {
-      console.error('build error', error);
-
+    if (decisionCode !== DecisionCode.ACCEPTED) {
       printTestCaseResult({
         testCaseId: testCases[0]?.id ?? 'build',
-        decisionCode: DecisionCode.BUILD_ERROR,
-        stderr: error instanceof Error ? error.message : String(error),
+        decisionCode,
+        exitStatus: buildSpawnResult.status ?? undefined,
+        stdout: buildSpawnResult.stdout.slice(0, MAX_STDOUT_LENGTH) || undefined,
+        stderr: buildSpawnResult.stderr.slice(0, MAX_STDOUT_LENGTH) || undefined,
+        timeSeconds: buildSpawnResult.timeSeconds,
+        memoryBytes: buildSpawnResult.memoryBytes,
       });
       return;
     }
@@ -352,48 +342,38 @@ async function debugInTemporaryCopy(problemDir: string, cwd: string, params: Deb
   const mainFilePath = prebuiltMainFilePath ?? originalMainFilePath;
 
   if (languageDefinition.buildCommand) {
-    try {
-      const buildCommand = languageDefinition.buildCommand(mainFilePath);
+    const buildCommand = languageDefinition.buildCommand(mainFilePath);
 
-      const buildSpawnResult = await spawnWithTimeout(
-        buildCommand[0],
-        buildCommand.slice(1),
-        { cwd, env },
-        BUILD_TIMEOUT_SECONDS
-      );
+    // A build that cannot even be run is the judge's failure and ends the run without a verdict.
+    const buildSpawnResult = await spawnWithTimeout(
+      buildCommand[0],
+      buildCommand.slice(1),
+      { cwd, env },
+      BUILD_TIMEOUT_SECONDS
+    );
 
-      let decisionCode: DecisionCode = DecisionCode.ACCEPTED;
+    let decisionCode: DecisionCode = DecisionCode.ACCEPTED;
 
-      if (buildSpawnResult.status !== 0) {
-        decisionCode = DecisionCode.BUILD_ERROR;
-      } else if (buildSpawnResult.timeSeconds > BUILD_TIMEOUT_SECONDS) {
-        decisionCode = DecisionCode.BUILD_TIME_LIMIT_EXCEEDED;
-      } else if (
-        buildSpawnResult.stdout.length > MAX_STDOUT_LENGTH ||
-        buildSpawnResult.stderr.length > MAX_STDOUT_LENGTH
-      ) {
-        decisionCode = DecisionCode.BUILD_OUTPUT_SIZE_LIMIT_EXCEEDED;
-      }
+    if (buildSpawnResult.status !== 0) {
+      decisionCode = DecisionCode.BUILD_ERROR;
+    } else if (buildSpawnResult.timeSeconds > BUILD_TIMEOUT_SECONDS) {
+      decisionCode = DecisionCode.BUILD_TIME_LIMIT_EXCEEDED;
+    } else if (
+      buildSpawnResult.stdout.length > MAX_STDOUT_LENGTH ||
+      buildSpawnResult.stderr.length > MAX_STDOUT_LENGTH
+    ) {
+      decisionCode = DecisionCode.BUILD_OUTPUT_SIZE_LIMIT_EXCEEDED;
+    }
 
-      if (decisionCode !== DecisionCode.ACCEPTED) {
-        printTestCaseResult({
-          testCaseId: 'build',
-          decisionCode,
-          exitStatus: buildSpawnResult.status ?? undefined,
-          stdout: buildSpawnResult.stdout.slice(0, MAX_STDOUT_LENGTH) || undefined,
-          stderr: buildSpawnResult.stderr.slice(0, MAX_STDOUT_LENGTH) || undefined,
-          timeSeconds: buildSpawnResult.timeSeconds,
-          memoryBytes: buildSpawnResult.memoryBytes,
-        });
-        return;
-      }
-    } catch (error) {
-      console.error('build error', error);
-
+    if (decisionCode !== DecisionCode.ACCEPTED) {
       printTestCaseResult({
         testCaseId: 'build',
-        decisionCode: DecisionCode.BUILD_ERROR,
-        stderr: error instanceof Error ? error.message : String(error),
+        decisionCode,
+        exitStatus: buildSpawnResult.status ?? undefined,
+        stdout: buildSpawnResult.stdout.slice(0, MAX_STDOUT_LENGTH) || undefined,
+        stderr: buildSpawnResult.stderr.slice(0, MAX_STDOUT_LENGTH) || undefined,
+        timeSeconds: buildSpawnResult.timeSeconds,
+        memoryBytes: buildSpawnResult.memoryBytes,
       });
       return;
     }
