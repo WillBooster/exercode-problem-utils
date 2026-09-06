@@ -8,8 +8,6 @@ export * from './helpers/readTestCases.js';
 export * from './helpers/removeCommentsInSourceCode.js';
 export * from './helpers/runCommandInTemporaryPackageManagerProject.js';
 export * from './helpers/runPythonInTemporaryUvProject.js';
-export * from './helpers/safeFs.js';
-export * from './helpers/sandboxUser.js';
 export * from './helpers/sourceCodeGrammars.js';
 export * from './helpers/startHttpServer.js';
 export * from './learningMaterial/validateContest.js';

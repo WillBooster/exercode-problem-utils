@@ -12,7 +12,6 @@ import { judgeByStaticAnalysis } from '../helpers/judgeByStaticAnalysis.js';
 import { parseArgs } from '../helpers/parseArgs.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readOutputFiles } from '../helpers/readOutputFiles.js';
-import { makeAccessibleToSandboxUser, makeTraversableBySandboxUser } from '../helpers/sandboxUser.js';
 import {
   judgesTestCasesWithoutExpectations,
   readProblemMarkdownFrontMatter,
@@ -63,9 +62,6 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
   const args = parseArgs(process.argv);
   if (!args.cwd) throw new Error('cwd argument required');
   const params = judgeParamsSchema.parse(args.params);
-
-  // The sandboxed submission must read its sources and write build/run outputs in its directory.
-  makeAccessibleToSandboxUser(args.cwd);
 
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
   const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
@@ -301,9 +297,6 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
   process.once('SIGTERM', removeOnSignal);
   try {
     const copy = await copyProblemDirToTemporaryRoot(args.cwd, { onTempRootCreated: (root) => (tempRoot = root) });
-    // `mkdtemp` creates a 0700 root: the sandbox user only traverses the root and the synthesized
-    // ancestors, and gets full access to the copied answer directory alone.
-    makeTraversableBySandboxUser(copy.tempRoot, path.dirname(copy.copiedProblemDir));
     await debugInTemporaryCopy(problemDir, copy.copiedProblemDir, params);
   } finally {
     if (tempRoot !== undefined) await forciblyRemoveDirectory(tempRoot);
@@ -313,9 +306,6 @@ export async function stdioDebugPreset(problemDir: string): Promise<void> {
 }
 
 async function debugInTemporaryCopy(problemDir: string, cwd: string, params: DebugParams): Promise<void> {
-  // The sandboxed submission must read its sources and write build/run outputs in its directory.
-  makeAccessibleToSandboxUser(cwd);
-
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
 
   const originalMainFilePath = await findEntryPointFile(cwd, params.language);
