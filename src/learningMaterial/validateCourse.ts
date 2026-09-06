@@ -1,5 +1,5 @@
 import { readdir, readFile, realpath } from 'node:fs/promises';
-import { basename, dirname, join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import {
   collectProblemDefinitions,
@@ -215,7 +215,7 @@ async function collectAvailableProblemIds(
   if (explicitProblemsDirectoryPath === undefined || namesConventionalDirectory) return availableProblemIds;
   if (
     (await isUsableProblemsDirectory(explicitProblemsDirectoryPath, errors)) &&
-    relative(courseDirectoryPath, explicitProblemsDirectoryPath).startsWith('..')
+    isOutsideDirectory(courseDirectoryPath, explicitProblemsDirectoryPath)
   ) {
     // Exercode links a material only to problems inside its course, so outside problems never count.
     errors.push(
@@ -223,6 +223,11 @@ async function collectAvailableProblemIds(
     );
   }
   return availableProblemIds;
+}
+
+function isOutsideDirectory(parentPath: string, path: string): boolean {
+  const relativePath = relative(parentPath, path);
+  return relativePath === '..' || relativePath.startsWith(`..${sep}`);
 }
 
 async function validateLectureDirectory(
