@@ -73,7 +73,8 @@ export async function spawnWithLimits(
     stdio: Array.from({ length: TIME_OUTPUT_FD + 1 }, () => 'pipe' as const),
   });
   liveSubprocesses.add(subprocess);
-  const timeOutput = subprocess.stdio[TIME_OUTPUT_FD] as NodeJS.ReadableStream;
+  // Bun leaves the extra pipe null when the spawn itself fails; the 'error' event below reports that.
+  const timeOutput = subprocess.stdio[TIME_OUTPUT_FD] as (NodeJS.ReadableStream & { destroy(): void }) | null;
 
   const stdoutChunks: Buffer[] = [];
   const stderrChunks: Buffer[] = [];
@@ -106,7 +107,7 @@ export async function spawnWithLimits(
 
   subprocess.stdout.on('data', (chunk: Buffer) => appendOutputChunk(stdoutChunks, chunk));
   subprocess.stderr.on('data', (chunk: Buffer) => appendOutputChunk(stderrChunks, chunk));
-  timeOutput.on('data', (chunk: Buffer) => {
+  timeOutput?.on('data', (chunk: Buffer) => {
     timeOutputTail = Buffer.concat([timeOutputTail, chunk]).subarray(-TIME_OUTPUT_TAIL_BYTES);
   });
 
@@ -166,7 +167,7 @@ export async function spawnWithLimits(
         closeTimeout = setTimeout(() => {
           subprocess.stdout.destroy();
           subprocess.stderr.destroy();
-          (timeOutput as NodeJS.ReadableStream & { destroy(): void }).destroy();
+          timeOutput?.destroy();
           settle(code, exitSignal);
         }, killGracePeriodMilliseconds);
       });
