@@ -53,14 +53,17 @@ test('returns once the program exits even if a child in its own session still ho
     0.5
   );
   const elapsedMilliseconds = Date.now() - startedAt;
-  // The child escaped the process group on purpose, so end it here.
   const childPid = Number(result.stdout.trim());
-  expect(childPid).toBeGreaterThan(0);
-  process.kill(childPid, 'SIGKILL');
 
-  expect(elapsedMilliseconds).toBeLessThan(3000);
-  expect(result.status).toBe(0);
-  expect(result.timeSeconds).toBeLessThan(0.5);
+  try {
+    expect(childPid).toBeGreaterThan(0);
+    expect(elapsedMilliseconds).toBeLessThan(3000);
+    expect(result.status).toBe(0);
+    expect(result.timeSeconds).toBeLessThan(0.5);
+  } finally {
+    // The child escaped the process group on purpose, so end it here whatever the assertions said.
+    if (childPid > 0) process.kill(childPid, 'SIGKILL');
+  }
 });
 
 test('passes stdin through to the program', async () => {

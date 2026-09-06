@@ -141,8 +141,9 @@ export async function spawnWithLimits(
       const failAfterClose = (error: Error): void => {
         if (settled) return;
         if (subprocess.pid === undefined) {
-          // The command could not be started (e.g. a missing executable): that is the command's
-          // failure, reported like a run that produced only this message.
+          // The spawn itself failed, i.e. the head of the chain (`timeout` here, the command
+          // itself on Windows) or the cwd is missing. GNU time reports a missing judged command
+          // as status 127 instead. Report this like a run that produced only this message.
           spawnErrorMessage = error.message;
           settle(undefined, undefined);
           return;

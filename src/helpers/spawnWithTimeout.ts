@@ -5,8 +5,9 @@ const OUTPUT_LIMIT_BYTES = 8 * 1024 * 1024;
 /**
  * Runs a submission-derived command under a time limit and an output cap. A run that hits a limit is
  * reported like a normal exit (status 0), with `timeSeconds` just above the limit or the output
- * truncated at the cap, so callers judge it by the limit it hit. A command that cannot be started is
- * reported with no status and the error as stderr; a failure on the judge's side throws.
+ * truncated at the cap, so callers judge it by the limit it hit. A missing command is reported by
+ * GNU time as status 127; a spawn that fails outright (e.g. a missing cwd) is reported with no
+ * status and the error as stderr; a failure on the judge's side throws.
  */
 export async function spawnWithTimeout(
   command: string,
