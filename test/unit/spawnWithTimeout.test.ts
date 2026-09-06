@@ -15,16 +15,18 @@ test('returns once the program exits even if a background child still holds stdo
 
 test('returns once the program exits even if a child in its own session still holds stdout', async () => {
   const startedAt = Date.now();
+  // The limit expires while the pipes are still held; it must not be reported as a timeout.
   const result = await spawnWithTimeout(
     'python3',
     ['-c', 'import os, time\nif os.fork() == 0:\n    os.setsid()\n    time.sleep(30)\nelse:\n    print("done")'],
     context,
-    5
+    0.5
   );
 
   expect(Date.now() - startedAt).toBeLessThan(3000);
   expect(result.status).toBe(0);
   expect(result.stdout).toBe('done\n');
+  expect(result.timeSeconds).toBeLessThan(0.5);
 });
 
 test('passes stdin through to the program', async () => {

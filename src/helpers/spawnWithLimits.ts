@@ -117,10 +117,13 @@ export async function spawnWithLimits(
           if (error.code !== 'EPIPE') failAfterClose(error);
         });
         subprocess.on('exit', (code, exitSignal) => {
-          // The command is gone, but a descendant that inherited the pipes (e.g. `sleep 1000 &`)
-          // would keep them open and hold back 'close' until it ends. Kill what is left of the group;
-          // a descendant that moved to its own session survives that, so stop waiting for the pipes
-          // after a grace period and keep the output read so far.
+          // The command is gone, so the limit timers must not fire during the grace period below. A
+          // descendant that inherited the pipes (e.g. `sleep 1000 &`) would keep them open and hold
+          // back 'close' until it ends: kill what is left of the group. A descendant that moved to
+          // its own session survives that, so stop waiting for the pipes after the grace period and
+          // keep the output read so far.
+          clearTimeout(timeout);
+          clearTimeout(killTimeout);
           killSubprocessGroup(subprocess, 'SIGKILL');
           closeTimeout = setTimeout(() => {
             subprocess.stdout.destroy();
