@@ -21,7 +21,8 @@ export async function spawnWithTimeout(
   memoryBytes: number;
   outputLimitExceeded: boolean;
 }> {
-  // Without measurements, time and memory limits would silently never apply.
+  // Without GNU time's measurements, the memory limit would silently never apply and the reported
+  // time would be this process's wall clock rather than the program's.
   if (!isTimeCommandAvailable) throw new Error('GNU time (gtime on macOS, /usr/bin/time on Linux) is required.');
 
   const result = await spawnWithLimits([command, ...args], {
