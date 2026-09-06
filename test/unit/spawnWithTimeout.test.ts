@@ -30,12 +30,24 @@ test('returns once the program exits even if a background child still holds stdo
 
 test('returns once the program exits even if a child in its own session still holds stdout', async () => {
   const startedAt = Date.now();
-  // The limit expires while the pipes are still held; it must not be reported as a timeout.
+  // The limit expires while the pipes are still held; it must not be reported as a timeout. The
+  // parent exits only once the child has left the process group, or the group kill would catch it.
   const result = await spawnWithTimeout(
     'python3',
     [
       '-c',
-      'import os, time\npid = os.fork()\nif pid == 0:\n    os.setsid()\n    time.sleep(30)\nelse:\n    print(pid)',
+      [
+        'import os, time',
+        'ready_read, ready_write = os.pipe()',
+        'pid = os.fork()',
+        'if pid == 0:',
+        '    os.setsid()',
+        '    os.write(ready_write, b"1")',
+        '    time.sleep(30)',
+        'else:',
+        '    os.read(ready_read, 1)',
+        '    print(pid)',
+      ].join('\n'),
     ],
     context,
     0.5
