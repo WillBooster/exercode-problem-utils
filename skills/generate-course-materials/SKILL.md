@@ -20,7 +20,7 @@ Read these references before authoring any file:
 4. Write markdown material files inside each lecture directory, prefixing them with zero-padded sequence numbers that restart at `01_` in every lecture (`01_`, `02_`, ...), following [references/material-authoring.md](references/material-authoring.md). Write material bodies in Japanese unless the user requests another language.
 5. Embed quiz questions in the material bodies as fenced `yaml question` blocks per [references/question-authoring.md](references/question-authoring.md). Insert questions right after each newly introduced concept, not in a batch at the end.
 6. Decide whether writing, modifying, or executing code is part of the course's learning objective. If it is, create one or more course-scoped Judge problems at meaningful checkpoints with [generate-judge-problems](../generate-judge-problems/SKILL.md). Each problem must require learners to apply concepts already introduced in the course; embedded questions and complete code examples do not satisfy this requirement. Link each problem near its prerequisite material as `[表示名](problems/<problemId>)`. Every linked problem directory must exist under the same course's `problems/` directory. For a course without executable coding objectives, create Judge problems only when the request requires them. Never reference another course's problems.
-7. Validate and fix until clean:
+7. Validate with the `exercode-problem` CLI (it ships with `@exercode/problem-utils`, which must be a declared repository dependency — see [setup-exercode-course-repository](../setup-exercode-course-repository/SKILL.md)) and fix until clean:
 
    ```bash
    bunx exercode-problem validate-course <courseDir> --problems-dir <problemsDir>
