@@ -3,8 +3,9 @@ import { spawnWithLimits, type SpawnWithLimitsResult } from './spawnWithLimits.j
 const OUTPUT_LIMIT_BYTES = 8 * 1024 * 1024;
 
 /**
- * Runs a submission-derived command under a time limit. A run that hits the limit is reported with
- * status 0 and `timeSeconds` just above the limit, which callers read as time limit exceeded.
+ * Runs a submission-derived command under a time limit and an output cap. A run that hits a limit is
+ * reported like a normal exit (status 0), with `timeSeconds` just above the limit or the output
+ * truncated at the cap, so callers judge it by the limit it hit.
  */
 export async function spawnWithTimeout(
   command: string,
@@ -36,9 +37,13 @@ export async function spawnWithTimeout(
   // Keep GNU time's note about an abnormal exit (e.g. a segmentation fault) visible to the learner.
   const stderr = result.timeCommandMessage ? `${result.stderr}${result.timeCommandMessage}\n` : result.stderr;
 
-  if (result.timedOut) {
-    return { ...result, stderr, status: 0, timeSeconds: timeoutSeconds + 1e-3 };
-  }
-
-  return { ...result, stderr, timeSeconds: result.timeSeconds || (Date.now() - startTimeMilliseconds) / 1000 };
+  return {
+    stdout: result.stdout,
+    stderr,
+    status: result.timedOut || result.outputLimitExceeded ? 0 : result.status,
+    timeSeconds: result.timedOut
+      ? timeoutSeconds + 1e-3
+      : result.timeSeconds || (Date.now() - startTimeMilliseconds) / 1000,
+    memoryBytes: result.memoryBytes,
+  };
 }

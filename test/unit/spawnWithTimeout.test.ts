@@ -64,3 +64,10 @@ test('preserves the exit status and stderr of the program', async () => {
   expect(result.stderr).toBe('oops\nCommand exited with non-zero status 7\n');
   expect(result.memoryBytes).toBeGreaterThan(0);
 });
+
+test('reports output beyond the cap as a normal exit with the output truncated', async () => {
+  const result = await spawnWithTimeout('sh', ['-c', 'yes | head -c 10000000; sleep 30'], context, 5);
+
+  expect(result.status).toBe(0);
+  expect(result.stdout.length).toBe(8 * 1024 * 1024);
+});
