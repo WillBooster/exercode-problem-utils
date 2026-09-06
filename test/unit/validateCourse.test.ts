@@ -109,6 +109,18 @@ describe('validateCourseDirectory', () => {
     expect(result.warnings).toEqual([]);
   });
 
+  test('reports a symlinked --problems-dir once even when it names the conventional directory', async () => {
+    const tempDir = await createTempDir();
+    const courseDir = join(tempDir, 'example_course');
+    await cp(validCourseDir, courseDir, { recursive: true });
+    await rename(join(courseDir, 'problems'), join(tempDir, 'problems'));
+    await symlink(join(tempDir, 'problems'), join(courseDir, 'problems'));
+    const result = await validateCourseDirectory(courseDir, { problemsDirectoryPath: join(courseDir, 'problems') });
+    expect(result.errors.filter((error) => error.includes('problems directory'))).toEqual([
+      expect.stringContaining('problems directory is a symbolic link'),
+    ]);
+  });
+
   test('still discovers course-wide problems when --problems-dir names a subdirectory', async () => {
     const tempDir = await createTempDir();
     const courseDir = join(tempDir, 'example_course');

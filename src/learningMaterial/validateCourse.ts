@@ -102,12 +102,16 @@ export async function validateCourseDirectory(
   return result;
 }
 
-/** Resolves symbolic links in an existing path; a missing path keeps its lexical form. */
+/**
+ * Resolves symbolic links in the ancestors of a path while keeping its final entry as written, so
+ * a linked entry can still be reported as such; a missing ancestor keeps its lexical form.
+ */
 async function canonicalize(path: string): Promise<string> {
+  const absolutePath = resolve(path);
   try {
-    return await realpath(path);
+    return join(await realpath(dirname(absolutePath)), basename(absolutePath));
   } catch {
-    return resolve(path);
+    return absolutePath;
   }
 }
 
