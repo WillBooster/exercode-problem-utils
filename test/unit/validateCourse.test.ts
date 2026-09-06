@@ -104,6 +104,17 @@ describe('validateCourseDirectory', () => {
     expect(result.warnings).toEqual([]);
   });
 
+  test('still reports an orphan directory when --problems-dir names a missing directory inside it', async () => {
+    const courseDir = await copyCourseFixture();
+    await mkdir(join(courseDir, 'data'));
+    await writeFile(join(courseDir, 'data', 'orphan.md'), '# orphan\n');
+    const result = await validateCourseDirectory(courseDir, {
+      problemsDirectoryPath: join(courseDir, 'data', 'problems'),
+    });
+    expect(result.errors).toEqual([expect.stringContaining('problems directory not found')]);
+    expect(result.warnings).toEqual([expect.stringContaining('directory "data" is not listed as a lecture')]);
+  });
+
   test('treats --problems-dir as course-internal when either path goes through a symbolic link', async () => {
     const tempDir = await createTempDir();
     const realParentDir = join(tempDir, 'real');
