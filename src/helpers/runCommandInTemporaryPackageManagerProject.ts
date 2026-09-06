@@ -99,7 +99,6 @@ export async function runCommandInTemporaryPackageManagerProject(
     const installCommand =
       options.prepareDependencies === false ? undefined : await resolveInstallCommand(options.packageManager, runDir);
     const command = typeof options.command === 'function' ? options.command({ runDir }) : options.command;
-    const startedAt = Date.now();
     const outputLimitBytes = options.outputLimitBytes ?? defaultOutputLimitBytes;
     let installResult: SpawnWithLimitsResult | undefined;
 
@@ -119,7 +118,8 @@ export async function runCommandInTemporaryPackageManagerProject(
       }
     }
 
-    const remainingTimeLimitSeconds = options.timeLimitSeconds - (Date.now() - startedAt) / 1000;
+    // The install's measured time excludes the grace spent releasing pipes after it exited.
+    const remainingTimeLimitSeconds = options.timeLimitSeconds - (installResult?.timeSeconds ?? 0);
     if (remainingTimeLimitSeconds <= 0) {
       return {
         stdin: options.stdin ?? '',
