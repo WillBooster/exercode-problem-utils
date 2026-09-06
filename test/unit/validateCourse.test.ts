@@ -115,6 +115,14 @@ describe('validateCourseDirectory', () => {
     expect(result.warnings).toEqual([expect.stringContaining('directory "data" is not listed as a lecture')]);
   });
 
+  test('does not report the conventional problems directory holding a note file', async () => {
+    const courseDir = await copyCourseFixture();
+    await writeFile(join(courseDir, 'problems', 'README.md'), '# Problems\n');
+    const result = await validateCourseDirectory(courseDir);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
+
   test('reports an unlisted directory that holds materials next to problems', async () => {
     const courseDir = await copyCourseFixture();
     await rename(join(courseDir, 'problems'), join(courseDir, 'data'));

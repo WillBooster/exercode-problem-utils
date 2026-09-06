@@ -121,7 +121,13 @@ async function reportOrphanLectureDirectories(
   const lectureIds = new Set((courseFile.lectures ?? []).map((lecture) => lecture.id));
   const dirents = await readdir(courseDirectoryPath, { withFileTypes: true });
   for (const dirent of dirents) {
-    if (!dirent.isDirectory() || dirent.name.startsWith('.') || lectureIds.has(dirent.name)) continue;
+    if (
+      !dirent.isDirectory() ||
+      dirent.name.startsWith('.') ||
+      lectureIds.has(dirent.name) ||
+      dirent.name === 'problems'
+    )
+      continue;
     // Only a directory that directly holds material files loses anything (problems are found at any depth).
     const entries = await readdir(join(courseDirectoryPath, dirent.name), { withFileTypes: true });
     if (!entries.some((entry) => entry.isFile() && isMaterialFileName(entry.name))) continue;
