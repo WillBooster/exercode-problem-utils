@@ -414,6 +414,7 @@ async function runBuild(
   }
 
   if (
+    spawnResult.outputLimitExceeded ||
     spawnResult.stdout.length > context.limits.maxOutputLength ||
     spawnResult.stderr.length > context.limits.maxOutputLength
   ) {

@@ -435,6 +435,13 @@ async function runDefaultPrepare(context: {
     };
   }
 
+  if (buildResult.outputLimitExceeded) {
+    return {
+      decisionCode: DecisionCode.BUILD_OUTPUT_SIZE_LIMIT_EXCEEDED,
+      stderr: buildResult.stderr || buildResult.stdout || undefined,
+    };
+  }
+
   return undefined;
 }
 
