@@ -128,7 +128,8 @@ async function reportOrphanLectureDirectories(
       dirent.name === 'problems'
     )
       continue;
-    // Only a directory that directly holds material files loses anything (problems are found at any depth).
+    // A lecture imports only its direct files, so only a directory that directly holds material files
+    // would gain anything from being listed (problems are found at any depth regardless).
     const entries = await readdir(join(courseDirectoryPath, dirent.name), { withFileTypes: true });
     if (!entries.some((entry) => entry.isFile() && isMaterialFileName(entry.name))) continue;
     warnings.push(
