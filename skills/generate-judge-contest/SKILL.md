@@ -14,7 +14,7 @@ Read [references/contest-format.md](references/contest-format.md) before authori
    - Assign scores increasing with difficulty (e.g. 100, 200, 300, ...).
 3. Generate each problem directory by following the [generate-judge-problems](../generate-judge-problems/SKILL.md) skill workflow (model answer first, run it to produce `.out` files unless the custom judge does not compare stdout, cross-check with a second language, validate).
 4. Write `<contestId>.contest.yaml` per [references/contest-format.md](references/contest-format.md), listing every division and every problem with its score. Place the file inside the lecture directory when the contest belongs to a course.
-5. Validate and fix until clean; rerun after every fix until both commands report success:
+5. Validate with the `exercode-problem` CLI (it ships with `@exercode/problem-utils`, which must be a declared repository dependency — see [setup-exercode-course-repository](../setup-exercode-course-repository/SKILL.md)) and fix until clean; rerun after every fix until both commands report success:
 
    ```bash
    bunx exercode-problem validate-problem <problemDir>...
