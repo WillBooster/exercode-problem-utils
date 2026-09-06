@@ -24,6 +24,13 @@ const timeCommand = resolveTimeCommand();
 /** Whether GNU time is available, i.e. whether `timeSeconds` and `memoryBytes` are measured at all. */
 export const isTimeCommandAvailable = timeCommand !== undefined;
 
+// The commands run in their own sessions, so they outlive this process unless it ends them itself
+// on the way out (e.g. a preset's SIGINT handler calling `process.exit`).
+const liveSubprocesses = new Set<childProcess.ChildProcess>();
+process.once('exit', () => {
+  for (const subprocess of liveSubprocesses) killSubprocessGroup(subprocess, 'SIGKILL');
+});
+
 /**
  * Runs a command in its own process group with `stdin` piped in, killing the whole group once it
  * exceeds the time or output limit, and reports the wall time and peak memory measured by GNU time.
@@ -63,6 +70,7 @@ export async function spawnWithLimits(
       env: context.env,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
+    liveSubprocesses.add(subprocess);
 
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
@@ -160,6 +168,7 @@ export async function spawnWithLimits(
     ).finally(() => {
       clearTimeout(timeout);
       clearTimeout(killTimeout);
+      liveSubprocesses.delete(subprocess);
     });
 
     const timeResult = timeOutputPath === undefined ? undefined : await readTimeResult(timeOutputPath);
