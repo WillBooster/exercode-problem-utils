@@ -115,6 +115,15 @@ describe('validateCourseDirectory', () => {
     expect(result.warnings).toEqual([expect.stringContaining('directory "data" is not listed as a lecture')]);
   });
 
+  test('reports an unlisted directory that holds materials next to problems', async () => {
+    const courseDir = await copyCourseFixture();
+    await rename(join(courseDir, 'problems'), join(courseDir, 'data'));
+    await cp(join(courseDir, 'lecture_1', '10_intro.md'), join(courseDir, 'data', 'orphan.md'));
+    const result = await validateCourseDirectory(courseDir);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([expect.stringContaining('directory "data" is not listed as a lecture')]);
+  });
+
   test('treats --problems-dir as course-internal when either path goes through a symbolic link', async () => {
     const tempDir = await createTempDir();
     const realParentDir = join(tempDir, 'real');

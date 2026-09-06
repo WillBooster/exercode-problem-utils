@@ -60,7 +60,7 @@ export async function validateCourseDirectory(
   const parsedCourseFile = await parseCourseFile(absoluteDirectoryPath, errors);
   // Messages name the course directory because that is what discovery searches (see collectAvailableProblemIds).
   const problemsDirectoryPath = absoluteDirectoryPath;
-  const { availableProblemIds, problemHoldingDirectoryNames } = await collectAvailableProblemIds(
+  const availableProblemIds = await collectAvailableProblemIds(
     absoluteDirectoryPath,
     options.problemsDirectoryPath,
     explicitProblemsDirectoryPath,
@@ -92,13 +92,7 @@ export async function validateCourseDirectory(
       warnings
     );
   }
-  await reportOrphanLectureDirectories(
-    absoluteDirectoryPath,
-    courseFile,
-    courseFileName,
-    problemHoldingDirectoryNames,
-    warnings
-  );
+  await reportOrphanLectureDirectories(absoluteDirectoryPath, courseFile, courseFileName, warnings);
   return result;
 }
 
@@ -122,19 +116,15 @@ async function reportOrphanLectureDirectories(
   courseDirectoryPath: string,
   courseFile: CourseFile,
   courseFileName: string,
-  problemHoldingDirectoryNames: Set<string>,
   warnings: string[]
 ): Promise<void> {
   const lectureIds = new Set((courseFile.lectures ?? []).map((lecture) => lecture.id));
   const dirents = await readdir(courseDirectoryPath, { withFileTypes: true });
   for (const dirent of dirents) {
-    if (
-      !dirent.isDirectory() ||
-      dirent.name.startsWith('.') ||
-      lectureIds.has(dirent.name) ||
-      problemHoldingDirectoryNames.has(dirent.name)
-    )
-      continue;
+    if (!dirent.isDirectory() || dirent.name.startsWith('.') || lectureIds.has(dirent.name)) continue;
+    // Only a directory that directly holds material files loses anything (problems are found at any depth).
+    const entries = await readdir(join(courseDirectoryPath, dirent.name), { withFileTypes: true });
+    if (!entries.some((entry) => entry.isFile() && isMaterialFileName(entry.name))) continue;
     warnings.push(
       `directory "${dirent.name}" is not listed as a lecture in ${courseFileName}, so its materials are not imported`
     );
@@ -189,10 +179,11 @@ async function findFirst<T>(items: readonly T[], predicate: (item: T) => Promise
   return undefined;
 }
 
-interface AvailableProblems {
-  availableProblemIds: Set<string>;
-  /** Top-level course directories that hold problems rather than lecture materials. */
-  problemHoldingDirectoryNames: Set<string>;
+function isMaterialFileName(fileName: string): boolean {
+  return (
+    fileName.endsWith(CONTEST_MATERIAL_FILE_SUFFIX) ||
+    (fileName.endsWith('.md') && fileName !== 'problem.md' && !fileName.endsWith('.problem.md'))
+  );
 }
 
 /**
@@ -204,23 +195,17 @@ async function collectAvailableProblemIds(
   problemsDirectoryOption: string | undefined,
   explicitProblemsDirectoryPath: string | undefined,
   errors: string[]
-): Promise<AvailableProblems> {
+): Promise<Set<string>> {
   const definitionPathsById = await collectProblemDefinitions(courseDirectoryPath);
   reportProblemDefinitionIssues(definitionPathsById, errors);
-  const availableProblems: AvailableProblems = {
-    availableProblemIds: new Set(definitionPathsById.keys()),
-    problemHoldingDirectoryNames: new Set([
-      'problems',
-      ...[...definitionPathsById.values()].flat().map((definitionPath) => definitionPath.split(sep)[0] ?? ''),
-    ]),
-  };
+  const availableProblemIds = new Set(definitionPathsById.keys());
   // Discovery does not traverse a symbolic link, so a linked problems directory imports nothing.
   const courseProblemsDirectoryPath = join(courseDirectoryPath, 'problems');
   const namesConventionalDirectory = explicitProblemsDirectoryPath === courseProblemsDirectoryPath;
   if (namesConventionalDirectory || (await isDirectory(courseProblemsDirectoryPath))) {
     await isUsableProblemsDirectory(courseProblemsDirectoryPath, errors);
   }
-  if (explicitProblemsDirectoryPath === undefined || namesConventionalDirectory) return availableProblems;
+  if (explicitProblemsDirectoryPath === undefined || namesConventionalDirectory) return availableProblemIds;
   if (
     (await isUsableProblemsDirectory(explicitProblemsDirectoryPath, errors)) &&
     isOutsideDirectory(courseDirectoryPath, explicitProblemsDirectoryPath)
@@ -230,7 +215,7 @@ async function collectAvailableProblemIds(
       `problems directory ${problemsDirectoryOption} is outside the course directory; Exercode links a material only to problems inside the course, so move them under the course`
     );
   }
-  return availableProblems;
+  return availableProblemIds;
 }
 
 function isOutsideDirectory(parentPath: string, path: string): boolean {
