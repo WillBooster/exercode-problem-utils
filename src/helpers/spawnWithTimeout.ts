@@ -42,7 +42,9 @@ export async function spawnWithTimeout(
   }
 
   // Keep GNU time's note about an abnormal exit (e.g. a segmentation fault) visible to the learner.
-  const stderr = result.timeCommandMessage ? `${result.stderr}${result.timeCommandMessage}\n` : result.stderr;
+  const stderr = result.timeCommandMessage
+    ? `${result.stderr}${result.stderr && !result.stderr.endsWith('\n') ? '\n' : ''}${result.timeCommandMessage}\n`
+    : result.stderr;
 
   return {
     stdout: result.stdout,
