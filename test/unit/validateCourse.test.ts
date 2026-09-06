@@ -93,6 +93,17 @@ describe('validateCourseDirectory', () => {
     expect(result.warnings).toEqual([]);
   });
 
+  test('does not report the ancestor of a nested --problems-dir as an orphan lecture', async () => {
+    const courseDir = await copyCourseFixture();
+    await mkdir(join(courseDir, 'data'));
+    await rename(join(courseDir, 'problems'), join(courseDir, 'data', 'problems'));
+    const result = await validateCourseDirectory(courseDir, {
+      problemsDirectoryPath: join(courseDir, 'data', 'problems'),
+    });
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
+
   test('treats --problems-dir as course-internal when either path goes through a symbolic link', async () => {
     const tempDir = await createTempDir();
     const realParentDir = join(tempDir, 'real');

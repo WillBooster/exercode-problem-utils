@@ -126,11 +126,12 @@ async function reportOrphanLectureDirectories(
   warnings: string[]
 ): Promise<void> {
   const lectureIds = new Set((courseFile.lectures ?? []).map((lecture) => lecture.id));
-  // The course's own `problems/` holds problems, never lecture materials, and so does an explicitly
-  // named problems directory inside the course.
+  // The course's own `problems/` holds problems, never lecture materials, and so does the top-level
+  // directory that contains an explicitly named problems directory inside the course.
   const problemsDirectoryNames = new Set(['problems']);
-  if (problemsDirectoryPath && dirname(problemsDirectoryPath) === courseDirectoryPath) {
-    problemsDirectoryNames.add(basename(problemsDirectoryPath));
+  if (problemsDirectoryPath && !isOutsideDirectory(courseDirectoryPath, problemsDirectoryPath)) {
+    const [topLevelDirectoryName] = relative(courseDirectoryPath, problemsDirectoryPath).split(sep);
+    if (topLevelDirectoryName) problemsDirectoryNames.add(topLevelDirectoryName);
   }
   const dirents = await readdir(courseDirectoryPath, { withFileTypes: true });
   for (const dirent of dirents) {
