@@ -484,6 +484,7 @@ async function runCommand(
     status: spawnResult.status ?? undefined,
     timeSeconds: spawnResult.timeSeconds,
     memoryBytes: spawnResult.memoryBytes,
+    outputLimitExceeded: spawnResult.outputLimitExceeded,
   };
 }
 

@@ -12,7 +12,14 @@ export async function spawnWithTimeout(
   args: readonly string[],
   context: { cwd: string; env: NodeJS.ProcessEnv; stdin?: string },
   timeoutSeconds: number
-): Promise<{ stdout: string; stderr: string; status: number | undefined; timeSeconds: number; memoryBytes: number }> {
+): Promise<{
+  stdout: string;
+  stderr: string;
+  status: number | undefined;
+  timeSeconds: number;
+  memoryBytes: number;
+  outputLimitExceeded: boolean;
+}> {
   const startTimeMilliseconds = Date.now();
   let result: SpawnWithLimitsResult;
   try {
@@ -31,6 +38,7 @@ export async function spawnWithTimeout(
       status: undefined,
       timeSeconds: 0,
       memoryBytes: 0,
+      outputLimitExceeded: false,
     };
   }
 
@@ -45,5 +53,6 @@ export async function spawnWithTimeout(
       ? timeoutSeconds + 1e-3
       : result.timeSeconds || (Date.now() - startTimeMilliseconds) / 1000,
     memoryBytes: result.memoryBytes,
+    outputLimitExceeded: result.outputLimitExceeded,
   };
 }
