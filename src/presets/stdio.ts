@@ -17,7 +17,7 @@ import {
   readProblemMarkdownFrontMatter,
 } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases } from '../helpers/readTestCases.js';
-import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
+import { spawnWithTimeout } from '../helpers/spawnWithTimeout.js';
 import { EXAMPLE_TEST_CASE_ID_PATTERN, MAX_STDOUT_LENGTH } from '../helpers/stdioJudgeRules.js';
 import {
   copyProblemDirToTemporaryRoot,
@@ -133,10 +133,10 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
     try {
       const buildCommand = languageDefinition.buildCommand(mainFilePath);
 
-      const buildSpawnResult = spawnSyncWithTimeout(
+      const buildSpawnResult = await spawnWithTimeout(
         buildCommand[0],
         buildCommand.slice(1),
-        { cwd: args.cwd, encoding: 'utf8', env },
+        { cwd: args.cwd, env },
         BUILD_TIMEOUT_SECONDS
       );
 
@@ -196,10 +196,10 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
 
     const command = languageDefinition.command(mainFilePath);
 
-    const spawnResult = spawnSyncWithTimeout(
+    const spawnResult = await spawnWithTimeout(
       command[0],
       command.slice(1),
-      { cwd: args.cwd, encoding: 'utf8', input: testCase.input, env },
+      { cwd: args.cwd, stdin: testCase.input, env },
       timeoutSeconds
     );
 
@@ -355,10 +355,10 @@ async function debugInTemporaryCopy(problemDir: string, cwd: string, params: Deb
     try {
       const buildCommand = languageDefinition.buildCommand(mainFilePath);
 
-      const buildSpawnResult = spawnSyncWithTimeout(
+      const buildSpawnResult = await spawnWithTimeout(
         buildCommand[0],
         buildCommand.slice(1),
-        { cwd, encoding: 'utf8', env },
+        { cwd, env },
         BUILD_TIMEOUT_SECONDS
       );
 
@@ -417,10 +417,10 @@ async function debugInTemporaryCopy(problemDir: string, cwd: string, params: Deb
 
   const command = languageDefinition.command(mainFilePath);
 
-  const spawnResult = spawnSyncWithTimeout(
+  const spawnResult = await spawnWithTimeout(
     command[0],
     command.slice(1),
-    { cwd, encoding: 'utf8', input: params.stdin, env },
+    { cwd, stdin: params.stdin, env },
     timeoutSeconds
   );
 

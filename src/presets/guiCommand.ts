@@ -16,7 +16,7 @@ import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readOutputFiles } from '../helpers/readOutputFiles.js';
 import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases as readFileTestCases } from '../helpers/readTestCases.js';
-import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
+import { spawnWithTimeout } from '../helpers/spawnWithTimeout.js';
 import { DecisionCode } from '../types/decisionCode.js';
 import { languageIdToDefinition } from '../types/language.js';
 import type { ProblemMarkdownFrontMatter } from '../types/problem.js';
@@ -242,12 +242,12 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
   }
   const prepareResult =
     customPrepareResult ??
-    runDefaultPrepare({
+    (await runDefaultPrepare({
       cwd: args.cwd,
       env,
       mainFilePath: resolvedMainFilePath,
       languageDefinition,
-    });
+    }));
   if (prepareResult) {
     printTestCaseResult({
       testCaseId: prebuildTestCaseId,
@@ -405,19 +405,19 @@ function inferLanguageIdsByPath(filePath: string): string[] | undefined {
   return languageIds.length > 0 ? languageIds : undefined;
 }
 
-function runDefaultPrepare(context: {
+async function runDefaultPrepare(context: {
   cwd: string;
   env: NodeJS.ProcessEnv;
   mainFilePath: string;
   languageDefinition: NonNullable<ReturnType<typeof findLanguageDefinitionByPath>>;
-}): Partial<GuiJudgeCaseResult> | undefined {
+}): Promise<Partial<GuiJudgeCaseResult> | undefined> {
   const buildCommand = context.languageDefinition.buildCommand?.(context.mainFilePath);
   if (!buildCommand) return undefined;
 
-  const buildResult = spawnSyncWithTimeout(
+  const buildResult = await spawnWithTimeout(
     buildCommand[0],
     buildCommand.slice(1),
-    { cwd: context.cwd, encoding: 'utf8', env: context.env },
+    { cwd: context.cwd, env: context.env },
     BUILD_TIMEOUT_SECONDS
   );
 

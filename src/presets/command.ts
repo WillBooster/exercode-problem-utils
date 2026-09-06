@@ -20,7 +20,7 @@ import {
   resolveCwds,
   type ResolvedCwd,
 } from '../helpers/resolveCwds.js';
-import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
+import { spawnWithTimeout } from '../helpers/spawnWithTimeout.js';
 import { DecisionCode } from '../types/decisionCode.js';
 import type { ProblemMarkdownFrontMatter } from '../types/problem.js';
 import type { TestCaseResult } from '../types/testCaseResult.js';
@@ -270,7 +270,7 @@ async function runCommandJudgeForCwd<
 
     const buildCommand = languageDefinition.buildCommand?.(mainFilePath);
     if (buildCommand) {
-      const buildResult = runBuild(buildCommand, {
+      const buildResult = await runBuild(buildCommand, {
         cwd,
         env,
         testCaseId: prebuildTestCaseId,
@@ -306,12 +306,12 @@ async function runCommandJudgeForCwd<
 
       runResult = options.runCommand
         ? await options.runCommand({ testCase, command, stdin, cwd, env, timeLimitSeconds })
-        : (runCommand(command, {
+        : ((await runCommand(command, {
             stdin,
             cwd,
             env,
             timeLimitSeconds,
-          }) as TRunResult);
+          })) as TRunResult);
     } catch (error) {
       printTestCaseResult({
         testCaseId: testCase.id,
@@ -377,14 +377,14 @@ function matchesExpectedResult(resolvedCwd: ResolvedCwd, result: { allAccepted: 
   return result.allAccepted === (resolvedCwd.expectedResult === 'accepted');
 }
 
-function runBuild(
+async function runBuild(
   buildCommand: readonly [string, ...string[]],
   context: { cwd: string; env: NodeJS.ProcessEnv; testCaseId: string; limits: CommandJudgeLimits }
-): (Omit<TestCaseResult, 'testCaseId'> & { testCaseId: string }) | undefined {
-  const spawnResult = spawnSyncWithTimeout(
+): Promise<(Omit<TestCaseResult, 'testCaseId'> & { testCaseId: string }) | undefined> {
+  const spawnResult = await spawnWithTimeout(
     buildCommand[0],
     buildCommand.slice(1),
-    { cwd: context.cwd, encoding: 'utf8', env: context.env },
+    { cwd: context.cwd, env: context.env },
     context.limits.buildTimeoutSeconds
   );
   const exitStatus = spawnResult.status ?? undefined;
@@ -461,7 +461,7 @@ async function compareWithExpectedOutputs(context: {
   return judgement.matches ? {} : { decisionCode: DecisionCode.WRONG_ANSWER };
 }
 
-function runCommand(
+async function runCommand(
   command: readonly [string, ...string[]],
   context: {
     stdin: string;
@@ -469,11 +469,11 @@ function runCommand(
     env: NodeJS.ProcessEnv;
     timeLimitSeconds: number;
   }
-): CommandRunResult {
-  const spawnResult = spawnSyncWithTimeout(
+): Promise<CommandRunResult> {
+  const spawnResult = await spawnWithTimeout(
     command[0],
     command.slice(1),
-    { cwd: context.cwd, encoding: 'utf8', input: context.stdin, env: context.env },
+    { cwd: context.cwd, stdin: context.stdin, env: context.env },
     context.timeLimitSeconds
   );
 
