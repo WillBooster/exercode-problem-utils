@@ -85,6 +85,7 @@ const uniqueOptionsSchema = z
   .string()
   .array()
   .min(1)
+  // zod 4 names the custom-message option `error` (`message` is the deprecated zod 3 spelling).
   .refine((options) => options.length === new Set(options).size, { error: 'options must contain unique values' });
 
 // A quoted index is coerced like the judge does, but a non-numeric string is a schema error rather
