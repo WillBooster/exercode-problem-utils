@@ -21,6 +21,9 @@ export interface SpawnWithLimitsResult {
 const killGracePeriodMilliseconds = 1000;
 const timeCommand = resolveTimeCommand();
 
+/** Whether GNU time is available, i.e. whether `timeSeconds` and `memoryBytes` are measured at all. */
+export const isTimeCommandAvailable = timeCommand !== undefined;
+
 /**
  * Runs a command in its own process group with `stdin` piped in, killing the whole group once it
  * exceeds the time or output limit, and reports the wall time and peak memory measured by GNU time.
@@ -67,6 +70,7 @@ export async function spawnWithLimits(
     let timedOut = false;
     let outputLimitExceeded = false;
     let wallTimeSeconds = 0;
+    let spawnErrorMessage: string | undefined;
 
     const appendOutputChunk = (chunks: Buffer[], chunk: Buffer): void => {
       if (outputBytes >= context.outputLimitBytes) {
@@ -108,7 +112,7 @@ export async function spawnWithLimits(
         let settled = false;
         let pendingError: Error | undefined;
         let closeTimeout: NodeJS.Timeout | undefined;
-        const settle = (code: number | null, exitSignal: NodeJS.Signals | null): void => {
+        const settle = (code: number | null | undefined, exitSignal: NodeJS.Signals | null | undefined): void => {
           if (settled) return;
           settled = true;
           clearTimeout(closeTimeout);
@@ -120,12 +124,15 @@ export async function spawnWithLimits(
         };
         const failAfterClose = (error: Error): void => {
           if (settled) return;
+          if (subprocess.pid === undefined) {
+            // The command could not be started (e.g. a missing executable): that is the command's
+            // failure, reported like a run that produced only this message.
+            spawnErrorMessage = error.message;
+            settle(undefined, undefined);
+            return;
+          }
           pendingError = error;
           killSubprocessGroup(subprocess, 'SIGKILL');
-          if (subprocess.pid === undefined) {
-            settled = true;
-            reject(error);
-          }
         };
         subprocess.on('error', failAfterClose);
         subprocess.stdin.on('error', (error: NodeJS.ErrnoException) => {
@@ -159,7 +166,7 @@ export async function spawnWithLimits(
 
     return {
       stdout: Buffer.concat(stdoutChunks).toString(),
-      stderr: Buffer.concat(stderrChunks).toString(),
+      stderr: spawnErrorMessage ?? Buffer.concat(stderrChunks).toString(),
       status,
       signal,
       // GNU time rounds a fast run to 0.00; the wall time until 'exit' stands in for it (never the
@@ -173,7 +180,8 @@ export async function spawnWithLimits(
       outputLimitExceeded,
     };
   } finally {
-    if (timeDir !== undefined) await fs.rm(timeDir, { recursive: true, force: true });
+    // A failed cleanup must not discard a finished run.
+    if (timeDir !== undefined) await fs.rm(timeDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 
