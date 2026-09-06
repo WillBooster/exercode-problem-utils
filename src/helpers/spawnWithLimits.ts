@@ -20,6 +20,8 @@ const killGracePeriodMilliseconds = 1000;
 // GNU time writes its record to a pipe of this process (fd 3 of the command) rather than to a file:
 // the command runs as the same OS user and could swap a file for e.g. a FIFO that blocks the read.
 const TIME_OUTPUT_FD = 3;
+// The command inherits that pipe too, so only the tail that can hold GNU time's record is kept.
+const TIME_OUTPUT_TAIL_BYTES = 4096;
 const timeCommand = resolveTimeCommand();
 
 /** Whether GNU time is available, i.e. whether `timeSeconds` and `memoryBytes` are measured at all. */
@@ -73,7 +75,7 @@ export async function spawnWithLimits(
 
   const stdoutChunks: Buffer[] = [];
   const stderrChunks: Buffer[] = [];
-  const timeChunks: Buffer[] = [];
+  let timeOutputTail = Buffer.alloc(0);
   let outputBytes = 0;
   let timedOut = false;
   let outputLimitExceeded = false;
@@ -102,7 +104,9 @@ export async function spawnWithLimits(
 
   subprocess.stdout.on('data', (chunk: Buffer) => appendOutputChunk(stdoutChunks, chunk));
   subprocess.stderr.on('data', (chunk: Buffer) => appendOutputChunk(stderrChunks, chunk));
-  timeOutput.on('data', (chunk: Buffer) => timeChunks.push(chunk));
+  timeOutput.on('data', (chunk: Buffer) => {
+    timeOutputTail = Buffer.concat([timeOutputTail, chunk]).subarray(-TIME_OUTPUT_TAIL_BYTES);
+  });
 
   const timeout = setTimeout(() => {
     timedOut = true;
@@ -173,7 +177,7 @@ export async function spawnWithLimits(
     liveSubprocesses.delete(subprocess);
   });
 
-  const timeResult = parseTimeOutput(Buffer.concat(timeChunks).toString());
+  const timeResult = parseTimeOutput(timeOutputTail.toString());
 
   return {
     stdout: Buffer.concat(stdoutChunks).toString(),
