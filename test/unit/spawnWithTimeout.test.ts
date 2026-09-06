@@ -22,7 +22,8 @@ test('returns once the program exits even if a background child still holds stdo
   const startedAt = Date.now();
   const result = await spawnWithTimeout('sh', ['-c', 'sleep 30 & echo done; exit 0'], context, 5);
 
-  expect(Date.now() - startedAt).toBeLessThan(3000);
+  // Well below the grace period for pipes held by an escaped child: the child must have been killed.
+  expect(Date.now() - startedAt).toBeLessThan(500);
   expect(result.status).toBe(0);
   expect(result.stdout).toBe('done\n');
 });
