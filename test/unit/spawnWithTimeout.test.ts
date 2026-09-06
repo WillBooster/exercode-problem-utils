@@ -18,14 +18,19 @@ test('returns once the program exits even if a child in its own session still ho
   // The limit expires while the pipes are still held; it must not be reported as a timeout.
   const result = await spawnWithTimeout(
     'python3',
-    ['-c', 'import os, time\nif os.fork() == 0:\n    os.setsid()\n    time.sleep(30)\nelse:\n    print("done")'],
+    [
+      '-c',
+      'import os, time\npid = os.fork()\nif pid == 0:\n    os.setsid()\n    time.sleep(30)\nelse:\n    print(pid)',
+    ],
     context,
     0.5
   );
+  const elapsedMilliseconds = Date.now() - startedAt;
+  // The child escaped the process group on purpose, so end it here.
+  process.kill(Number(result.stdout), 'SIGKILL');
 
-  expect(Date.now() - startedAt).toBeLessThan(3000);
+  expect(elapsedMilliseconds).toBeLessThan(3000);
   expect(result.status).toBe(0);
-  expect(result.stdout).toBe('done\n');
   expect(result.timeSeconds).toBeLessThan(0.5);
 });
 
