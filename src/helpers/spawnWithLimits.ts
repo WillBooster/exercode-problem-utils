@@ -53,6 +53,7 @@ export async function spawnWithLimits(
           ...timedCommand,
         ]
       : timedCommand;
+    const startTimeMilliseconds = Date.now();
     const subprocess = childProcess.spawn(spawnedCommand[0], spawnedCommand.slice(1), {
       cwd: context.cwd,
       detached,
@@ -162,8 +163,9 @@ export async function spawnWithLimits(
       timeSeconds: timeResult?.timeSeconds ?? 0,
       memoryBytes: timeResult?.memoryBytes ?? 0,
       timeCommandMessage: timeResult?.message,
-      // 124 is `timeout` reporting that it had to end the run itself.
-      timedOut: timedOut || status === 124,
+      // 124 is `timeout` reporting that it had to end the run itself, unless the program exited
+      // with that status on its own before the limit.
+      timedOut: timedOut || (status === 124 && Date.now() - startTimeMilliseconds >= context.timeLimitSeconds * 1000),
       outputLimitExceeded,
     };
   } finally {
