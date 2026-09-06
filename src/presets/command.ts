@@ -298,20 +298,15 @@ async function runCommandJudgeForCwd<
 
     const command = languageDefinition.command(mainFilePath);
     let stdin = testCase.input ?? '';
-    let runResult: TRunResult;
+    let customRunResult: TRunResult | undefined;
     try {
       if (options.resolveInput) {
         stdin = await options.resolveInput({ testCase, cwd, env });
       }
 
-      runResult = options.runCommand
-        ? await options.runCommand({ testCase, command, stdin, cwd, env, timeLimitSeconds })
-        : ((await runCommand(command, {
-            stdin,
-            cwd,
-            env,
-            timeLimitSeconds,
-          })) as TRunResult);
+      if (options.runCommand) {
+        customRunResult = await options.runCommand({ testCase, command, stdin, cwd, env, timeLimitSeconds });
+      }
     } catch (error) {
       printTestCaseResult({
         testCaseId: testCase.id,
@@ -322,6 +317,11 @@ async function runCommandJudgeForCwd<
       await cleanWorkingDirectory(cwd, cwdSnapshot);
       return { allAccepted: false };
     }
+
+    // The default runner reports the submission's failures in its result; what it throws is the
+    // judge's own failure and ends the run without a verdict.
+    const runResult =
+      customRunResult ?? ((await runCommand(command, { stdin, cwd, env, timeLimitSeconds })) as TRunResult);
 
     const outputFiles = await readOutputFiles(cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
     const judgeContext: CommandJudgeContext = {
