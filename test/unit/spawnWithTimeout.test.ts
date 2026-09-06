@@ -1,8 +1,20 @@
+import childProcess from 'node:child_process';
+import path from 'node:path';
+
 import { expect, test } from 'vitest';
 
 import { spawnWithTimeout } from '../../src/helpers/spawnWithTimeout.js';
 
 const context = { cwd: process.cwd(), env: process.env };
+
+async function waitUntil(condition: () => boolean, timeoutMilliseconds: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMilliseconds;
+  while (Date.now() < deadline) {
+    if (condition()) return true;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return condition();
+}
 
 test('returns once the program exits even if a background child still holds stdout', async () => {
   const startedAt = Date.now();
@@ -70,4 +82,24 @@ test('reports output beyond the cap as a normal exit with the output truncated',
 
   expect(result.status).toBe(0);
   expect(result.stdout.length).toBe(8 * 1024 * 1024);
+});
+
+test('ends the program at its limit even after the judge process was killed', async () => {
+  const marker = `exercode-orphan-${process.pid}`;
+  const helperPath = path.resolve('src/helpers/spawnWithTimeout.ts');
+  const judge = childProcess.spawn(process.execPath, [
+    '-e',
+    `const { spawnWithTimeout } = await import(${JSON.stringify(helperPath)});
+await spawnWithTimeout('sh', ['-c', 'sleep 30; echo ${marker}'], { cwd: process.cwd(), env: process.env }, 1);`,
+  ]);
+  const isProgramRunning = (): boolean =>
+    childProcess.spawnSync('pgrep', ['-f', `echo ${marker}`], { stdio: 'ignore' }).status === 0;
+
+  try {
+    expect(await waitUntil(isProgramRunning, 10_000)).toBe(true);
+    judge.kill('SIGKILL');
+    expect(await waitUntil(() => !isProgramRunning(), 10_000)).toBe(true);
+  } finally {
+    childProcess.spawnSync('pkill', ['-KILL', '-f', `echo ${marker}`], { stdio: 'ignore' });
+  }
 });

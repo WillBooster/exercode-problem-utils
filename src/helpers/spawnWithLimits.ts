@@ -38,11 +38,24 @@ export async function spawnWithLimits(
   const timeDir = timeCommand === undefined ? undefined : await fs.mkdtemp(path.join(os.tmpdir(), 'exercode-time-'));
   try {
     const timeOutputPath = timeDir === undefined ? undefined : path.join(timeDir, 'result');
-    const spawnedCommand: readonly [string, ...string[]] =
+    const detached = process.platform !== 'win32';
+    const timedCommand: readonly [string, ...string[]] =
       timeCommand === undefined ? command : [...timeCommand, `--output=${timeOutputPath}`, ...command];
+    // The command runs in its own session so the group kill below cannot hit this process, but that
+    // also puts it out of reach of whoever kills this process. GNU `timeout` keeps the run bounded
+    // in that case; it acts only after the timers below had their chance.
+    const spawnedCommand: readonly [string, ...string[]] = detached
+      ? [
+          'timeout',
+          '-k',
+          String(killGracePeriodMilliseconds / 1000),
+          String(context.timeLimitSeconds + killGracePeriodMilliseconds / 1000),
+          ...timedCommand,
+        ]
+      : timedCommand;
     const subprocess = childProcess.spawn(spawnedCommand[0], spawnedCommand.slice(1), {
       cwd: context.cwd,
-      detached: process.platform !== 'win32',
+      detached,
       env: context.env,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -149,7 +162,8 @@ export async function spawnWithLimits(
       timeSeconds: timeResult?.timeSeconds ?? 0,
       memoryBytes: timeResult?.memoryBytes ?? 0,
       timeCommandMessage: timeResult?.message,
-      timedOut,
+      // 124 is `timeout` reporting that it had to end the run itself.
+      timedOut: timedOut || status === 124,
       outputLimitExceeded,
     };
   } finally {
