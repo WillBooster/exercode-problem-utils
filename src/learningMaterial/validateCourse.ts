@@ -1,4 +1,4 @@
-import { readdir, readFile, realpath } from 'node:fs/promises';
+import { lstat, readdir, readFile, realpath } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import {
@@ -201,7 +201,9 @@ async function collectAvailableProblemIds(
   const availableProblemIds = new Set(definitionPathsById.keys());
   // Discovery does not traverse a symbolic link, so a linked problems directory imports nothing.
   const courseProblemsDirectoryPath = join(courseDirectoryPath, 'problems');
-  const namesConventionalDirectory = explicitProblemsDirectoryPath === courseProblemsDirectoryPath;
+  const namesConventionalDirectory =
+    explicitProblemsDirectoryPath !== undefined &&
+    (await isSameEntry(explicitProblemsDirectoryPath, courseProblemsDirectoryPath));
   if (namesConventionalDirectory || (await isDirectory(courseProblemsDirectoryPath))) {
     await isUsableProblemsDirectory(courseProblemsDirectoryPath, errors);
   }
@@ -216,6 +218,17 @@ async function collectAvailableProblemIds(
     );
   }
   return availableProblemIds;
+}
+
+/** Whether two paths name the same directory entry (e.g. differently cased on a case-insensitive file system). */
+async function isSameEntry(path1: string, path2: string): Promise<boolean> {
+  if (path1 === path2) return true;
+  try {
+    const [stats1, stats2] = await Promise.all([lstat(path1), lstat(path2)]);
+    return stats1.dev === stats2.dev && stats1.ino === stats2.ino;
+  } catch {
+    return false;
+  }
 }
 
 function isOutsideDirectory(parentPath: string, path: string): boolean {
