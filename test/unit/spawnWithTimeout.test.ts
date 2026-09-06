@@ -95,8 +95,12 @@ test('preserves the exit status and stderr of the program', async () => {
 });
 
 test('reports output beyond the cap as a normal exit with the output truncated', async () => {
+  const startedAt = Date.now();
   const result = await spawnWithTimeout('sh', ['-c', 'yes | head -c 10000000; sleep 30'], context, 5);
 
+  // The cap, not the time limit, must have ended the run.
+  expect(Date.now() - startedAt).toBeLessThan(3000);
+  expect(result.outputLimitExceeded).toBe(true);
   expect(result.status).toBe(0);
   expect(result.stdout.length).toBe(8 * 1024 * 1024);
 });
