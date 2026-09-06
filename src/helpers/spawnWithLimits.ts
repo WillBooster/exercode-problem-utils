@@ -66,6 +66,7 @@ export async function spawnWithLimits(
     let outputBytes = 0;
     let timedOut = false;
     let outputLimitExceeded = false;
+    let exitedAfterLimit = false;
 
     const appendOutputChunk = (chunks: Buffer[], chunk: Buffer): void => {
       if (outputBytes >= context.outputLimitBytes) {
@@ -138,6 +139,7 @@ export async function spawnWithLimits(
           // keep the output read so far.
           clearTimeout(timeout);
           clearTimeout(killTimeout);
+          exitedAfterLimit = Date.now() - startTimeMilliseconds >= context.timeLimitSeconds * 1000;
           killSubprocessGroup(subprocess, 'SIGKILL');
           closeTimeout = setTimeout(() => {
             subprocess.stdout.destroy();
@@ -165,7 +167,7 @@ export async function spawnWithLimits(
       timeCommandMessage: timeResult?.message,
       // 124 is `timeout` reporting that it had to end the run itself, unless the program exited
       // with that status on its own before the limit.
-      timedOut: timedOut || (status === 124 && Date.now() - startTimeMilliseconds >= context.timeLimitSeconds * 1000),
+      timedOut: timedOut || (status === 124 && exitedAfterLimit),
       outputLimitExceeded,
     };
   } finally {

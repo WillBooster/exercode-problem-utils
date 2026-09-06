@@ -1,4 +1,6 @@
 import childProcess from 'node:child_process';
+import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 
 import { expect, test } from 'vitest';
@@ -39,7 +41,9 @@ test('returns once the program exits even if a child in its own session still ho
   );
   const elapsedMilliseconds = Date.now() - startedAt;
   // The child escaped the process group on purpose, so end it here.
-  process.kill(Number(result.stdout), 'SIGKILL');
+  const childPid = Number(result.stdout.trim());
+  expect(childPid).toBeGreaterThan(0);
+  process.kill(childPid, 'SIGKILL');
 
   expect(elapsedMilliseconds).toBeLessThan(3000);
   expect(result.status).toBe(0);
@@ -84,22 +88,27 @@ test('reports output beyond the cap as a normal exit with the output truncated',
   expect(result.stdout.length).toBe(8 * 1024 * 1024);
 });
 
-test('ends the program at its limit even after the judge process was killed', async () => {
+test('ends the program at its limit even after the judge process was killed', { timeout: 30_000 }, async () => {
   const marker = `exercode-orphan-${process.pid}`;
-  const helperPath = path.resolve('src/helpers/spawnWithTimeout.ts');
-  const judge = childProcess.spawn(process.execPath, [
-    '-e',
-    `const { spawnWithTimeout } = await import(${JSON.stringify(helperPath)});
-await spawnWithTimeout('sh', ['-c', 'sleep 30; echo ${marker}'], { cwd: process.cwd(), env: process.env }, 1);`,
-  ]);
+  // The judge script lives in a file so that only the judged program's command line carries the marker.
+  const judgeDir = await fs.mkdtemp(path.join(os.tmpdir(), 'exercode-judge-'));
+  const judgePath = path.join(judgeDir, 'judge.ts');
+  await fs.writeFile(
+    judgePath,
+    `import { spawnWithTimeout } from ${JSON.stringify(path.resolve('src/helpers/spawnWithTimeout.ts'))};
+await spawnWithTimeout('sh', ['-c', 'sleep 30; echo ${marker}'], { cwd: process.cwd(), env: process.env }, 1);`
+  );
+  const judge = childProcess.spawn('bun', [judgePath], { stdio: 'ignore' });
   const isProgramRunning = (): boolean =>
     childProcess.spawnSync('pgrep', ['-f', `echo ${marker}`], { stdio: 'ignore' }).status === 0;
 
   try {
     expect(await waitUntil(isProgramRunning, 10_000)).toBe(true);
+    expect(judge.exitCode).toBeNull();
     judge.kill('SIGKILL');
     expect(await waitUntil(() => !isProgramRunning(), 10_000)).toBe(true);
   } finally {
     childProcess.spawnSync('pkill', ['-KILL', '-f', `echo ${marker}`], { stdio: 'ignore' });
+    await fs.rm(judgeDir, { recursive: true, force: true });
   }
 });
