@@ -36,7 +36,9 @@ let signalHandlersInstalled = false;
 
 /**
  * Run a judge harness with `process.execPath` in its own process group, killing the whole group on
- * timeout or when the output cap is exceeded so grandchild submission processes cannot outlive the run.
+ * timeout or when the output cap is exceeded. The submissions a harness judges through
+ * `spawnWithLimits` run in sessions of their own, out of that kill's reach; each is bounded by its
+ * own GNU `timeout` wrapper instead.
  */
 export function runHarnessProcess(
   commandArgs: readonly string[],

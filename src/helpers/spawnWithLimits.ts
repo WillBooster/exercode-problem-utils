@@ -68,7 +68,9 @@ export async function spawnWithLimits(
     cwd: context.cwd,
     detached,
     env: context.env,
-    stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+    // GNU time refuses to run the command at all if its descriptor is not open, so the pipes are
+    // created up to that fd.
+    stdio: Array.from({ length: TIME_OUTPUT_FD + 1 }, () => 'pipe' as const),
   });
   liveSubprocesses.add(subprocess);
   const timeOutput = subprocess.stdio[TIME_OUTPUT_FD] as NodeJS.ReadableStream;
