@@ -113,7 +113,6 @@ export async function runCommandInTemporaryPackageManagerProject(
       });
       if (isFailedSpawnResult(installResult)) {
         return toPackageManagerCommandRunResult({
-          elapsedTimeSeconds: (Date.now() - startedAt) / 1000,
           options,
           result: installResult,
         });
@@ -142,11 +141,9 @@ export async function runCommandInTemporaryPackageManagerProject(
       stdin: options.stdin ?? '',
       timeLimitSeconds: remainingTimeLimitSeconds,
     });
-    const elapsedTimeSeconds = (Date.now() - startedAt) / 1000;
 
     if (installResult) {
       return toPackageManagerCommandRunResult({
-        elapsedTimeSeconds,
         options,
         result: {
           ...result,
@@ -156,7 +153,7 @@ export async function runCommandInTemporaryPackageManagerProject(
       });
     }
 
-    return toPackageManagerCommandRunResult({ elapsedTimeSeconds, options, result });
+    return toPackageManagerCommandRunResult({ options, result });
   } finally {
     // The command may have left permission-locked entries (e.g. a mode-000 directory).
     await forciblyRemoveDirectory(runDir);
@@ -164,7 +161,6 @@ export async function runCommandInTemporaryPackageManagerProject(
 }
 
 function toPackageManagerCommandRunResult(context: {
-  elapsedTimeSeconds: number;
   options: RunCommandInTemporaryPackageManagerProjectOptions;
   result: SpawnWithLimitsResult;
 }): PackageManagerCommandRunResult {
@@ -173,9 +169,7 @@ function toPackageManagerCommandRunResult(context: {
     stdout: context.result.stdout,
     stderr: context.result.stderr,
     status: context.result.timedOut || context.result.outputLimitExceeded ? 0 : context.result.status,
-    timeSeconds: context.result.timedOut
-      ? context.options.timeLimitSeconds + 1e-3
-      : context.result.timeSeconds || context.elapsedTimeSeconds,
+    timeSeconds: context.result.timedOut ? context.options.timeLimitSeconds + 1e-3 : context.result.timeSeconds,
     memoryBytes: context.result.memoryBytes,
     timedOut: context.result.timedOut,
     signal: context.result.signal,

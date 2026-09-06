@@ -8,7 +8,7 @@ export interface SpawnWithLimitsResult {
   stderr: string;
   status: number | undefined;
   signal: NodeJS.Signals | undefined;
-  /** Wall time measured by GNU time, or 0 when it produced no measurement. */
+  /** Wall time measured by GNU time, or measured here until the command exited when it produced none. */
   timeSeconds: number;
   /** Peak resident set size measured by GNU time, or 0 when it produced no measurement. */
   memoryBytes: number;
@@ -66,7 +66,7 @@ export async function spawnWithLimits(
     let outputBytes = 0;
     let timedOut = false;
     let outputLimitExceeded = false;
-    let exitedAfterLimit = false;
+    let wallTimeSeconds = 0;
 
     const appendOutputChunk = (chunks: Buffer[], chunk: Buffer): void => {
       if (outputBytes >= context.outputLimitBytes) {
@@ -139,7 +139,7 @@ export async function spawnWithLimits(
           // keep the output read so far.
           clearTimeout(timeout);
           clearTimeout(killTimeout);
-          exitedAfterLimit = Date.now() - startTimeMilliseconds >= context.timeLimitSeconds * 1000;
+          wallTimeSeconds = (Date.now() - startTimeMilliseconds) / 1000;
           killSubprocessGroup(subprocess, 'SIGKILL');
           closeTimeout = setTimeout(() => {
             subprocess.stdout.destroy();
@@ -162,12 +162,14 @@ export async function spawnWithLimits(
       stderr: Buffer.concat(stderrChunks).toString(),
       status,
       signal,
-      timeSeconds: timeResult?.timeSeconds ?? 0,
+      // GNU time rounds a fast run to 0.00; the wall time until 'exit' stands in for it (never the
+      // grace period spent on the pipes afterwards).
+      timeSeconds: timeResult?.timeSeconds || wallTimeSeconds,
       memoryBytes: timeResult?.memoryBytes ?? 0,
       timeCommandMessage: timeResult?.message,
       // 124 is `timeout` reporting that it had to end the run itself, unless the program exited
       // with that status on its own before the limit.
-      timedOut: timedOut || (status === 124 && exitedAfterLimit),
+      timedOut: timedOut || (status === 124 && wallTimeSeconds >= context.timeLimitSeconds),
       outputLimitExceeded,
     };
   } finally {

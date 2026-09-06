@@ -20,7 +20,6 @@ export async function spawnWithTimeout(
   memoryBytes: number;
   outputLimitExceeded: boolean;
 }> {
-  const startTimeMilliseconds = Date.now();
   let result: SpawnWithLimitsResult;
   try {
     result = await spawnWithLimits([command, ...args], {
@@ -49,9 +48,7 @@ export async function spawnWithTimeout(
     stdout: result.stdout,
     stderr,
     status: result.timedOut || result.outputLimitExceeded ? 0 : result.status,
-    timeSeconds: result.timedOut
-      ? timeoutSeconds + 1e-3
-      : result.timeSeconds || (Date.now() - startTimeMilliseconds) / 1000,
+    timeSeconds: result.timedOut ? timeoutSeconds + 1e-3 : result.timeSeconds,
     memoryBytes: result.memoryBytes,
     outputLimitExceeded: result.outputLimitExceeded,
   };
