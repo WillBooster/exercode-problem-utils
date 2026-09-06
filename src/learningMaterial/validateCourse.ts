@@ -103,11 +103,13 @@ export async function validateCourseDirectory(
 }
 
 /**
- * Resolves symbolic links in the ancestors of a path while keeping its final entry as written, so
- * a linked entry can still be reported as such; a missing ancestor keeps its lexical form.
+ * Resolves symbolic links (and, on a case-insensitive file system, the casing) of a regular
+ * directory; a linked or missing final entry keeps its own name so it can be reported as such,
+ * with only its ancestors resolved.
  */
 async function canonicalize(path: string): Promise<string> {
   const absolutePath = resolve(path);
+  if (await isRegularDirectory(absolutePath)) return realpath(absolutePath);
   try {
     return join(await realpath(dirname(absolutePath)), basename(absolutePath));
   } catch {
