@@ -99,6 +99,7 @@ describe('validateCourseDirectory', () => {
     await rename(join(courseDir, 'problems'), join(courseDir, 'data', 'problems'));
     await writeFile(join(courseDir, 'data', 'notes.txt'), 'not a material\n');
     await writeFile(join(courseDir, 'data', 'legacy_task.problem.md'), '# v1 problem definition\n');
+    await writeFile(join(courseDir, 'data', 'problem.md'), '# v2 problem definition\n');
     const result = await validateCourseDirectory(courseDir);
     expect(result.errors).toEqual([]);
     expect(result.warnings).toEqual([]);
