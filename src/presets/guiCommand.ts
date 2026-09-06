@@ -17,6 +17,7 @@ import { readOutputFiles } from '../helpers/readOutputFiles.js';
 import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases as readFileTestCases } from '../helpers/readTestCases.js';
 import { spawnWithTimeout } from '../helpers/spawnWithTimeout.js';
+import { MAX_STDOUT_LENGTH } from '../helpers/stdioJudgeRules.js';
 import { DecisionCode } from '../types/decisionCode.js';
 import { languageIdToDefinition } from '../types/language.js';
 import type { ProblemMarkdownFrontMatter } from '../types/problem.js';
@@ -420,25 +421,26 @@ async function runDefaultPrepare(context: {
     { cwd: context.cwd, env: context.env },
     BUILD_TIMEOUT_SECONDS
   );
+  const buildOutput = (buildResult.stderr || buildResult.stdout).slice(0, MAX_STDOUT_LENGTH) || undefined;
 
   if (buildResult.timeSeconds > BUILD_TIMEOUT_SECONDS) {
     return {
       decisionCode: DecisionCode.BUILD_TIME_LIMIT_EXCEEDED,
-      stderr: buildResult.stderr || undefined,
+      stderr: buildOutput,
     };
   }
 
   if (buildResult.status !== 0) {
     return {
       decisionCode: DecisionCode.BUILD_ERROR,
-      stderr: buildResult.stderr || buildResult.stdout || undefined,
+      stderr: buildOutput,
     };
   }
 
   if (buildResult.outputLimitExceeded) {
     return {
       decisionCode: DecisionCode.BUILD_OUTPUT_SIZE_LIMIT_EXCEEDED,
-      stderr: buildResult.stderr || buildResult.stdout || undefined,
+      stderr: buildOutput,
     };
   }
 
