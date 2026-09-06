@@ -132,7 +132,8 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
   if (languageDefinition.buildCommand) {
     const buildCommand = languageDefinition.buildCommand(mainFilePath);
 
-    // A build that cannot even be run is the judge's failure and ends the run without a verdict.
+    // The build reports the submission's failures in its result; what `spawnWithTimeout` throws is
+    // the judge's own failure and ends the run without a verdict.
     const buildSpawnResult = await spawnWithTimeout(
       buildCommand[0],
       buildCommand.slice(1),
@@ -344,7 +345,8 @@ async function debugInTemporaryCopy(problemDir: string, cwd: string, params: Deb
   if (languageDefinition.buildCommand) {
     const buildCommand = languageDefinition.buildCommand(mainFilePath);
 
-    // A build that cannot even be run is the judge's failure and ends the run without a verdict.
+    // The build reports the submission's failures in its result; what `spawnWithTimeout` throws is
+    // the judge's own failure and ends the run without a verdict.
     const buildSpawnResult = await spawnWithTimeout(
       buildCommand[0],
       buildCommand.slice(1),
