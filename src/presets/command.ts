@@ -20,7 +20,7 @@ import {
   resolveCwds,
   type ResolvedCwd,
 } from '../helpers/resolveCwds.js';
-import { spawnSyncWithTimeout } from '../helpers/spawnSyncWithTimeout.js';
+import { spawnWithTimeout } from '../helpers/spawnWithTimeout.js';
 import { DecisionCode } from '../types/decisionCode.js';
 import type { ProblemMarkdownFrontMatter } from '../types/problem.js';
 import type { TestCaseResult } from '../types/testCaseResult.js';
@@ -270,7 +270,7 @@ async function runCommandJudgeForCwd<
 
     const buildCommand = languageDefinition.buildCommand?.(mainFilePath);
     if (buildCommand) {
-      const buildResult = runBuild(buildCommand, {
+      const buildResult = await runBuild(buildCommand, {
         cwd,
         env,
         testCaseId: prebuildTestCaseId,
@@ -298,20 +298,15 @@ async function runCommandJudgeForCwd<
 
     const command = languageDefinition.command(mainFilePath);
     let stdin = testCase.input ?? '';
-    let runResult: TRunResult;
+    let customRunResult: TRunResult | undefined;
     try {
       if (options.resolveInput) {
         stdin = await options.resolveInput({ testCase, cwd, env });
       }
 
-      runResult = options.runCommand
-        ? await options.runCommand({ testCase, command, stdin, cwd, env, timeLimitSeconds })
-        : (runCommand(command, {
-            stdin,
-            cwd,
-            env,
-            timeLimitSeconds,
-          }) as TRunResult);
+      if (options.runCommand) {
+        customRunResult = await options.runCommand({ testCase, command, stdin, cwd, env, timeLimitSeconds });
+      }
     } catch (error) {
       printTestCaseResult({
         testCaseId: testCase.id,
@@ -322,6 +317,11 @@ async function runCommandJudgeForCwd<
       await cleanWorkingDirectory(cwd, cwdSnapshot);
       return { allAccepted: false };
     }
+
+    // The default runner reports the submission's failures in its result; what it throws is the
+    // judge's own failure and ends the run without a verdict.
+    const runResult =
+      customRunResult ?? ((await runCommand(command, { stdin, cwd, env, timeLimitSeconds })) as TRunResult);
 
     const outputFiles = await readOutputFiles(cwd, problemMarkdownFrontMatter.requiredOutputFilePaths ?? []);
     const judgeContext: CommandJudgeContext = {
@@ -377,14 +377,14 @@ function matchesExpectedResult(resolvedCwd: ResolvedCwd, result: { allAccepted: 
   return result.allAccepted === (resolvedCwd.expectedResult === 'accepted');
 }
 
-function runBuild(
+async function runBuild(
   buildCommand: readonly [string, ...string[]],
   context: { cwd: string; env: NodeJS.ProcessEnv; testCaseId: string; limits: CommandJudgeLimits }
-): (Omit<TestCaseResult, 'testCaseId'> & { testCaseId: string }) | undefined {
-  const spawnResult = spawnSyncWithTimeout(
+): Promise<(Omit<TestCaseResult, 'testCaseId'> & { testCaseId: string }) | undefined> {
+  const spawnResult = await spawnWithTimeout(
     buildCommand[0],
     buildCommand.slice(1),
-    { cwd: context.cwd, encoding: 'utf8', env: context.env },
+    { cwd: context.cwd, env: context.env },
     context.limits.buildTimeoutSeconds
   );
   const exitStatus = spawnResult.status ?? undefined;
@@ -414,6 +414,7 @@ function runBuild(
   }
 
   if (
+    spawnResult.outputLimitExceeded ||
     spawnResult.stdout.length > context.limits.maxOutputLength ||
     spawnResult.stderr.length > context.limits.maxOutputLength
   ) {
@@ -461,7 +462,7 @@ async function compareWithExpectedOutputs(context: {
   return judgement.matches ? {} : { decisionCode: DecisionCode.WRONG_ANSWER };
 }
 
-function runCommand(
+async function runCommand(
   command: readonly [string, ...string[]],
   context: {
     stdin: string;
@@ -469,11 +470,11 @@ function runCommand(
     env: NodeJS.ProcessEnv;
     timeLimitSeconds: number;
   }
-): CommandRunResult {
-  const spawnResult = spawnSyncWithTimeout(
+): Promise<CommandRunResult> {
+  const spawnResult = await spawnWithTimeout(
     command[0],
     command.slice(1),
-    { cwd: context.cwd, encoding: 'utf8', input: context.stdin, env: context.env },
+    { cwd: context.cwd, stdin: context.stdin, env: context.env },
     context.timeLimitSeconds
   );
 
@@ -484,6 +485,7 @@ function runCommand(
     status: spawnResult.status ?? undefined,
     timeSeconds: spawnResult.timeSeconds,
     memoryBytes: spawnResult.memoryBytes,
+    outputLimitExceeded: spawnResult.outputLimitExceeded,
   };
 }
 
