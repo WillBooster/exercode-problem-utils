@@ -93,6 +93,22 @@ describe('validateCourseDirectory', () => {
     expect(result.warnings).toEqual([]);
   });
 
+  test('treats --problems-dir as course-internal when either path goes through a symbolic link', async () => {
+    const tempDir = await createTempDir();
+    const realParentDir = join(tempDir, 'real');
+    const linkedParentDir = join(tempDir, 'link');
+    await mkdir(realParentDir);
+    await symlink(realParentDir, linkedParentDir);
+    const courseDir = join(realParentDir, 'example_course');
+    await cp(validCourseDir, courseDir, { recursive: true });
+    await rename(join(courseDir, 'problems'), join(courseDir, 'exercises'));
+    const result = await validateCourseDirectory(join(linkedParentDir, 'example_course'), {
+      problemsDirectoryPath: join(courseDir, 'exercises'),
+    });
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
+
   test('still discovers course-wide problems when --problems-dir names a subdirectory', async () => {
     const tempDir = await createTempDir();
     const courseDir = join(tempDir, 'example_course');

@@ -1,4 +1,4 @@
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, realpath } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import {
@@ -38,16 +38,20 @@ export async function validateCourseDirectory(
   const warnings: string[] = [];
   const result = { errors, warnings };
 
-  const absoluteDirectoryPath = resolve(courseDirectoryPath);
   // Course discovery does not traverse a symbolic link, so a linked course directory is never imported.
-  if (!(await isRegularDirectory(absoluteDirectoryPath))) {
+  if (!(await isRegularDirectory(resolve(courseDirectoryPath)))) {
     errors.push(
-      (await isDirectory(absoluteDirectoryPath))
+      (await isDirectory(resolve(courseDirectoryPath)))
         ? `course directory is a symbolic link, which the judge does not traverse: ${courseDirectoryPath}`
         : `course directory not found: ${courseDirectoryPath}`
     );
     return result;
   }
+  // Canonical paths make the "inside the course" comparisons below independent of how the caller
+  // spelled either path (e.g. `/var` vs `/private/var` on macOS).
+  const absoluteDirectoryPath = await realpath(courseDirectoryPath);
+  const explicitProblemsDirectoryPath =
+    options.problemsDirectoryPath === undefined ? undefined : await canonicalize(options.problemsDirectoryPath);
   const courseId = basename(absoluteDirectoryPath);
   if (!LEARNING_MATERIAL_ID_REGEX.test(courseId)) {
     errors.push(`course ID "${courseId}" (directory name) must match ${LEARNING_MATERIAL_ID_REGEX}`);
@@ -56,7 +60,12 @@ export async function validateCourseDirectory(
   const parsedCourseFile = await parseCourseFile(absoluteDirectoryPath, errors);
   // Messages name the course directory because that is what discovery searches (see collectAvailableProblemIds).
   const problemsDirectoryPath = absoluteDirectoryPath;
-  const availableProblemIds = await collectAvailableProblemIds(absoluteDirectoryPath, options, errors);
+  const availableProblemIds = await collectAvailableProblemIds(
+    absoluteDirectoryPath,
+    options.problemsDirectoryPath,
+    explicitProblemsDirectoryPath,
+    errors
+  );
 
   if (!parsedCourseFile) return result;
   const { courseFile, courseFileName } = parsedCourseFile;
@@ -87,10 +96,19 @@ export async function validateCourseDirectory(
     absoluteDirectoryPath,
     courseFile,
     courseFileName,
-    options.problemsDirectoryPath,
+    explicitProblemsDirectoryPath,
     warnings
   );
   return result;
+}
+
+/** Resolves symbolic links in an existing path; a missing path keeps its lexical form. */
+async function canonicalize(path: string): Promise<string> {
+  try {
+    return await realpath(path);
+  } catch {
+    return resolve(path);
+  }
 }
 
 /** Directories not listed as lectures are never imported, so their materials silently disappear. */
@@ -105,7 +123,7 @@ async function reportOrphanLectureDirectories(
   // The course's own `problems/` holds problems, never lecture materials, and so does an explicitly
   // named problems directory inside the course.
   const problemsDirectoryNames = new Set(['problems']);
-  if (problemsDirectoryPath && dirname(resolve(problemsDirectoryPath)) === courseDirectoryPath) {
+  if (problemsDirectoryPath && dirname(problemsDirectoryPath) === courseDirectoryPath) {
     problemsDirectoryNames.add(basename(problemsDirectoryPath));
   }
   const dirents = await readdir(courseDirectoryPath, { withFileTypes: true });
@@ -177,7 +195,8 @@ async function findFirst<T>(items: readonly T[], predicate: (item: T) => Promise
  */
 async function collectAvailableProblemIds(
   courseDirectoryPath: string,
-  options: CourseValidationOptions,
+  problemsDirectoryOption: string | undefined,
+  explicitProblemsDirectoryPath: string | undefined,
   errors: string[]
 ): Promise<Set<string>> {
   const definitionPathsById = await collectProblemDefinitions(courseDirectoryPath);
@@ -185,8 +204,6 @@ async function collectAvailableProblemIds(
   const availableProblemIds = new Set(definitionPathsById.keys());
   // Discovery does not traverse a symbolic link, so a linked problems directory imports nothing.
   const courseProblemsDirectoryPath = join(courseDirectoryPath, 'problems');
-  const explicitProblemsDirectoryPath =
-    options.problemsDirectoryPath === undefined ? undefined : resolve(options.problemsDirectoryPath);
   const namesConventionalDirectory = explicitProblemsDirectoryPath === courseProblemsDirectoryPath;
   if (namesConventionalDirectory || (await isDirectory(courseProblemsDirectoryPath))) {
     await isUsableProblemsDirectory(courseProblemsDirectoryPath, errors);
@@ -198,7 +215,7 @@ async function collectAvailableProblemIds(
   ) {
     // Exercode links a material only to problems inside its course, so outside problems never count.
     errors.push(
-      `problems directory ${options.problemsDirectoryPath} is outside the course directory; Exercode links a material only to problems inside the course, so move them under the course`
+      `problems directory ${problemsDirectoryOption} is outside the course directory; Exercode links a material only to problems inside the course, so move them under the course`
     );
   }
   return availableProblemIds;
