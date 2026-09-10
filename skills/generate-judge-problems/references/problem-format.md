@@ -31,10 +31,11 @@ reuse the stdio debug preset); any other content, even an added comment, makes t
 harness. A CUSTOM `debug.ts` without `judge.ts` is allowed: the judge runs `debug.ts` whenever it
 is present, so it can customize debugging for a problem judged by the default stdio judge.
 
-Only custom judges (GUI, LLM, command-based, and other special judging) provide a `judge.ts`, using
+Only custom judges (GUI, LLM, command-based, and other special judging) provide a `judge.ts`, using presets such as
 `commandJudgePreset` from `@exercode/problem-utils/presets/command`, `guiCommandJudgePreset`
-from `@exercode/problem-utils/presets/guiCommand`, `llmJudgePreset` from
-`@exercode/problem-utils-llm`, or `browserJudgePreset` from `@exercode/problem-utils-browser`.
+from `@exercode/problem-utils/presets/guiCommand`, `evaluationJudgePreset` from
+`@exercode/problem-utils/presets/evaluation`, `llmJudgePreset` from `@exercode/problem-utils-llm`,
+or `browserJudgePreset` and `htmlJudgePreset` from `@exercode/problem-utils-browser`.
 Declare the packages the harness imports in the repository's dependencies. A custom judge should
 ship a `debug.ts` as well; without it the debug feature is unavailable for the problem.
 Relative imports in `judge.ts` and `debug.ts` must stay inside the problem directory; reuse
