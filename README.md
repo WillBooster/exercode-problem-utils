@@ -9,11 +9,11 @@
 
 ## Packages
 
-| Package                           | Purpose                                                                                              |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `@exercode/problem-utils`         | CLI, validation, result types, and stdio/command/evaluation presets; no browser or AI SDK dependency |
-| `@exercode/problem-utils-browser` | Playwright Chromium lifecycle, browser judging, and screenshots                                      |
-| `@exercode/problem-utils-llm`     | LLM judging and AI SDK providers                                                                     |
+| Package                           | Purpose                                                                                                  |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `@exercode/problem-utils`         | CLI, validation, result types, and stdio/command/GUI/evaluation presets; no browser or AI SDK dependency |
+| `@exercode/problem-utils-browser` | Playwright Chromium lifecycle, browser judging, and screenshots                                          |
+| `@exercode/problem-utils-llm`     | LLM judging and AI SDK providers                                                                         |
 
 Install only the packages the problem uses. Import `llmJudgePreset` from
 `@exercode/problem-utils-llm`. Browser judges receive Playwright's native `Page`:

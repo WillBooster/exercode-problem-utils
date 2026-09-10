@@ -24,8 +24,8 @@
     "test/ci": "bun run check-authoring && bun wb test-on-ci",
     "test/ci-setup": "bun run build && bunx playwright-core install chromium",
     "typecheck": "bun tsc --noEmit && bun tsc --noEmit -p example/tsconfig.json",
-    "verify": "bun run check-authoring && bun wb verify",
-    "verify-full": "bun run check-authoring && bun wb verify --full"
+    "verify": "bun run build && bun run check-authoring && bun wb verify",
+    "verify-full": "bun run build && bun run check-authoring && bun wb verify --full"
   },
   "prettier": "@willbooster/prettier-config",
   "devDependencies": {
