@@ -12,6 +12,7 @@
   ],
   "scripts": {
     "build": "bun run --filter '@exercode/*' build",
+    "check-authoring": "bun run typecheck && bun oxlint --type-aware --type-check test example",
     "cleanup": "bun wb lint --fix --format",
     "format": "bun wb lint --format",
     "lint": "bun wb lint",
@@ -20,11 +21,11 @@
     "release": "wb release",
     "start": "bun packages/problem-utils/src/index.ts",
     "test": "bun wb test",
-    "test/ci": "bun wb test-on-ci",
+    "test/ci": "bun run check-authoring && bun wb test-on-ci",
     "test/ci-setup": "bun run build && bunx playwright-core install chromium",
-    "typecheck": "bun wb typecheck",
-    "verify": "bun wb verify",
-    "verify-full": "bun wb verify --full"
+    "typecheck": "bun tsc --noEmit && bun tsc --noEmit -p example/tsconfig.json",
+    "verify": "bun run check-authoring && bun wb verify",
+    "verify-full": "bun run check-authoring && bun wb verify --full"
   },
   "prettier": "@willbooster/prettier-config",
   "devDependencies": {
