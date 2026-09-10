@@ -60,6 +60,7 @@ includes both PNG files. If either document cannot be formatted, both are render
 Each check uses fresh pages for both answers. Pixel comparison requires deterministic
 page content; JavaScript timers, random content, and animated images are not frozen. Missing required files are reported before starting Chromium.
 
+For isolated judging, keep shared assets inside the problem directory.
 Both directories can use the nearest ancestor's `assets` directory, through `assets/`
 or directly from the served root. Local assets are merged with that shared directory;
 submission files and links take precedence, followed by local assets. A directory

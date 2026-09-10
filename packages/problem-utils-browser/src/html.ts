@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 
 import {
@@ -15,6 +14,7 @@ import { format } from 'prettier';
 import prettierPluginOrganizeAttributes from 'prettier-plugin-organize-attributes';
 
 import { launchBrowser } from './browser.js';
+import { createTemporaryDirectory } from './temporaryDirectory.js';
 
 type JudgeCaseResult = Omit<TestCaseResult, 'testCaseId'>;
 interface JudgeContext {
@@ -235,7 +235,8 @@ export interface ServedDirectory {
 
 export async function createHtmlServedDirectory(sourceDirectoryPath: string): Promise<ServedDirectory> {
   sourceDirectoryPath = path.resolve(sourceDirectoryPath);
-  const servedDirectoryPath = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'judge-html-'));
+  const directory = createTemporaryDirectory('judge-html-');
+  const servedDirectoryPath = directory.path;
   try {
     await mergeDirectory(sourceDirectoryPath, servedDirectoryPath);
 
@@ -249,16 +250,11 @@ export async function createHtmlServedDirectory(sourceDirectoryPath: string): Pr
       await mergeDirectory(sharedAssets, servedDirectoryPath);
     }
   } catch (error) {
-    await fsPromises.rm(servedDirectoryPath, { recursive: true, force: true });
+    await directory[Symbol.asyncDispose]();
     throw error;
   }
 
-  return {
-    path: servedDirectoryPath,
-    async [Symbol.asyncDispose]() {
-      await fsPromises.rm(servedDirectoryPath, { force: true, recursive: true });
-    },
-  };
+  return directory;
 }
 
 async function mergeDirectory(sourceDirectoryPath: string, destinationDirectoryPath: string): Promise<void> {
