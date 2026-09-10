@@ -47,7 +47,11 @@ export async function browserJudgePreset(options: BrowserJudgePresetOptions): Pr
 
 /** Launches the Chromium installed for this Playwright version. */
 export async function launchBrowser(options: LaunchOptions = {}): Promise<Browser> {
-  return chromium.launch({ headless: true, ...options });
+  return chromium.launch({
+    headless: true,
+    chromiumSandbox: !process.env.CI && process.env.WB_DOCKER !== '1',
+    ...options,
+  });
 }
 
 /** Encodes a page screenshot as a judge output file. */
