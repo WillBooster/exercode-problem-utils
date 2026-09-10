@@ -15,7 +15,8 @@ export function startHttpServer(dir: string): HttpServer {
   const server = http.createServer((request, response) => {
     let pathname: string;
     try {
-      pathname = decodeURIComponent(new URL(request.url ?? '/', 'http://127.0.0.1').pathname);
+      const encodedPathname = new URL(request.url ?? '/', 'http://127.0.0.1').pathname;
+      pathname = decodeURIComponent(encodedPathname.replaceAll(/%(?![\da-f]{2})/giu, '%25'));
     } catch {
       response.writeHead(400);
       response.end();

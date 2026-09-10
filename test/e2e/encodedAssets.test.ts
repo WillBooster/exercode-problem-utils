@@ -18,12 +18,12 @@ test('PDF export loads relative assets with Japanese names, spaces and literal p
     const response = await fetch(`${server.url}/${encodeURIComponent(fileName)}`);
     expect(response.status).toBe(200);
     expect(await response.text()).toBe(svg);
-    const pdf = await markdownToPdf(`# Asset export\n\n![Illustration](${encodeURIComponent(fileName)})`, {
+    const pdf = await markdownToPdf(`# Asset export\n\n![Illustration](<${fileName}>)`, {
       assetDirectoryPath: directory,
     });
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
     expect(pdf.length).toBeGreaterThan(1000);
-    const malformed = await fetch(`${server.url}/%invalid`);
+    const malformed = await fetch(`${server.url}/%FF`);
     expect(malformed.status).toBe(400);
     const subsequentResponse = await fetch(`${server.url}/${encodeURIComponent(fileName)}`);
     expect(subsequentResponse.status).toBe(200);
