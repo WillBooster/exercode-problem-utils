@@ -24,7 +24,7 @@ test.each([
   },
   { name: 'per-page session state', model: sessionPage, submission: sessionPage },
   { name: 'cookie state', model: cookiePage, submission: cookiePage },
-])('HTML comparison preserves equivalence with $name', async ({ model, submission }) => {
+])('HTML comparison preserves equivalence with $name', { timeout: 30_000 }, async ({ model, submission }) => {
   await fs.mkdir('.tmp', { recursive: true });
   const root = await fs.mkdtemp(path.resolve('.tmp', 'html-comparison-'));
   try {

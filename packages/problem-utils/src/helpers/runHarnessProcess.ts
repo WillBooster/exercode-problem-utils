@@ -51,7 +51,8 @@ export function runHarnessProcess(
     const child = child_process.spawn(process.execPath, commandArgs, {
       cwd: options.cwd,
       detached: process.platform !== 'win32',
-      env: options.env,
+      // The parent removes this root even when SIGKILL prevents child cleanup.
+      env: options.tempRoot ? { ...options.env, TMPDIR: options.tempRoot } : options.env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     const liveRun: LiveHarnessRun | undefined =
