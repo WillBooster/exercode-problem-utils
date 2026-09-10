@@ -10,7 +10,7 @@ import {
   startHttpServer,
   type TestCaseResult,
 } from '@exercode/problem-utils';
-import type { BrowserContext, Page } from 'playwright-core';
+import type { BrowserContext, Page, Route } from 'playwright-core';
 import { format } from 'prettier';
 import prettierPluginOrganizeAttributes from 'prettier-plugin-organize-attributes';
 
@@ -176,9 +176,19 @@ export async function captureHtmlBodySnapshot(page: Page, url: string): Promise<
 
 export async function captureHtmlScreenshot(page: Page, url: string): Promise<Buffer> {
   const formattedHtml = await loadFormattedHtmlForScreenshot(url);
-  await (formattedHtml === undefined
-    ? page.goto(url, { waitUntil: 'load' })
-    : page.setContent(formattedHtml, { waitUntil: 'load' }));
+  if (formattedHtml === undefined) {
+    await page.goto(url, { waitUntil: 'load' });
+  } else {
+    // Keep the document URL so relative base elements and asset URLs resolve as served.
+    // Interception stays active until subresources finish loading.
+    const renderHtml = async (route: Route) => route.fulfill({ contentType: 'text/html', body: formattedHtml });
+    await page.route(url, renderHtml);
+    try {
+      await page.goto(url, { waitUntil: 'load' });
+    } finally {
+      await page.unroute(url, renderHtml);
+    }
+  }
 
   await page.evaluate(async () => {
     const style = document.createElement('style');
@@ -213,25 +223,10 @@ async function loadFormattedHtmlForScreenshot(url: string): Promise<string | und
       attributeIgnoreCase: false,
       attributeSort: 'ASC',
     });
-    return injectBaseTag(formattedHtml, url);
+    return formattedHtml;
   } catch {
     return undefined;
   }
-}
-
-function injectBaseTag(html: string, url: string): string {
-  if (/<base\s/i.test(html)) return html;
-
-  const baseTag = `<base href="${url}">`;
-  if (/<head[^>]*>/i.test(html)) {
-    return html.replace(/<head([^>]*)>/i, `<head$1>${baseTag}`);
-  }
-
-  if (/<html[^>]*>/i.test(html)) {
-    return html.replace(/<html([^>]*)>/i, `<html$1><head>${baseTag}</head>`);
-  }
-
-  return `<head>${baseTag}</head>${html}`;
 }
 
 export interface ServedDirectory {
