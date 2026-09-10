@@ -45,7 +45,7 @@ export async function browserJudgePreset(options: BrowserJudgePresetOptions): Pr
     page.setDefaultTimeout(options.timeoutMs ?? 5000);
     await page.goto(server.url, { waitUntil: 'domcontentloaded' });
     for (const [testCaseId, test] of options.testCases) {
-      const result = await test(page);
+      const result = { ...(await test(page)) };
       if (options.screenshotOnFailure && result.decisionCode !== DecisionCode.ACCEPTED) {
         try {
           result.outputFiles = [...(result.outputFiles ?? []), await captureScreenshot(page)];

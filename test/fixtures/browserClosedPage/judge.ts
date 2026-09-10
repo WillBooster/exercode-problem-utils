@@ -8,7 +8,7 @@ await browserJudgePreset({
       'closed_page',
       async (page) => {
         await page.close();
-        return { decisionCode: DecisionCode.WRONG_ANSWER, feedbackMarkdown: 'The answer is incorrect.' };
+        return Object.freeze({ decisionCode: DecisionCode.WRONG_ANSWER, feedbackMarkdown: 'The answer is incorrect.' });
       },
     ],
   ],

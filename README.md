@@ -47,7 +47,7 @@ The browser package depends on `playwright-core`; installing the package does no
 install Chromium. Install the matching Chromium with `playwright-core install chromium`
 in the environment containing that dependency. Docker/CI should install its OS
 libraries at image build/setup time. Browser versions must match the installed
-Playwright version.
+Playwright version. Install the fonts required by the course content in that environment.
 
 ## HTML comparison
 
@@ -62,7 +62,8 @@ page content; JavaScript timers, random content, and animated images are not fro
 
 Both directories can use the nearest ancestor's `assets` directory, through `assets/`
 or directly from the served root. Local assets are merged with that shared directory;
-submission files and links take precedence, followed by local assets. Source files and
+submission files and links take precedence, followed by local assets. A directory
+symlink overrides that entire directory rather than merging shared files into its target. Source files and
 linked directories are left unchanged. The temporary
 served directories and browser are closed after judging. `captureHtmlBodySnapshot`,
 `captureHtmlScreenshot`, and `createHtmlServedDirectory` expose the same operations
