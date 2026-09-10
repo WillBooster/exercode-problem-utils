@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { DecisionCode, parseArgs, printTestCaseResult, type TestCaseResult } from '../index.js';
 import { z } from 'zod';
 
@@ -380,7 +381,7 @@ async function waitForTomcatState(expectedRunning: boolean, timeoutMs: number): 
     if ((await isTomcatRunning()) === expectedRunning) {
       return true;
     }
-    await Bun.sleep(200);
+    await sleep(200);
   }
   return (await isTomcatRunning()) === expectedRunning;
 }

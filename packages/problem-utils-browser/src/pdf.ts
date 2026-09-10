@@ -62,7 +62,7 @@ export async function markdownToPdf(markdown: string, options: MarkdownPdfOption
     });
     return await page.pdf({
       printBackground: true,
-      format: 'A4',
+      format: options.pdfOptions?.width || options.pdfOptions?.height ? undefined : 'A4',
       margin: { top: '30mm', right: '40mm', bottom: '30mm', left: '20mm' },
       ...options.pdfOptions,
     });

@@ -123,7 +123,7 @@ images against `assetDirectoryPath`, and waits for fonts and images before print
 browser placeholders without preventing the document from exporting.
 Pass `mermaidScriptPath` pointing to a Mermaid browser bundle to render diagrams,
 `css` to customize styling, and `pdfOptions` for native Playwright PDF settings.
-The defaults use screen media, A4 paper, printed backgrounds, and margins of
+The defaults use screen media, A4 paper when no custom dimensions are supplied, printed backgrounds, and margins of
 30 mm top/bottom, 40 mm right, and 20 mm left. PDF rendering dependencies are loaded
 through this subpath; importing the browser judging entry point does not load them.
 
