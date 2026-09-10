@@ -56,7 +56,9 @@ page with the specified model-answer directory. It reports `snapshot_body` first
 then `screenshot`, stopping on the first difference. The DOM comparison ignores
 comments and normalizes text whitespace and attribute order. Screenshots render
 formatted HTML at 800×600, with CSS animations disabled and fonts loaded; a difference
-includes both PNG files. If either document cannot be formatted, both are rendered raw.
+includes both PNG files. HTML decoding honors a BOM or declared HTTP/meta charset, defaulting to UTF-8 when
+none is declared; formatted responses explicitly use UTF-8. If either document cannot
+be decoded or formatted, both are rendered raw.
 Each check uses fresh, separate browser contexts for both answers. Pixel comparison requires deterministic
 page content; JavaScript timers, random content, and animated images are not frozen. Missing required files are reported before starting Chromium.
 

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
+import { MIMEType } from 'node:util';
 
 import {
   DecisionCode,
@@ -9,6 +10,7 @@ import {
   startHttpServer,
   type TestCaseResult,
 } from '@exercode/problem-utils';
+import sniffHtmlEncoding from 'html-encoding-sniffer';
 import type { Page, Route } from 'playwright-core';
 import { format } from 'prettier';
 import prettierPluginOrganizeAttributes from 'prettier-plugin-organize-attributes';
@@ -188,7 +190,8 @@ async function capturePreparedHtmlScreenshot(page: Page, url: string, formattedH
   } else {
     // Keep the document URL so relative base elements and asset URLs resolve as served.
     // Interception stays active until subresources finish loading.
-    const renderHtml = async (route: Route) => route.fulfill({ contentType: 'text/html', body: formattedHtml });
+    const renderHtml = async (route: Route) =>
+      route.fulfill({ contentType: 'text/html; charset=utf-8', body: formattedHtml });
     await page.route(url, renderHtml);
     try {
       await page.goto(url, { waitUntil: 'load' });
@@ -221,7 +224,12 @@ async function loadFormattedHtmlForScreenshot(url: string): Promise<string | und
     const contentType = response.headers.get('content-type') ?? '';
     if (!contentType.includes('text/html')) return undefined;
 
-    const html = await response.text();
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const encoding = sniffHtmlEncoding(bytes, {
+      transportLayerEncodingLabel: new MIMEType(contentType).params.get('charset') ?? undefined,
+      defaultEncoding: 'utf8',
+    });
+    const html = new TextDecoder(encoding).decode(bytes);
     const formattedHtml = await format(html, {
       parser: 'html',
       htmlWhitespaceSensitivity: 'ignore',

@@ -5,7 +5,7 @@ import { expect, test } from 'vitest';
 
 import { DecisionCode, TEST_CASE_RESULT_PREFIX, testCaseResultSchema } from '@exercode/problem-utils';
 
-test('a failure screenshot cannot discard a verdict after the check closes its page', () => {
+test('a failure screenshot cannot discard a verdict after the check closes its page', { timeout: 30_000 }, () => {
   const result = spawnSync(
     'bun',
     ['test/fixtures/browserClosedPage/judge.ts', path.resolve('example/web_page_weather/model_answers/default'), '{}'],

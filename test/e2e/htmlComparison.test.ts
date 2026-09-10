@@ -16,6 +16,10 @@ const cookiePage = `<!doctype html><html><body><span id="count"></span><script>
   document.querySelector('#count').textContent = document.cookie;
 </script></body></html>`;
 
+const encodedPage = String.raw`<!doctype html><html><head><meta charset="utf8"></head><body><script>
+  document.body.style.backgroundColor = '日本語' === '\u65e5\u672c\u8a9e' ? 'navy' : 'red';
+</script></body></html>`;
+
 test.each([
   {
     name: 'browser recovery of a stray closing tag',
@@ -24,6 +28,16 @@ test.each([
   },
   { name: 'per-page session state', model: sessionPage, submission: sessionPage },
   { name: 'cookie state', model: cookiePage, submission: cookiePage },
+  {
+    name: 'Shift_JIS document encoding',
+    model: encodedPage,
+    submission: Buffer.from(
+      encodedPage
+        .replace('utf8', 'Shift_JIS')
+        .replace('日本語', String.fromCodePoint(0x93, 0xFA, 0x96, 0x7B, 0x8C, 0xEA)),
+      'latin1'
+    ),
+  },
 ])('HTML comparison preserves equivalence with $name', { timeout: 30_000 }, async ({ model, submission }) => {
   await fs.mkdir('.tmp', { recursive: true });
   const root = await fs.mkdtemp(path.resolve('.tmp', 'html-comparison-'));
