@@ -93,3 +93,23 @@ test('asset assembly and disposal leave linked source directories unchanged', as
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test('relative asset links resolve through the real shared asset directory', async () => {
+  await fs.mkdir('.tmp', { recursive: true });
+  const root = await fs.mkdtemp(path.resolve('.tmp', 'html-asset-alias-'));
+  try {
+    const store = path.join(root, 'store');
+    const problem = path.join(root, 'problem');
+    const submission = path.join(problem, 'answer');
+    await fs.mkdir(path.join(store, 'assets'), { recursive: true });
+    await fs.mkdir(submission, { recursive: true });
+    await fs.writeFile(path.join(store, 'target.txt'), 'shared target');
+    await fs.symlink('../target.txt', path.join(store, 'assets', 'item.txt'));
+    await fs.symlink('../store/assets', path.join(problem, 'assets'));
+    await using served = await createHtmlServedDirectory(submission);
+    expect(await fs.readFile(path.join(served.path, 'assets', 'item.txt'), 'utf8')).toBe('shared target');
+    expect(await fs.readFile(path.join(served.path, 'item.txt'), 'utf8')).toBe('shared target');
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});

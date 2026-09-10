@@ -272,10 +272,7 @@ async function mergeDirectory(sourceDirectoryPath: string, destinationDirectoryP
     if (entry.isDirectory()) {
       await mergeDirectory(sourcePath, destinationPath);
     } else if (!fs.lstatSync(destinationPath, { throwIfNoEntry: false })) {
-      const target = entry.isSymbolicLink()
-        ? path.resolve(sourceDirectoryPath, await fsPromises.readlink(sourcePath))
-        : sourcePath;
-      await fsPromises.symlink(target, destinationPath);
+      await fsPromises.symlink(sourcePath, destinationPath);
     }
   }
 }
