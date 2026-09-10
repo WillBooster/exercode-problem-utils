@@ -35,7 +35,12 @@ export async function browserJudgePreset(options: BrowserJudgePresetOptions): Pr
     for (const [testCaseId, test] of options.testCases) {
       const result = await test(page);
       if (options.screenshotOnFailure && result.decisionCode !== DecisionCode.ACCEPTED) {
-        result.outputFiles = [...(result.outputFiles ?? []), await captureScreenshot(page)];
+        try {
+          result.outputFiles = [...(result.outputFiles ?? []), await captureScreenshot(page)];
+        } catch (error) {
+          const message = `Screenshot capture failed: ${error instanceof Error ? error.message : String(error)}`;
+          result.stderr = result.stderr ? `${result.stderr}\n${message}` : message;
+        }
       }
       printTestCaseResult({ testCaseId, ...result });
       if (result.decisionCode !== DecisionCode.ACCEPTED) break;

@@ -39,8 +39,9 @@ prints each result, stops on the first non-accepted result, and closes the brows
 when a check throws. Checks return learner-facing verdicts; uncaught harness errors
 propagate to the caller. Use `timeoutMs`, `contextOptions`, and `launchOptions` to set
 problem-specific requirements. `screenshotOnFailure` attaches a full-page image to a
-non-accepted result. `launchBrowser` and `captureScreenshot` are also exported for
-harnesses that manage their own HTTP server or test loop.
+non-accepted result; capture failures are recorded in `stderr` without replacing the verdict.
+`launchBrowser` and `captureScreenshot` are also exported for harnesses that manage their
+own HTTP server or test loop.
 
 The browser package depends on `playwright-core`; installing the package does not
 install Chromium. Install the matching Chromium with `playwright-core install chromium`
