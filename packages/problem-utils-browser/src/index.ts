@@ -13,9 +13,10 @@ export { captureScreenshot, launchBrowser } from './browser.js';
 export {
   htmlJudgePreset,
   captureHtmlBodySnapshot,
-  captureHtmlScreenshot,
+  captureHtmlScreenshotPair,
   createHtmlServedDirectory,
   type HtmlJudgePresetOptions,
+  type HtmlScreenshotTarget,
   type ServedDirectory,
 } from './html.js';
 

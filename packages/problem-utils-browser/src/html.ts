@@ -94,18 +94,10 @@ async function testSnapshotBody(page: Page, solutionPage: Page, ctx: JudgeContex
 
 async function testScreenshot(page: Page, solutionPage: Page, ctx: JudgeContext): Promise<JudgeCaseResult> {
   try {
-    let [expectedHtml, actualHtml] = await Promise.all([
-      loadFormattedHtmlForScreenshot(ctx.solutionUrl),
-      loadFormattedHtmlForScreenshot(ctx.submissionUrl),
-    ]);
-    if (expectedHtml === undefined || actualHtml === undefined) {
-      expectedHtml = undefined;
-      actualHtml = undefined;
-    }
-    const [expectedScreenshot, actualScreenshot] = await Promise.all([
-      capturePreparedHtmlScreenshot(solutionPage, ctx.solutionUrl, expectedHtml),
-      capturePreparedHtmlScreenshot(page, ctx.submissionUrl, actualHtml),
-    ]);
+    const [expectedScreenshot, actualScreenshot] = await captureHtmlScreenshotPair(
+      { page: solutionPage, url: ctx.solutionUrl },
+      { page, url: ctx.submissionUrl }
+    );
     if (!expectedScreenshot.equals(actualScreenshot)) {
       return {
         decisionCode: DecisionCode.WRONG_ANSWER,
@@ -169,8 +161,25 @@ export async function captureHtmlBodySnapshot(page: Page, url: string): Promise<
   });
 }
 
-export async function captureHtmlScreenshot(page: Page, url: string): Promise<Buffer> {
-  return capturePreparedHtmlScreenshot(page, url, await loadFormattedHtmlForScreenshot(url));
+export interface HtmlScreenshotTarget {
+  page: Page;
+  url: string;
+}
+
+/** Captures both pages with a shared HTML formatting decision and returns their PNGs in input order. */
+export async function captureHtmlScreenshotPair(
+  expected: HtmlScreenshotTarget,
+  actual: HtmlScreenshotTarget
+): Promise<[Buffer, Buffer]> {
+  const [expectedHtml, actualHtml] = await Promise.all([
+    loadFormattedHtmlForScreenshot(expected.url),
+    loadFormattedHtmlForScreenshot(actual.url),
+  ]);
+  const canFormatBoth = expectedHtml !== undefined && actualHtml !== undefined;
+  return Promise.all([
+    capturePreparedHtmlScreenshot(expected.page, expected.url, canFormatBoth ? expectedHtml : undefined),
+    capturePreparedHtmlScreenshot(actual.page, actual.url, canFormatBoth ? actualHtml : undefined),
+  ]);
 }
 
 async function capturePreparedHtmlScreenshot(page: Page, url: string, formattedHtml?: string): Promise<Buffer> {

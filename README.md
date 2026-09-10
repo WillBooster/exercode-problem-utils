@@ -67,8 +67,10 @@ submission files and links take precedence, followed by local assets. A director
 symlink overrides that entire directory rather than merging shared files into its target. Source files and
 linked directories are left unchanged. The temporary
 served directories and browser are closed after judging. `captureHtmlBodySnapshot`,
-`captureHtmlScreenshot`, and `createHtmlServedDirectory` expose the same operations
-for custom checks. See the [HTML example](example/web_page_comparison/judge.ts).
+`captureHtmlScreenshotPair`, and `createHtmlServedDirectory` expose the same operations
+for custom checks. The screenshot pair takes two `{ page, url }` targets and returns
+PNGs in that order, formatting both documents or neither. Give those pages matching
+viewport options and separate fresh browser contexts. See the [HTML example](example/web_page_comparison/judge.ts).
 
 ## CLI
 
