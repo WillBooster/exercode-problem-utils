@@ -32,9 +32,7 @@ test.each([
     name: 'Shift_JIS document encoding',
     model: encodedPage,
     submission: Buffer.from(
-      encodedPage
-        .replace('utf8', 'Shift_JIS')
-        .replace('日本語', String.fromCodePoint(0x93, 0xFA, 0x96, 0x7B, 0x8C, 0xEA)),
+      encodedPage.replace('utf8', 'Shift_JIS').replace('日本語', Buffer.from('k/qWe4zq', 'base64').toString('latin1')),
       'latin1'
     ),
   },
