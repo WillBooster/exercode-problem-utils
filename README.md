@@ -57,7 +57,7 @@ then `screenshot`, stopping on the first difference. The DOM comparison ignores
 comments and normalizes text whitespace and attribute order. Screenshots render
 formatted HTML at 800×600, with CSS animations disabled and fonts loaded; a difference
 includes both PNG files. If either document cannot be formatted, both are rendered raw.
-Each check uses fresh pages for both answers. Pixel comparison requires deterministic
+Each check uses fresh, separate browser contexts for both answers. Pixel comparison requires deterministic
 page content; JavaScript timers, random content, and animated images are not frozen. Missing required files are reported before starting Chromium.
 
 For isolated judging, keep shared assets inside the problem directory.

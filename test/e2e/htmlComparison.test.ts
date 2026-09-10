@@ -10,6 +10,12 @@ const sessionPage = `<!doctype html><html><body><span id="count"></span><script>
   document.querySelector('#count').textContent = sessionStorage.count;
 </script></body></html>`;
 
+const cookiePage = `<!doctype html><html><body><span id="count"></span><script>
+  const previous = Number(document.cookie.split('=')[1] ?? '0');
+  document.cookie = 'visits=' + String(previous + 1) + '; path=/';
+  document.querySelector('#count').textContent = document.cookie;
+</script></body></html>`;
+
 test.each([
   {
     name: 'browser recovery of a stray closing tag',
@@ -17,6 +23,7 @@ test.each([
     submission: '<!doctype html><html><body><span>A</span><span>B</span></div></body></html>',
   },
   { name: 'per-page session state', model: sessionPage, submission: sessionPage },
+  { name: 'cookie state', model: cookiePage, submission: cookiePage },
 ])('HTML comparison preserves equivalence with $name', async ({ model, submission }) => {
   await fs.mkdir('.tmp', { recursive: true });
   const root = await fs.mkdtemp(path.resolve('.tmp', 'html-comparison-'));

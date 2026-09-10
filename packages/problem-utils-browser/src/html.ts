@@ -48,16 +48,15 @@ export async function htmlJudgePreset(options: HtmlJudgePresetOptions): Promise<
   await using solutionServer = startHttpServer(solutionDirectory.path);
   const browser = await launchBrowser();
   try {
-    const context = await browser.newContext({ viewport: { width: 800, height: 600 } });
-    context.setDefaultTimeout(30_000);
+    const pageOptions = { viewport: { width: 800, height: 600 } };
     const ctx: JudgeContext = { solutionUrl: solutionServer.url, submissionUrl: submissionServer.url };
     const checks = [
       ['snapshot_body', testSnapshotBody],
       ['screenshot', testScreenshot],
     ] as const;
     for (const [testCaseId, check] of checks) {
-      const actualPage = await context.newPage();
-      const solutionPage = await context.newPage();
+      const actualPage = await browser.newPage(pageOptions);
+      const solutionPage = await browser.newPage(pageOptions);
       try {
         const result = await check(actualPage, solutionPage, ctx);
         printTestCaseResult({ testCaseId, ...result });
