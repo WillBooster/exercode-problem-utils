@@ -58,3 +58,18 @@ test('PDF export still produces a page when images are missing or invalid', { ti
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('PDF export preserves prose after leading Markdown thematic breaks', { timeout: 30_000 }, async () => {
+  const prose = Array.from(
+    { length: 20 },
+    (_, index) => `Preface paragraph ${index} should remain in this document.`
+  ).join('\n\n');
+  for (const markdown of ['---\n\n' + prose, '---\n\n' + prose + '\n\n---\n\n# Main body']) {
+    const pdf = await markdownToPdf(markdown, {
+      assetDirectoryPath: process.cwd(),
+      pdfOptions: { width: '400px', height: '200px', margin: { top: 0, right: 0, bottom: 0, left: 0 } },
+    });
+    const pages = pdf.toString('latin1').match(/\/Type\s*\/Page\b/g);
+    expect(pages?.length).toBeGreaterThan(1);
+  }
+});

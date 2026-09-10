@@ -118,7 +118,7 @@ const pdf = await markdownToPdf(markdown, {
 await Bun.write('material.pdf', pdf);
 ```
 
-The PDF entry point renders Markdown with syntax highlighting, resolves relative
+The PDF entry point removes YAML mapping frontmatter, renders Markdown with syntax highlighting, and resolves relative
 images against `assetDirectoryPath`, and waits for fonts and images before printing. Missing or invalid images leave
 browser placeholders without preventing the document from exporting.
 Pass `mermaidScriptPath` pointing to a Mermaid browser bundle to render diagrams,

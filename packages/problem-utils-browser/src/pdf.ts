@@ -2,6 +2,7 @@ import { parseFrontmatter, startHttpServer } from '@exercode/problem-utils';
 import type { Page } from 'playwright-core';
 import { Marked } from 'marked';
 import hljs from 'highlight.js';
+import { z } from 'zod';
 import { launchBrowser } from './browser.js';
 import { markdownStyles, highlightStyles } from './markdownStyles.js';
 
@@ -25,7 +26,7 @@ export async function markdownToPdf(markdown: string, options: MarkdownPdfOption
       },
     },
   });
-  const body = await marked.parse(parseFrontmatter(markdown).body);
+  const body = await marked.parse(markdownBody(markdown));
   await using server = startHttpServer(options.assetDirectoryPath);
   const browser = await launchBrowser();
   try {
@@ -68,5 +69,14 @@ export async function markdownToPdf(markdown: string, options: MarkdownPdfOption
     });
   } finally {
     await browser.close();
+  }
+}
+
+function markdownBody(markdown: string): string {
+  try {
+    const parsed = parseFrontmatter(markdown);
+    return z.record(z.string(), z.unknown()).safeParse(parsed.attributes).success ? parsed.body : markdown;
+  } catch {
+    return markdown;
   }
 }
