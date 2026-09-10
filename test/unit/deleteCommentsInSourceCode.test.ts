@@ -3,8 +3,8 @@ import { assert, expect, test } from 'vitest';
 import {
   removeCommentsAndStringsInSourceCode,
   removeCommentsInSourceCode,
-} from '../../src/helpers/removeCommentsInSourceCode.js';
-import { languageIdToSourceCodeGrammar } from '../../src/helpers/sourceCodeGrammars.js';
+} from '../../packages/problem-utils/src/helpers/removeCommentsInSourceCode.js';
+import { languageIdToSourceCodeGrammar } from '../../packages/problem-utils/src/helpers/sourceCodeGrammars.js';
 
 test.each<[string, string, string]>([
   [
@@ -469,7 +469,7 @@ test('comment grammars preserve existing regex flags while adding global matchin
 });
 
 test('root exports expose source-code stripping helpers and grammars', async () => {
-  const exports = await import('../../src/index.js');
+  const exports = await import('../../packages/problem-utils/src/index.js');
   expect(exports.removeCommentsInSourceCode).toBe(removeCommentsInSourceCode);
   expect(exports.removeCommentsAndStringsInSourceCode).toBe(removeCommentsAndStringsInSourceCode);
   expect(exports.languageIdToSourceCodeGrammar.python).toBe(languageIdToSourceCodeGrammar.python);

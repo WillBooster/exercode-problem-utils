@@ -7,6 +7,77 @@
 
 :100: A set of utilities for judging programs on Exercode (https://exercode.willbooster.com/).
 
+## Packages
+
+| Package                           | Purpose                                                                                                  |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `@exercode/problem-utils`         | CLI, validation, result types, and stdio/command/GUI/evaluation presets; no browser or AI SDK dependency |
+| `@exercode/problem-utils-browser` | Playwright Chromium lifecycle, browser judging, and screenshots                                          |
+| `@exercode/problem-utils-llm`     | LLM judging and AI SDK providers                                                                         |
+
+Install only the packages the problem uses. Import `llmJudgePreset` from
+`@exercode/problem-utils-llm`. Browser judges receive Playwright's native `Page`:
+
+```ts
+import { DecisionCode } from '@exercode/problem-utils';
+import { browserJudgePreset } from '@exercode/problem-utils-browser';
+
+await browserJudgePreset({
+  testCases: [
+    [
+      'heading',
+      async (page) => ({
+        decisionCode: (await page.locator('h1').count()) === 1 ? DecisionCode.ACCEPTED : DecisionCode.WRONG_ANSWER,
+      }),
+    ],
+  ],
+});
+```
+
+The browser preset serves the submitted directory, runs checks in order on one page,
+prints each result, stops on the first non-accepted result, and closes the browser even
+when a check throws. Checks return learner-facing verdicts; uncaught harness errors
+propagate to the caller. Use `timeoutMs`, `contextOptions`, and `launchOptions` to set
+problem-specific requirements. `screenshotOnFailure` attaches a full-page image to a
+non-accepted result; capture failures are recorded in `stderr` without replacing the verdict.
+`launchBrowser` and `captureScreenshot` are also exported for harnesses that manage their
+own HTTP server or test loop.
+
+The browser package depends on `playwright-core`; installing the package does not
+install Chromium. Install the matching Chromium with `playwright-core install chromium`
+in the environment containing that dependency. Docker/CI should install its OS
+libraries at image build/setup time. Browser versions must match the installed
+Playwright version. Install the fonts required by the course content in that environment.
+
+## HTML comparison
+
+`htmlJudgePreset({ solutionDirectoryPath, requiredFiles? })` compares the submitted
+page with the specified model-answer directory. It reports `snapshot_body` first,
+then `screenshot`, stopping on the first difference. The DOM comparison ignores
+comments and normalizes text whitespace and attribute order. Screenshots render
+formatted HTML at 800×600, with CSS animations disabled and fonts loaded; a difference
+includes both PNG files. HTML decoding honors a BOM or declared HTTP/meta charset, defaulting to UTF-8 when
+none is declared; formatted responses explicitly use UTF-8. If either document cannot
+be decoded or formatted, both are rendered raw.
+Each check uses fresh, separate browser contexts for both answers. Pixel comparison requires deterministic
+page content; JavaScript timers, random content, and animated images are not frozen. Missing required files are reported before starting Chromium.
+
+For isolated judging, keep shared assets inside the problem directory.
+Both directories can use the nearest ancestor's `assets` directory, through `assets/`
+or directly from the served root. Local assets are merged with that shared directory;
+submission files and links take precedence, followed by local assets. A directory
+symlink overrides that entire directory rather than merging shared files into its target. Source files and
+linked directories are left unchanged. The temporary
+served directories and browser are closed after judging. The directory helpers leave
+process signals to the host. Hosts must provide and remove a per-run `TMPDIR` when a
+harness terminates before disposal; isolated CLI checks do this automatically for
+SIGINT, SIGTERM, and SIGKILL. Long-lived hosts can await disposal in their own
+shutdown handlers. `captureHtmlBodySnapshot`,
+`captureHtmlScreenshotPair`, and `createHtmlServedDirectory` expose the same operations
+for custom checks. The screenshot pair takes two `{ page, url }` targets and returns
+PNGs in that order, formatting both documents or neither. Give those pages matching
+viewport options and separate fresh browser contexts. See the [HTML example](example/web_page_comparison/judge.ts).
+
 ## CLI
 
 The package ships an `exercode-problem` command for problem authors (run it with `bun x` in a repository that depends on `@exercode/problem-utils`):
@@ -86,3 +157,5 @@ How a missing expectation is treated depends on the harness:
 ## Measurements
 
 `stdioJudgePreset`, `stdioDebugPreset`, and `commandJudgePreset` (with its default runner; a custom `runCommand` decides whether its results carry `cpuTimeSeconds`) run a program under GNU time (`/usr/bin/time` on Linux, `gtime` on macOS) and report its wall time (`timeSeconds`), user plus system CPU time (`cpuTimeSeconds`), and peak resident set size (`memoryBytes`, at least the footprint of the GNU `timeout` wrapper the program runs under, about 1 MiB) in every test case result; `guiCommandJudgePreset` reports the wall time and the peak resident set size, and `llmJudgePreset` the wall time only. Time limits are judged by wall time. The CPU time is recorded even for a run that exceeded its limit, so a judge server sharing CPUs between programs can tell a program that used up its limit (its CPU time, summed over its threads, reaches the limit, so it would exceed it on any single CPU) from one that may only have waited for a CPU (its CPU time stays below the limit) and re-run just the latter alone.
+
+`browserJudgePreset` forwards measurements returned by each check; it does not measure elapsed time, CPU time, or memory automatically. Its `timeoutMs` bounds individual Playwright operations, not the complete check. Checks that require their own measurements or time-limit verdicts must provide them explicitly. The hosting judge can independently limit the overall harness process.

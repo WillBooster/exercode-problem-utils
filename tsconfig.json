@@ -12,9 +12,11 @@
     "noUncheckedIndexedAccess": true,
     "outDir": "dist",
     "paths": {
-      "@exercode/problem-utils": ["./src/index.ts"],
-      "@exercode/problem-utils/presets/*": ["./src/presets/*.ts"],
-      "undici-types": ["./node_modules/undici-types/index.d.ts"]
+      "@exercode/problem-utils": ["./packages/problem-utils/src/index.ts"],
+      "@exercode/problem-utils/presets/*": ["./packages/problem-utils/src/presets/*.ts"],
+      "undici-types": ["./node_modules/undici-types/index.d.ts"],
+      "@exercode/problem-utils-browser": ["./packages/problem-utils-browser/dist/index.d.ts"],
+      "@exercode/problem-utils-llm": ["./packages/problem-utils-llm/src/index.ts"]
     },
     "resolveJsonModule": true,
     "rootDir": ".",
@@ -30,5 +32,11 @@
     "@tsconfig/node-ts/tsconfig.json",
     "@tsconfig/node24/tsconfig.json"
   ],
-  "include": ["*.config.ts", "scripts/**/*", "src/**/*", "test/**/*"]
+  "include": [
+    "*.config.ts",
+    "scripts/**/*",
+    "packages/problem-utils/src/**/*",
+    "packages/problem-utils-llm/src/**/*",
+    "test/**/*"
+  ]
 }

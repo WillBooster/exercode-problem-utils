@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from 'vitest';
 import { appendFile, cp, mkdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { validateCourseDirectory } from '../../src/learningMaterial/validateCourse.js';
-import { validateMaterialFile } from '../../src/learningMaterial/validateMaterial.js';
+import { validateCourseDirectory } from '../../packages/problem-utils/src/learningMaterial/validateCourse.js';
+import { validateMaterialFile } from '../../packages/problem-utils/src/learningMaterial/validateMaterial.js';
 import {
   cleanupTempDirs,
   copyFixtureToTempDir,

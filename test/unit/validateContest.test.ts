@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from 'vitest';
 import { readFile, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { validateContestFile } from '../../src/learningMaterial/validateContest.js';
+import { validateContestFile } from '../../packages/problem-utils/src/learningMaterial/validateContest.js';
 import { cleanupTempDirs, createTempDir, learningMaterialFixturesDir } from './learningMaterialTestHelpers.js';
 
 const problemsDir = join(learningMaterialFixturesDir, 'courses', 'example_course', 'problems');

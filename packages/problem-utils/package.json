@@ -1,0 +1,59 @@
+{
+  "name": "@exercode/problem-utils",
+  "version": "0.0.0-semantically-released",
+  "description": ":100: A set of utilities for judging programs on Exercode (https://exercode.willbooster.com/).",
+  "keywords": [
+    "exercode",
+    "judge"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WillBooster/exercode-problem-utils.git",
+    "directory": "packages/problem-utils"
+  },
+  "license": "Apache-2.0",
+  "author": "WillBooster Inc.",
+  "sideEffects": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./presets/*": {
+      "types": "./dist/presets/*.d.ts",
+      "import": "./dist/presets/*.js",
+      "require": "./dist/presets/*.cjs"
+    }
+  },
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "exercode-problem": "bin/exercode-problem.mjs"
+  },
+  "files": [
+    "bin/",
+    "dist/"
+  ],
+  "scripts": {
+    "build": "build-ts lib --input src/index.ts src/presets/*.ts src/cli/*.ts"
+  },
+  "prettier": "@willbooster/prettier-config",
+  "dependencies": {
+    "front-matter": "4.0.2",
+    "yaml": "2.9.0",
+    "zod": "4.5.2"
+  },
+  "devDependencies": {
+    "build-ts": "21.0.12"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

@@ -1,68 +1,38 @@
 {
-  "name": "@exercode/problem-utils",
+  "name": "exercode-problem-utils",
   "version": "0.0.0-semantically-released",
+  "private": true,
   "description": ":100: A set of utilities for judging programs on Exercode (https://exercode.willbooster.com/).",
-  "keywords": [
-    "exercode",
-    "judge"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/WillBooster/exercode-problem-utils.git"
-  },
   "license": "Apache-2.0",
   "author": "WillBooster Inc.",
-  "sideEffects": false,
   "type": "module",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
-    },
-    "./presets/*": {
-      "types": "./dist/presets/*.d.ts",
-      "import": "./dist/presets/*.js",
-      "require": "./dist/presets/*.cjs"
-    }
-  },
-  "main": "dist/index.cjs",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "bin": {
-    "exercode-problem": "bin/exercode-problem.mjs"
-  },
-  "files": [
-    "bin/",
-    "dist/"
+  "workspaces": [
+    "packages/*",
+    "example"
   ],
   "scripts": {
-    "build": "build-ts lib --input src/index.ts src/presets/*.ts src/cli/*.ts",
+    "build": "bun run --filter '@exercode/*' build",
+    "check-authoring": "bun run typecheck && bun oxlint --type-aware --type-check test example *.config.ts",
     "cleanup": "bun wb lint --fix --format",
     "format": "bun wb lint --format",
     "lint": "bun wb lint",
     "lint-fix": "bun wb lint --fix",
     "prepare": "(bun lefthook install || true) && (test ! -f .lefthook/normalize-bun-lockfile.sh || bash .lefthook/normalize-bun-lockfile.sh)",
-    "start": "bun src/index.ts",
-    "test": "bun wb test",
-    "test/ci": "bun wb test-on-ci",
-    "test/ci-setup": "bun run build && bun install --cwd example && cd example && bun run puppeteer browsers install chrome",
-    "typecheck": "bun wb typecheck",
-    "verify": "bun wb verify",
-    "verify-full": "bun wb verify --full"
+    "release": "wb release",
+    "start": "bun packages/problem-utils/src/index.ts",
+    "test": "bun run build && bun wb test",
+    "test/ci": "bun run check-authoring && bun wb test-on-ci",
+    "test/ci-setup": "bun run build && bunx playwright-core install chromium",
+    "typecheck": "bun run build && bun tsc --noEmit && bun tsc --noEmit -p example/tsconfig.json && bun tsc --noEmit -p packages/problem-utils-browser/tsconfig.json",
+    "verify": "bun run check-authoring && bun wb verify",
+    "verify-full": "bun run check-authoring && bun wb verify --full"
   },
   "prettier": "@willbooster/prettier-config",
-  "dependencies": {
-    "@ai-sdk/amazon-bedrock": "5.0.67",
-    "@ai-sdk/google": "4.0.57",
-    "@ai-sdk/openai": "4.0.51",
-    "@ai-sdk/xai": "4.0.49",
-    "ai": "7.0.84",
-    "front-matter": "4.0.2",
-    "yaml": "2.9.0",
-    "zod": "4.5.2"
-  },
   "devDependencies": {
+    "@anolilab/multi-semantic-release": "4.4.9",
+    "@exercode/problem-utils": "workspace:*",
+    "@exercode/problem-utils-browser": "workspace:*",
+    "@exercode/problem-utils-llm": "workspace:*",
     "@tsconfig/bun": "1.0.11",
     "@tsconfig/node-lts": "24.0.1",
     "@tsconfig/node-ts": "23.6.4",
@@ -79,9 +49,9 @@
     "oxfmt": "0.65.0",
     "oxlint": "1.80.0",
     "oxlint-tsgolint": "7.0.2001",
+    "playwright-core": "1.62.1",
     "prettier": "3.9.6",
     "prettier-plugin-java": "2.10.3",
-    "puppeteer": "25.9.0",
     "semantic-release": "25.0.9",
     "sort-package-json": "4.0.0",
     "typescript": "7.0.2",
@@ -90,8 +60,11 @@
   "engines": {
     "node": ">=24"
   },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
+  "multi-release": {
+    "tagFormat": "${name === '@exercode/problem-utils' ? 'v' : name + '@'}${version}",
+    "deps": {
+      "bump": "override",
+      "release": "patch"
+    }
   }
 }

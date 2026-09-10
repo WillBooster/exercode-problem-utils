@@ -6,7 +6,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 
 import { cleanupTempDirs, createTempDir, learningMaterialFixturesDir } from '../unit/learningMaterialTestHelpers.js';
 
-const cliPath = path.resolve('src/cli/exercodeProblem.ts');
+const cliPath = path.resolve('packages/problem-utils/src/cli/exercodeProblem.ts');
 const problemsDir = path.join(learningMaterialFixturesDir, 'courses', 'example_course', 'problems');
 
 describe('exercode-problem validate-* CLI', () => {

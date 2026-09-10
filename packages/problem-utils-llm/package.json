@@ -1,0 +1,49 @@
+{
+  "name": "@exercode/problem-utils-llm",
+  "version": "0.0.0-semantically-released",
+  "description": "Exercode llm judging utilities",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WillBooster/exercode-problem-utils.git",
+    "directory": "packages/problem-utils-llm"
+  },
+  "license": "Apache-2.0",
+  "author": "WillBooster Inc.",
+  "sideEffects": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build": "build-ts lib --input src/index.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/amazon-bedrock": "5.0.67",
+    "@ai-sdk/google": "4.0.57",
+    "@ai-sdk/openai": "4.0.51",
+    "@ai-sdk/xai": "4.0.49",
+    "@exercode/problem-utils": "workspace:*",
+    "ai": "7.0.84",
+    "zod": "4.5.2"
+  },
+  "devDependencies": {
+    "build-ts": "21.0.12"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

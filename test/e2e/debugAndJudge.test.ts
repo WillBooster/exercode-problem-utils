@@ -5,8 +5,11 @@ import path from 'node:path';
 
 import { expect, test } from 'vitest';
 
-import type { TestCaseResult } from '../../src/types/testCaseResult.js';
-import { TEST_CASE_RESULT_PREFIX, testCaseResultSchema } from '../../src/types/testCaseResult.js';
+import type { TestCaseResult } from '../../packages/problem-utils/src/types/testCaseResult.js';
+import {
+  TEST_CASE_RESULT_PREFIX,
+  testCaseResultSchema,
+} from '../../packages/problem-utils/src/types/testCaseResult.js';
 
 const acceptedTestCaseResultsForAPlusB = [
   {
@@ -321,7 +324,7 @@ test.each<
   // a_plus_b_file has no judge.ts, so the exercode-problem CLI's judge subcommand applies stdioJudgePreset (like the server).
   [
     'example/a_plus_b_file',
-    '../../src/cli/exercodeProblem.ts judge',
+    '../../packages/problem-utils/src/cli/exercodeProblem.ts judge',
     'model_answers/javascript',
     {},
     {},
@@ -329,7 +332,7 @@ test.each<
   ],
   [
     'example/a_plus_b_file',
-    '../../src/cli/exercodeProblem.ts judge',
+    '../../packages/problem-utils/src/cli/exercodeProblem.ts judge',
     'model_answers.test/javascript_mrofe',
     {},
     {},
@@ -347,7 +350,7 @@ test.each<
   ],
   [
     'example/a_plus_b_file',
-    '../../src/cli/exercodeProblem.ts judge',
+    '../../packages/problem-utils/src/cli/exercodeProblem.ts judge',
     'model_answers.test/javascript_wa',
     {},
     {},
@@ -455,11 +458,62 @@ test.each<
     ],
   ],
 
+  // HTML comparison
+  [
+    'example/web_page_comparison',
+    'judge.ts',
+    'model_answers/default',
+    {},
+    {},
+    [
+      { testCaseId: 'snapshot_body', decisionCode: 2000 },
+      { testCaseId: 'screenshot', decisionCode: 2000 },
+    ],
+  ],
+  [
+    'example/web_page_comparison',
+    'judge.ts',
+    'model_answers.test/wrong_structure',
+    {},
+    {},
+    [{ testCaseId: 'snapshot_body', decisionCode: 1000, feedbackMarkdown: 'HTMLの構造が模範解答と一致しません。' }],
+  ],
+  [
+    'example/web_page_comparison',
+    'judge.ts',
+    'model_answers.test/wrong_style',
+    {},
+    {},
+    [
+      { testCaseId: 'snapshot_body', decisionCode: 2000 },
+      {
+        testCaseId: 'screenshot',
+        decisionCode: 1000,
+        feedbackMarkdown: 'スクリーンショットが模範解答と一致しません。',
+        outputFiles: [
+          { path: 'screenshot_expected.png', data: expect.any(String), encoding: 'base64' },
+          { path: 'screenshot_received.png', data: expect.any(String), encoding: 'base64' },
+        ],
+      },
+    ],
+  ],
   // startHttpServer
   [
     'example/web_page_weather',
     'judge.ts',
     'model_answers/default',
+    {},
+    {},
+    [
+      { testCaseId: '01_h1', decisionCode: 2000 },
+      { testCaseId: '02_hr', decisionCode: 2000 },
+      { testCaseId: '03_p', decisionCode: 2000 },
+    ],
+  ],
+  [
+    'example/web_page_weather',
+    'judge.ts',
+    'model_answers.test/extra_elements',
     {},
     {},
     [
@@ -596,7 +650,7 @@ test.each<
     const tempDir = await fs.promises.mkdtemp(path.join('temp', 'judge_'));
     await fs.promises.cp(cwd, tempDir, { recursive: true });
 
-    // scriptFilename may carry a CLI subcommand (e.g. "../../src/cli/exercodeProblem.ts judge").
+    // scriptFilename may carry a CLI subcommand (e.g. "../../packages/problem-utils/src/cli/exercodeProblem.ts judge").
     const spawnResult = child_process.spawnSync(
       'bun',
       ['run', ...scriptFilename.split(' '), argsCwd, JSON.stringify(argsParams)],
@@ -628,7 +682,7 @@ test('debug mode derives the isolation check budget from timeLimitMs', { timeout
   const shimDir = path.join(tempDir, 'node_modules', '@exercode', 'problem-utils');
   await fs.promises.mkdir(shimDir, { recursive: true });
   await fs.promises.symlink(
-    path.resolve('src'),
+    path.resolve('packages/problem-utils/src'),
     path.join(shimDir, 'src'),
     process.platform === 'win32' ? 'junction' : 'dir'
   );

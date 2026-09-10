@@ -4,7 +4,10 @@ import path from 'node:path';
 
 import { expect, test } from 'vitest';
 
-import { findDefaultStdioHarnessFiles, isDefaultStdioHarnessSource } from '../../src/helpers/defaultStdioHarness.js';
+import {
+  findDefaultStdioHarnessFiles,
+  isDefaultStdioHarnessSource,
+} from '../../packages/problem-utils/src/helpers/defaultStdioHarness.js';
 
 const defaultJudgeSource = `import { stdioJudgePreset } from '@exercode/problem-utils/presets/stdio';
 

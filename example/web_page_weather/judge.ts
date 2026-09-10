@@ -1,16 +1,15 @@
-import { DecisionCode, parseArgs, printTestCaseResult, startHttpServer } from '@exercode/problem-utils';
+import { DecisionCode } from '@exercode/problem-utils';
 import type { TestCaseResult } from '@exercode/problem-utils';
 import assert from 'node:assert';
-import { launch } from 'puppeteer';
-import type { Page } from 'puppeteer';
+import { browserJudgePreset, type Page } from '@exercode/problem-utils-browser';
 
 const TEST_CASES: readonly [string, (page: Page) => Promise<Omit<TestCaseResult, 'testCaseId'>>][] = [
   [
     '01_h1',
     async (page) => {
       try {
-        const h1Handle = await page.locator('h1').waitHandle();
-        const h1Text = await h1Handle.evaluate((e: { textContent?: string }) => e.textContent?.trim() ?? '');
+        const heading = await page.locator('h1').first().textContent();
+        const h1Text = heading?.trim() ?? '';
         assert.strictEqual(h1Text, '今日の天気予報');
       } catch (error) {
         return {
@@ -26,7 +25,7 @@ const TEST_CASES: readonly [string, (page: Page) => Promise<Omit<TestCaseResult,
     '02_hr',
     async (page) => {
       try {
-        await page.locator('hr').waitHandle();
+        await page.locator('hr').first().waitFor({ state: 'attached' });
       } catch (error) {
         return {
           decisionCode: DecisionCode.WRONG_ANSWER,
@@ -64,22 +63,4 @@ const TEST_CASES: readonly [string, (page: Page) => Promise<Omit<TestCaseResult,
   ],
 ];
 
-const args = parseArgs(process.argv);
-if (!args.cwd) throw new Error('cwd argument required');
-await using server = startHttpServer(args.cwd);
-
-const browser = await launch({
-  args: process.env.CI || process.env.WB_DOCKER === '1' ? ['--no-sandbox', '--disable-setuid-sandbox'] : [],
-});
-const page = await browser.newPage();
-page.setDefaultTimeout(1000);
-
-await page.goto(server.url, { waitUntil: 'domcontentloaded' });
-
-for (const [testCaseId, test] of TEST_CASES) {
-  const result = await test(page);
-  printTestCaseResult({ testCaseId, ...result });
-  if (result.decisionCode !== DecisionCode.ACCEPTED) break;
-}
-
-await browser.close();
+await browserJudgePreset({ testCases: TEST_CASES, timeoutMs: 1000 });

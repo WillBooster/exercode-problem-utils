@@ -5,7 +5,7 @@ import path from 'node:path';
 
 import { expect, test } from 'vitest';
 
-import { spawnWithTimeout } from '../../src/helpers/spawnWithTimeout.js';
+import { spawnWithTimeout } from '../../packages/problem-utils/src/helpers/spawnWithTimeout.js';
 
 const context = { cwd: process.cwd(), env: process.env };
 
@@ -152,7 +152,7 @@ test('ends the program at its limit even after the judge process was killed', { 
   const judgePath = path.join(judgeDir, 'judge.ts');
   await fs.writeFile(
     judgePath,
-    `import { spawnWithTimeout } from ${JSON.stringify(path.resolve('src/helpers/spawnWithTimeout.ts'))};
+    `import { spawnWithTimeout } from ${JSON.stringify(path.resolve('packages/problem-utils/src/helpers/spawnWithTimeout.ts'))};
 await spawnWithTimeout('sh', ['-c', 'sleep 30; echo ${marker}'], { cwd: process.cwd(), env: process.env }, 1);`
   );
   const judge = childProcess.spawn('bun', [judgePath], { stdio: 'ignore' });

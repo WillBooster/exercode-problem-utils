@@ -9,11 +9,13 @@ import type { LanguageModel, ModelMessage } from 'ai';
 import { generateText } from 'ai';
 import { z } from 'zod';
 
-import { parseArgs } from '../helpers/parseArgs.js';
-import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
-import { readTestCases } from '../helpers/readTestCases.js';
-import { DecisionCode } from '../types/decisionCode.js';
-import type { TestCaseResult } from '../types/testCaseResult.js';
+import {
+  parseArgs,
+  printTestCaseResult,
+  readTestCases,
+  DecisionCode,
+  type TestCaseResult,
+} from '@exercode/problem-utils';
 
 const PROMPT_FILENAME = 'prompt.txt';
 
@@ -57,7 +59,7 @@ interface LlmJudgePresetOptions {
  * @example
  * Create `judge.ts`:
  * ```ts
- * import { llmJudgePreset } from '@exercode/problem-utils/presets/llm';
+ * import { llmJudgePreset } from '@exercode/problem-utils-llm';
  * import { DecisionCode } from '@exercode/problem-utils';
  *
  * await llmJudgePreset(import.meta.dirname, {

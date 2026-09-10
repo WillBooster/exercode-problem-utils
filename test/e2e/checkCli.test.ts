@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import { afterAll, expect, test } from 'vitest';
 
-const cliPath = path.resolve('src/cli/exercodeProblem.ts');
+const cliPath = path.resolve('packages/problem-utils/src/cli/exercodeProblem.ts');
 
 const tempRoots: string[] = [];
 afterAll(async () => {
@@ -122,5 +122,33 @@ test(
     if (result.stderr) console.error(result.stderr);
     expect(result.stdout).toContain('1 passed, 0 failed');
     expect(result.status).toBe(0);
+  }
+);
+
+test.each(['SIGINT', 'SIGTERM', 'SIGKILL'] as const)(
+  'check removes HTML serving files after a harness receives %s',
+  { timeout: 120_000 },
+  async (signal) => {
+    const tempRoot = await copyProblemToTempRoot();
+    const marker = path.resolve(tempRoot, 'served-directory.txt');
+    const problemDir = path.join(tempRoot, 'a_plus_b_file');
+    await fs.promises.writeFile(
+      path.join(problemDir, 'judge.ts'),
+      `import { writeFileSync } from 'node:fs';
+import { createHtmlServedDirectory } from '@exercode/problem-utils-browser';
+const directory = await createHtmlServedDirectory(process.argv[2]);
+writeFileSync(${JSON.stringify(marker)}, directory.path);
+process.kill(process.pid, ${JSON.stringify(signal)});
+`
+    );
+    const result = runCheck(tempRoot);
+    const servedDirectory = await fs.promises.readFile(marker, 'utf8');
+    try {
+      expect(result.status, result.stderr).toBe(1);
+      expect(fs.existsSync(servedDirectory)).toBe(false);
+      expect(fs.existsSync(path.join(problemDir, 'model_answers', 'javascript', 'main.mjs'))).toBe(true);
+    } finally {
+      await fs.promises.rm(servedDirectory, { recursive: true, force: true });
+    }
   }
 );

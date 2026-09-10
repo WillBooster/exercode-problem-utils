@@ -1,4 +1,4 @@
-import { llmJudgePreset } from '@exercode/problem-utils/presets/llm';
+import { llmJudgePreset } from '@exercode/problem-utils-llm';
 import { DecisionCode } from '@exercode/problem-utils';
 
 await llmJudgePreset(import.meta.dirname, {

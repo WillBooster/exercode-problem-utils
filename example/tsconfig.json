@@ -1,10 +1,4 @@
 {
-  "compilerOptions": {
-    "paths": {
-      "@exercode/problem-utils": ["../src/index.ts"],
-      "@exercode/problem-utils/presets/*": ["../src/presets/*.ts"]
-    }
-  },
   "extends": "../tsconfig.json",
   "include": ["**/*.ts"]
 }

@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { expect, test } from 'vitest';
 
-import { findEntryPointFile } from '../../src/helpers/findEntryPointFile.js';
+import { findEntryPointFile } from '../../packages/problem-utils/src/helpers/findEntryPointFile.js';
 
 test.each<[string | readonly string[] | undefined, readonly string[], string | undefined]>([
   [undefined, ['a.c', 'b.c', 'index.c', 'main.c', 'A.java', 'B.java', 'Index.java', 'Main.java'], 'main.c'],

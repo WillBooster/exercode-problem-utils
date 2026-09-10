@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { parseCsv, parseCsvRecords } from '../../src/helpers/parseCsv.js';
+import { parseCsv, parseCsvRecords } from '../../packages/problem-utils/src/helpers/parseCsv.js';
 
 describe('parseCsv', () => {
   test.each<[string, string, string[][]]>([
