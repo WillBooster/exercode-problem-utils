@@ -58,7 +58,7 @@ export async function markdownToPdf(markdown: string, options: MarkdownPdfOption
     await page.emulateMedia({ media: 'screen' });
     await page.evaluate(async () => {
       await document.fonts.ready;
-      await Promise.all(Array.from(document.images, (image) => image.decode()));
+      await Promise.allSettled(Array.from(document.images, (image) => image.decode()));
     });
     return await page.pdf({
       printBackground: true,

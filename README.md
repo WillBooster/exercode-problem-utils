@@ -119,7 +119,8 @@ await Bun.write('material.pdf', pdf);
 ```
 
 The PDF entry point renders Markdown with syntax highlighting, resolves relative
-images against `assetDirectoryPath`, and waits for fonts and images before printing.
+images against `assetDirectoryPath`, and waits for fonts and images before printing. Missing or invalid images leave
+browser placeholders without preventing the document from exporting.
 Pass `mermaidScriptPath` pointing to a Mermaid browser bundle to render diagrams,
 `css` to customize styling, and `pdfOptions` for native Playwright PDF settings.
 The defaults use screen media, A4 paper, printed backgrounds, and margins of
