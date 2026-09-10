@@ -68,9 +68,11 @@ or directly from the served root. Local assets are merged with that shared direc
 submission files and links take precedence, followed by local assets. A directory
 symlink overrides that entire directory rather than merging shared files into its target. Source files and
 linked directories are left unchanged. The temporary
-served directories and browser are closed after judging. Hosts that forcibly kill a
-harness must provide and remove a per-run `TMPDIR`; isolated CLI checks do this
-automatically, including when the harness receives SIGKILL. `captureHtmlBodySnapshot`,
+served directories and browser are closed after judging. The directory helpers leave
+process signals to the host. Hosts must provide and remove a per-run `TMPDIR` when a
+harness terminates before disposal; isolated CLI checks do this automatically for
+SIGINT, SIGTERM, and SIGKILL. Long-lived hosts can await disposal in their own
+shutdown handlers. `captureHtmlBodySnapshot`,
 `captureHtmlScreenshotPair`, and `createHtmlServedDirectory` expose the same operations
 for custom checks. The screenshot pair takes two `{ page, url }` targets and returns
 PNGs in that order, formatting both documents or neither. Give those pages matching
