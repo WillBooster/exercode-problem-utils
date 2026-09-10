@@ -458,6 +458,45 @@ test.each<
     ],
   ],
 
+  // HTML comparison
+  [
+    'example/web_page_comparison',
+    'judge.ts',
+    'model_answers/default',
+    {},
+    {},
+    [
+      { testCaseId: 'snapshot_body', decisionCode: 2000 },
+      { testCaseId: 'screenshot', decisionCode: 2000 },
+    ],
+  ],
+  [
+    'example/web_page_comparison',
+    'judge.ts',
+    'model_answers.test/wrong_structure',
+    {},
+    {},
+    [{ testCaseId: 'snapshot_body', decisionCode: 1000, feedbackMarkdown: 'HTMLの構造が模範解答と一致しません。' }],
+  ],
+  [
+    'example/web_page_comparison',
+    'judge.ts',
+    'model_answers.test/wrong_style',
+    {},
+    {},
+    [
+      { testCaseId: 'snapshot_body', decisionCode: 2000 },
+      {
+        testCaseId: 'screenshot',
+        decisionCode: 1000,
+        feedbackMarkdown: 'スクリーンショットが模範解答と一致しません。',
+        outputFiles: [
+          { path: 'screenshot_expected.png', data: expect.any(String), encoding: 'base64' },
+          { path: 'screenshot_received.png', data: expect.any(String), encoding: 'base64' },
+        ],
+      },
+    ],
+  ],
   // startHttpServer
   [
     'example/web_page_weather',

@@ -49,6 +49,21 @@ in the environment containing that dependency. Docker/CI should install its OS
 libraries at image build/setup time. Browser versions must match the installed
 Playwright version.
 
+## HTML comparison
+
+`htmlJudgePreset({ solutionDirectoryPath, requiredFiles? })` compares the submitted
+page with the specified model-answer directory. It reports `snapshot_body` first,
+then `screenshot`, stopping on the first difference. The DOM comparison ignores
+comments and normalizes text whitespace and attribute order. Screenshots render
+formatted HTML at 800×600, with animations disabled and fonts loaded; a difference
+includes both PNG files. Missing required files are reported before starting Chromium.
+
+Both directories can use the nearest ancestor's `assets` directory, through `assets/`
+or directly from the served root; submission files take precedence. The temporary
+served directories and browser are closed after judging. `captureHtmlBodySnapshot`,
+`captureHtmlScreenshot`, and `createHtmlServedDirectory` expose the same operations
+for custom checks. See the [HTML example](example/web_page_comparison/judge.ts).
+
 ## CLI
 
 The package ships an `exercode-problem` command for problem authors (run it with `bun x` in a repository that depends on `@exercode/problem-utils`):
