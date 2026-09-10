@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { compareStdoutAsSpaceSeparatedTokens } from '../../src/helpers/compareStdoutAsSpaceSeparatedTokens.js';
+import { compareStdoutAsSpaceSeparatedTokens } from '../../packages/problem-utils/src/helpers/compareStdoutAsSpaceSeparatedTokens.js';
 
 test.each<[string, string, boolean]>([
   [' 123\n 456\n', '123 456', true],

@@ -4,7 +4,10 @@ import path from 'node:path';
 
 import { expect, test } from 'vitest';
 
-import { TEST_CASE_RESULT_PREFIX, testCaseResultSchema } from '../../src/types/testCaseResult.js';
+import {
+  TEST_CASE_RESULT_PREFIX,
+  testCaseResultSchema,
+} from '../../packages/problem-utils/src/types/testCaseResult.js';
 
 for (const disposableWorkingDirectory of [false, true]) {
   test(
@@ -23,7 +26,7 @@ for (const disposableWorkingDirectory of [false, true]) {
         );
         await fs.writeFile(
           path.join(root, 'debug.ts'),
-          `import { stdioDebugPreset } from ${JSON.stringify(path.resolve('src/presets/stdio.ts'))};\nawait stdioDebugPreset(import.meta.dirname, { disposableWorkingDirectory: ${disposableWorkingDirectory} });\n`
+          `import { stdioDebugPreset } from ${JSON.stringify(path.resolve('packages/problem-utils/src/presets/stdio.ts'))};\nawait stdioDebugPreset(import.meta.dirname, { disposableWorkingDirectory: ${disposableWorkingDirectory} });\n`
         );
         const run = childProcess.spawnSync('bun', ['run', 'debug.ts', answer, JSON.stringify({ stdin: 'hello' })], {
           cwd: root,

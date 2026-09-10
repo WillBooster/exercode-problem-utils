@@ -4,8 +4,11 @@ import path from 'node:path';
 
 import { expect, test } from 'vitest';
 
-import { DecisionCode } from '../../src/types/decisionCode.js';
-import { TEST_CASE_RESULT_PREFIX, testCaseResultSchema } from '../../src/types/testCaseResult.js';
+import { DecisionCode } from '../../packages/problem-utils/src/types/decisionCode.js';
+import {
+  TEST_CASE_RESULT_PREFIX,
+  testCaseResultSchema,
+} from '../../packages/problem-utils/src/types/testCaseResult.js';
 
 test(
   'stdio judging enforces file and source rules while ignoring comments and non-source assets',
@@ -23,7 +26,7 @@ test(
       await fs.writeFile(path.join(answer, 'asset.txt'), 'forbidden');
       await fs.writeFile(
         path.join(root, 'judge.ts'),
-        `import { stdioJudgePreset } from ${JSON.stringify(path.resolve('src/presets/stdio.ts'))};\nawait stdioJudgePreset(import.meta.dirname);\n`
+        `import { stdioJudgePreset } from ${JSON.stringify(path.resolve('packages/problem-utils/src/presets/stdio.ts'))};\nawait stdioJudgePreset(import.meta.dirname);\n`
       );
       const judge = async (rules: string): Promise<number> => {
         await fs.writeFile(path.join(root, 'problem.md'), `---\n${rules}\n---\n`);

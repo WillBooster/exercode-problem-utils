@@ -1,0 +1,44 @@
+{
+  "name": "@exercode/problem-utils-browser",
+  "version": "0.0.0-semantically-released",
+  "description": "Exercode browser judging utilities",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WillBooster/exercode-problem-utils.git",
+    "directory": "packages/problem-utils-browser"
+  },
+  "license": "Apache-2.0",
+  "author": "WillBooster Inc.",
+  "sideEffects": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build": "build-ts lib --input src/index.ts"
+  },
+  "dependencies": {
+    "@exercode/problem-utils": "workspace:*",
+    "playwright-core": "1.62.1"
+  },
+  "devDependencies": {
+    "build-ts": "21.0.12"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
