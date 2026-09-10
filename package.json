@@ -20,10 +20,10 @@
     "prepare": "(bun lefthook install || true) && (test ! -f .lefthook/normalize-bun-lockfile.sh || bash .lefthook/normalize-bun-lockfile.sh)",
     "release": "wb release",
     "start": "bun packages/problem-utils/src/index.ts",
-    "test": "bun wb test",
+    "test": "bun run build && bun wb test",
     "test/ci": "bun run check-authoring && bun wb test-on-ci",
     "test/ci-setup": "bun run build && bunx playwright-core install chromium",
-    "typecheck": "bun tsc --noEmit && bun tsc --noEmit -p example/tsconfig.json",
+    "typecheck": "bun tsc --noEmit && bun tsc --noEmit -p example/tsconfig.json && bun tsc --noEmit -p packages/problem-utils-browser/tsconfig.json",
     "verify": "bun run build && bun run check-authoring && bun wb verify",
     "verify-full": "bun run build && bun run check-authoring && bun wb verify --full"
   },

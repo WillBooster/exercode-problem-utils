@@ -1,0 +1,6 @@
+{
+  "facts": [
+    "This library is not an OS sandbox. The judge deployment runs the entire harness and learner program as the same request sandbox user; server credentials remain in the privileged server process. Callers supply process isolation for untrusted programs. Preventing learners from reading model answers or their own request files is outside the security policy; do not add a harness/submission privilege split or symlink containment between them. Serving links does not grant filesystem permissions beyond the caller's OS user. Temporary asset assembly must nevertheless leave source files and linked directories unchanged.",
+    "The HTML comparison preset retains the existing course harness contract: pixel equality of deterministic pages. It disables CSS animations and transitions and waits for fonts, but does not freeze JavaScript timers, randomness, or animated image frames. Dynamic exercises must use custom browser checks.",
+  ],
+}

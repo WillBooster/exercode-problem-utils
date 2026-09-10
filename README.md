@@ -55,11 +55,15 @@ Playwright version.
 page with the specified model-answer directory. It reports `snapshot_body` first,
 then `screenshot`, stopping on the first difference. The DOM comparison ignores
 comments and normalizes text whitespace and attribute order. Screenshots render
-formatted HTML at 800×600, with animations disabled and fonts loaded; a difference
-includes both PNG files. Missing required files are reported before starting Chromium.
+formatted HTML at 800×600, with CSS animations disabled and fonts loaded; a difference
+includes both PNG files. If either document cannot be formatted, both are rendered raw.
+Each check uses fresh pages for both answers. Pixel comparison requires deterministic
+page content; JavaScript timers, random content, and animated images are not frozen. Missing required files are reported before starting Chromium.
 
 Both directories can use the nearest ancestor's `assets` directory, through `assets/`
-or directly from the served root; submission files take precedence. The temporary
+or directly from the served root. Local assets are merged with that shared directory;
+submission files and links take precedence, followed by local assets. Source files and
+linked directories are left unchanged. The temporary
 served directories and browser are closed after judging. `captureHtmlBodySnapshot`,
 `captureHtmlScreenshot`, and `createHtmlServedDirectory` expose the same operations
 for custom checks. See the [HTML example](example/web_page_comparison/judge.ts).
