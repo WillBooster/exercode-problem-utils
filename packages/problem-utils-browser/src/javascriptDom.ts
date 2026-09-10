@@ -73,7 +73,8 @@ export async function javascriptDomJudgePreset(problemDir: string): Promise<void
 
         // Run setup code from .in file (NOT wrapped - window.test etc. need global scope)
         if (input.trim()) {
-          await page.evaluate(input);
+          // oxlint-disable-next-line no-eval -- Setup needs global script semantics without Playwright's function-expression normalization.
+          await page.evaluate((source) => globalThis.eval(source), input);
         }
 
         const autoCallTest = input.includes('window.test =') && !userProgram.includes('test()') ? 'test?.();' : '';
