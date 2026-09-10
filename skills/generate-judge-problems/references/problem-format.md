@@ -32,10 +32,13 @@ harness. A CUSTOM `debug.ts` without `judge.ts` is allowed: the judge runs `debu
 is present, so it can customize debugging for a problem judged by the default stdio judge.
 
 Only custom judges (GUI, LLM, command-based, and other special judging) provide a `judge.ts`, using
-helpers such as `commandJudgePreset`, `guiCommandJudgePreset`, and `llmJudgePreset` from
-`@exercode/problem-utils`. A custom judge should ship a `debug.ts` as well; without it the debug
-feature is unavailable for the problem. `judge.ts` and `debug.ts` may import only files inside the
-problem directory (put shared helper code in the problem directory and import it with `./...`):
+`commandJudgePreset` from `@exercode/problem-utils/presets/command`, `guiCommandJudgePreset`
+from `@exercode/problem-utils/presets/guiCommand`, `llmJudgePreset` from
+`@exercode/problem-utils-llm`, or `browserJudgePreset` from `@exercode/problem-utils-browser`.
+Declare the packages the harness imports in the repository's dependencies. A custom judge should
+ship a `debug.ts` as well; without it the debug feature is unavailable for the problem.
+Relative imports in `judge.ts` and `debug.ts` must stay inside the problem directory; reuse
+cross-problem helpers through declared packages instead of importing from a parent directory:
 the judge server and `bunx exercode-problem <problemsDir>` judge a copy of the problem directory
 alone, so an import from the course or repository root breaks there even though
 `bunx exercode-problem judge` in the checked-out directory still works.
