@@ -23,8 +23,7 @@
     "skipLibCheck": true,
     "sourceMap": true,
     "strict": true,
-    "types": ["node", "vitest/globals", "bun"],
-    "lib": ["ESNext"]
+    "types": ["node", "vitest/globals", "bun"]
   },
   "exclude": ["test/fixtures"],
   "extends": [
