@@ -278,7 +278,7 @@ async function startTomcat(catalinaHome: string, catalinaBaseDir: string): Promi
 
 function runJudgeScript(buildDir: string, problemDirectoryPath: string): JudgeResult {
   const commandResult = runCommand(
-    ['bun', 'run', path.join(problemDirectoryPath, 'judge.ts'), '--evaluate'],
+    ['bun', 'run', './judge.ts', '--evaluate'],
     problemDirectoryPath,
     EVALUATE_TIMEOUT_SECONDS,
     {
