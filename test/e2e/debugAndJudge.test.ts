@@ -474,6 +474,18 @@ test.each<
   [
     'example/web_page_weather',
     'judge.ts',
+    'model_answers.test/extra_elements',
+    {},
+    {},
+    [
+      { testCaseId: '01_h1', decisionCode: 2000 },
+      { testCaseId: '02_hr', decisionCode: 2000 },
+      { testCaseId: '03_p', decisionCode: 2000 },
+    ],
+  ],
+  [
+    'example/web_page_weather',
+    'judge.ts',
     'model_answers.test/wa',
     {},
     {},
