@@ -74,3 +74,21 @@ test('caught browser timeouts produce readable wrong-answer feedback', { timeout
   expect(verdict.stderr).toContain('#missing-submission-element');
   expect(verdict.stderr).not.toContain('\u001B');
 });
+
+test('read-only callback errors keep their original identity and diagnostics', { timeout: 30_000 }, () => {
+  const result = spawnSync(
+    'bun',
+    ['test/fixtures/browserReadonlyErrors.ts', path.resolve('example/web_page_weather/model_answers/default'), '{}'],
+    { encoding: 'utf8', timeout: 20_000 }
+  );
+  expect(result.status, result.stderr).toBe(0);
+  expect(
+    result.stdout
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+  ).toEqual([
+    { sameError: true, name: 'AbortError', message: 'Browser operation aborted' },
+    { sameError: true, name: 'Error', message: '\u001B[2mFrozen failure\u001B[22m' },
+  ]);
+});

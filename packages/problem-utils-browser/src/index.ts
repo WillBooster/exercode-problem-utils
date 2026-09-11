@@ -45,9 +45,17 @@ export async function browserJudgePreset(options: BrowserJudgePresetOptions): Pr
   try {
     await runBrowserJudge(options);
   } catch (error) {
-    if (error instanceof Error) {
-      error.message = stripVTControlCharacters(error.message);
-      if (error.stack) error.stack = stripVTControlCharacters(error.stack);
+    try {
+      if (error instanceof Error) {
+        const message = stripVTControlCharacters(error.message);
+        if (message !== error.message) error.message = message;
+        if (error.stack) {
+          const stack = stripVTControlCharacters(error.stack);
+          if (stack !== error.stack) error.stack = stack;
+        }
+      }
+    } catch {
+      // A read-only diagnostic must not replace the original failure.
     }
     throw error;
   }
@@ -90,4 +98,4 @@ async function runBrowserJudge(options: BrowserJudgePresetOptions): Promise<void
 
 export { javascriptJudgePreset, type JavascriptJudgePresetOptions } from './javascript.js';
 export { javascriptDomJudgePreset } from './javascriptDom.js';
-export { captureTomcatScreenshots, verifyTomcatHtml } from './tomcat.js';
+export { captureTomcatScreenshots, verifyTomcatHtml, verifyTomcatPath } from './tomcat.js';

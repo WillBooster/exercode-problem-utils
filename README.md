@@ -133,7 +133,10 @@ limits are 60 and 30 seconds respectively.
 Browser evaluations can use native Playwright pages together with
 `captureTomcatScreenshots` or `verifyTomcatHtml` from the browser package. The latter
 compares document markup with whitespace removed and records screenshots for the
-verdict. All interrupted-run cleanup remains the host's responsibility.
+verdict. `verifyTomcatPath(page, endpoint)` waits up to five seconds for the endpoint's
+path and reports the expected and current paths in Japanese if navigation fails;
+query strings do not affect the check. All interrupted-run cleanup remains the host's
+responsibility.
 
 ## PDF export
 
