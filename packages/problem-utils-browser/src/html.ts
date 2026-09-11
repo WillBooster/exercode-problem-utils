@@ -11,7 +11,7 @@ import {
   type TestCaseResult,
 } from '@exercode/problem-utils';
 import sniffHtmlEncoding from 'html-encoding-sniffer';
-import type { Page, HTTPRequest } from 'puppeteer';
+import type { Page } from 'puppeteer';
 import { format } from 'prettier';
 import prettierPluginOrganizeAttributes from 'prettier-plugin-organize-attributes';
 
@@ -206,21 +206,25 @@ async function capturePreparedHtmlScreenshot(page: Page, url: string, formattedH
   if (formattedHtml === undefined) {
     await page.goto(url, { waitUntil: 'load' });
   } else {
-    // Keep the document URL so relative base elements and asset URLs resolve as served.
-    // Interception stays active until subresources finish loading.
-    const targetUrl = new URL(url).href;
-    const renderHtml = async (request: HTTPRequest) => {
-      await (request.url() === targetUrl && request.isNavigationRequest() && request.frame() === page.mainFrame()
-        ? request.respond({ contentType: 'text/html; charset=utf-8', body: formattedHtml })
-        : request.continue());
-    };
-    await page.setRequestInterception(true);
-    page.on('request', renderHtml);
+    // A separate CDP session leaves the caller's Puppeteer request handlers and interception state intact.
+    const session = await page.createCDPSession();
     try {
+      const targetUrl = new URL(url).href;
+      const { frameTree } = await session.send('Page.getFrameTree');
+      session.on('Fetch.requestPaused', async (event) => {
+        await (event.request.url === targetUrl && event.frameId === frameTree.frame.id
+          ? session.send('Fetch.fulfillRequest', {
+              requestId: event.requestId,
+              responseCode: 200,
+              responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }],
+              body: Buffer.from(formattedHtml).toString('base64'),
+            })
+          : session.send('Fetch.continueRequest', { requestId: event.requestId }));
+      });
+      await session.send('Fetch.enable', { patterns: [{ resourceType: 'Document', requestStage: 'Request' }] });
       await page.goto(url, { waitUntil: 'load' });
     } finally {
-      await page.setRequestInterception(false);
-      page.off('request', renderHtml);
+      await session.detach();
     }
   }
 

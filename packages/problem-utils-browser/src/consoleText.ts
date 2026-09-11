@@ -4,10 +4,8 @@ type RemoteValue = ReturnType<JSHandle['remoteObject']>;
 
 /** Formats Chromium console previews as the text expected by JavaScript course output files. */
 export function consoleText(message: ConsoleMessage): string {
-  return message
-    .args()
-    .map((argument) => previewText(argument.remoteObject()))
-    .join(' ');
+  const args = message.args();
+  return args.length === 0 ? message.text() : args.map((argument) => previewText(argument.remoteObject())).join(' ');
 }
 
 function previewText(value: RemoteValue): string {
