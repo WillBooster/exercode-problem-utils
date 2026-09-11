@@ -53,6 +53,11 @@ export async function requirePageElement(page: Page, selector: string) {
 
 /** Evaluates a program with shared window state and evaluation-local lexical declarations. */
 export async function evaluateBrowserProgram(page: Page, source: string): Promise<unknown> {
-  // oxlint-disable-next-line no-eval -- Separate lexical scopes prevent setup declarations from colliding with learner declarations.
-  return page.evaluate((program) => globalThis.eval(program), source);
+  try {
+    // oxlint-disable-next-line no-eval -- Separate lexical scopes prevent setup declarations from colliding with learner declarations.
+    return await page.evaluate((program) => globalThis.eval(program), source);
+  } catch (error) {
+    // Presets expose the message as feedback; include the browser exception type there.
+    throw error instanceof Error ? new Error(String(error), { cause: error }) : error;
+  }
 }
