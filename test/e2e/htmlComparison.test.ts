@@ -26,6 +26,24 @@ test.each([
     model: '<!doctype html><html><body><span>A</span><span>B</span></body></html>',
     submission: '<!doctype html><html><body><span>A</span><span>B</span></div></body></html>',
   },
+  {
+    name: 'default text whitespace normalization',
+    model: '<!doctype html><html><body><span>Hello world</span></body></html>',
+    submission: '<!doctype html><html><body><span>Hello  world</span></body></html>',
+  },
+  {
+    name: 'course-specific strict whitespace comparison',
+    model: '<!doctype html><html><body><span>Hello world</span></body></html>',
+    submission: '<!doctype html><html><body><span>Hello  world</span></body></html>',
+    textNormalizationPattern: String.raw`\\s+`,
+    expectedDecision: DecisionCode.WRONG_ANSWER,
+  },
+  {
+    name: 'course-specific text replacement across multiple nodes',
+    model: '<!doctype html><html><body><span hidden>A B C</span><span hidden>D E</span></body></html>',
+    submission: String.raw`<!doctype html><html><body><span hidden>A\sB\ssC</span><span hidden>D\sE</span></body></html>`,
+    textNormalizationPattern: String.raw`\\s+`,
+  },
   { name: 'per-page session state', model: sessionPage, submission: sessionPage },
   { name: 'cookie state', model: cookiePage, submission: cookiePage },
   {
@@ -36,40 +54,48 @@ test.each([
       'latin1'
     ),
   },
-])('HTML comparison preserves equivalence with $name', { timeout: 30_000 }, async ({ model, submission }) => {
-  await fs.mkdir('.tmp', { recursive: true });
-  const root = await fs.mkdtemp(path.resolve('.tmp', 'html-comparison-'));
-  try {
-    const solution = path.join(root, 'solution');
-    const answer = path.join(root, 'answer');
-    await fs.mkdir(solution);
-    await fs.mkdir(answer);
-    await fs.writeFile(path.join(solution, 'index.html'), model);
-    await fs.writeFile(path.join(answer, 'index.html'), submission);
-    const harness = path.join(root, 'judge.ts');
-    await fs.writeFile(
-      harness,
-      `import { htmlJudgePreset } from '@exercode/problem-utils-browser';
-await htmlJudgePreset({ solutionDirectoryPath: ${JSON.stringify(solution)} });
+])(
+  'HTML comparison preserves equivalence with $name',
+  { timeout: 30_000 },
+  async ({ model, submission, textNormalizationPattern, expectedDecision = DecisionCode.ACCEPTED }) => {
+    await fs.mkdir('.tmp', { recursive: true });
+    const root = await fs.mkdtemp(path.resolve('.tmp', 'html-comparison-'));
+    try {
+      const solution = path.join(root, 'solution');
+      const answer = path.join(root, 'answer');
+      await fs.mkdir(solution);
+      await fs.mkdir(answer);
+      await fs.writeFile(path.join(solution, 'index.html'), model);
+      await fs.writeFile(path.join(answer, 'index.html'), submission);
+      const harness = path.join(root, 'judge.ts');
+      await fs.writeFile(
+        harness,
+        `import { htmlJudgePreset } from '@exercode/problem-utils-browser';
+await htmlJudgePreset(${JSON.stringify({ solutionDirectoryPath: solution, textNormalizationPattern })});
 `
-    );
-    const result = spawnSync('bun', [harness, answer, '{}'], { encoding: 'utf8', timeout: 20_000 });
-    expect(result.status, result.stderr).toBe(0);
-    const verdicts = result.stdout
-      .trim()
-      .split('\n')
-      .map((line) => {
-        expect(line.startsWith(TEST_CASE_RESULT_PREFIX)).toBe(true);
-        return testCaseResultSchema.parse(JSON.parse(line.slice(TEST_CASE_RESULT_PREFIX.length)));
-      });
-    expect(verdicts.map(({ testCaseId, decisionCode }) => ({ testCaseId, decisionCode }))).toEqual([
-      { testCaseId: 'snapshot_body', decisionCode: DecisionCode.ACCEPTED },
-      { testCaseId: 'screenshot', decisionCode: DecisionCode.ACCEPTED },
-    ]);
-  } finally {
-    await fs.rm(root, { recursive: true, force: true });
+      );
+      const result = spawnSync('bun', [harness, answer, '{}'], { encoding: 'utf8', timeout: 20_000 });
+      expect(result.status, result.stderr).toBe(0);
+      const verdicts = result.stdout
+        .trim()
+        .split('\n')
+        .map((line) => {
+          expect(line.startsWith(TEST_CASE_RESULT_PREFIX)).toBe(true);
+          return testCaseResultSchema.parse(JSON.parse(line.slice(TEST_CASE_RESULT_PREFIX.length)));
+        });
+      expect(verdicts.map(({ testCaseId, decisionCode }) => ({ testCaseId, decisionCode }))).toEqual(
+        expectedDecision === DecisionCode.ACCEPTED
+          ? [
+              { testCaseId: 'snapshot_body', decisionCode: DecisionCode.ACCEPTED },
+              { testCaseId: 'screenshot', decisionCode: DecisionCode.ACCEPTED },
+            ]
+          : [{ testCaseId: 'snapshot_body', decisionCode: expectedDecision }]
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
   }
-});
+);
 
 test(
   'screenshot-only grading accepts invisible DOM differences and rejects visible differences',
