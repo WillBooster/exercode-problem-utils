@@ -76,7 +76,11 @@ export async function javascriptDomJudgePreset(problemDir: string): Promise<void
           // A page script preserves global lexical bindings that an eval call would discard.
           const session = await context.newCDPSession(page);
           try {
-            const result = await session.send('Runtime.evaluate', { expression: input, awaitPromise: true });
+            const result = await session.send('Runtime.evaluate', {
+              expression: input,
+              awaitPromise: true,
+              userGesture: true,
+            });
             if (result.exceptionDetails) {
               const { exception, text } = result.exceptionDetails;
               throw new Error(exception ? (exception.description ?? String(exception.value)) : text);
