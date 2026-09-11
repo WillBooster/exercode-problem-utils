@@ -22,12 +22,15 @@ type JudgeCaseResult = Omit<TestCaseResult, 'testCaseId'>;
 interface JudgeContext {
   solutionUrl: string;
   submissionUrl: string;
+  textNormalizationPattern?: string;
 }
 
 export interface HtmlJudgePresetOptions {
   solutionDirectoryPath: string;
   requiredFiles?: readonly string[];
   compareDom?: boolean;
+  /** Regular-expression source whose matches become spaces before trimming DOM text nodes. */
+  textNormalizationPattern?: string;
 }
 
 /** Compares a submitted HTML page with its model answer's screenshot and, by default, DOM. */
@@ -52,7 +55,11 @@ export async function htmlJudgePreset(options: HtmlJudgePresetOptions): Promise<
   const browser = await launchBrowser();
   try {
     const pageOptions = { viewport: { width: 800, height: 600 } };
-    const ctx: JudgeContext = { solutionUrl: solutionServer.url, submissionUrl: submissionServer.url };
+    const ctx: JudgeContext = {
+      solutionUrl: solutionServer.url,
+      submissionUrl: submissionServer.url,
+      textNormalizationPattern: options.textNormalizationPattern,
+    };
     const checks = [
       ['snapshot_body', testSnapshotBody],
       ['screenshot', testScreenshot],
@@ -77,8 +84,8 @@ export async function htmlJudgePreset(options: HtmlJudgePresetOptions): Promise<
 async function testSnapshotBody(page: Page, solutionPage: Page, ctx: JudgeContext): Promise<JudgeCaseResult> {
   try {
     const [expected, actual] = await Promise.all([
-      captureHtmlBodySnapshot(solutionPage, ctx.solutionUrl),
-      captureHtmlBodySnapshot(page, ctx.submissionUrl),
+      captureHtmlBodySnapshot(solutionPage, ctx.solutionUrl, ctx.textNormalizationPattern),
+      captureHtmlBodySnapshot(page, ctx.submissionUrl, ctx.textNormalizationPattern),
     ]);
     if (expected !== actual) {
       return {
@@ -122,9 +129,15 @@ async function testScreenshot(page: Page, solutionPage: Page, ctx: JudgeContext)
   }
 }
 
-export async function captureHtmlBodySnapshot(page: Page, url: string): Promise<string> {
+export async function captureHtmlBodySnapshot(
+  page: Page,
+  url: string,
+  textNormalizationPattern = String.raw`\s+`
+): Promise<string> {
   await page.goto(url);
-  return page.evaluate(() => {
+  return page.evaluate((pattern) => {
+    const textPattern = new RegExp(pattern, 'g');
+
     function snapshotNodes(nodes: readonly ChildNode[]): unknown[] {
       return nodes
         .map(snapshotNode)
@@ -140,7 +153,7 @@ export async function captureHtmlBodySnapshot(page: Page, url: string): Promise<
       if (node.nodeType === Node.COMMENT_NODE) return undefined;
 
       if (node.nodeType === Node.TEXT_NODE) {
-        const text = node.textContent?.replaceAll(/\s+/g, ' ').trim() ?? '';
+        const text = node.textContent?.replaceAll(textPattern, ' ').trim() ?? '';
         if (!text) return undefined;
         return { type: 'text', text };
       }
@@ -162,7 +175,7 @@ export async function captureHtmlBodySnapshot(page: Page, url: string): Promise<
     }
 
     return JSON.stringify(snapshotNodes([...document.body.childNodes]));
-  });
+  }, textNormalizationPattern);
 }
 
 export interface HtmlScreenshotTarget {
