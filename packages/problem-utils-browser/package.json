@@ -42,6 +42,7 @@
     "highlight.js": "11.11.1",
     "html-encoding-sniffer": "6.0.0",
     "marked": "18.0.11",
+    "marked-gfm-heading-id": "4.1.4",
     "playwright-core": "1.62.1",
     "prettier": "3.9.6",
     "prettier-plugin-organize-attributes": "1.0.0",

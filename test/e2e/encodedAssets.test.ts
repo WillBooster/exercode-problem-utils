@@ -59,6 +59,14 @@ test('PDF export still produces a page when images are missing or invalid', { ti
   }
 });
 
+test('PDF export preserves links to Markdown headings', { timeout: 30_000 }, async () => {
+  const pdf = await markdownToPdf('[Jump to section](#target)\n\n# Target\n\nSection content', {
+    assetDirectoryPath: process.cwd(),
+  });
+  expect(pdf.toString('latin1')).toMatch(/\/Subtype\s*\/Link\b/);
+  expect(pdf.toString('latin1')).toMatch(/\/Dest\s*\/target\b/);
+});
+
 test('PDF export preserves prose after leading Markdown thematic breaks', { timeout: 30_000 }, async () => {
   const prose = Array.from(
     { length: 20 },
