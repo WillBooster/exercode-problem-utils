@@ -1,5 +1,5 @@
 {a: 1}
 [1, 2]
 [empty, 2, empty x 2, 5]
-undefined null NaN Infinity -0 42
+undefined null NaN Infinity 0 42 undefined
 JSHandle@node

@@ -10,7 +10,7 @@ import type { BrowserContextOptions, LaunchOptions, Page } from 'puppeteer';
 
 import { captureScreenshot, launchBrowser } from './browser.js';
 
-export { captureScreenshot, launchBrowser, requirePageElement } from './browser.js';
+export { captureScreenshot, evaluateBrowserProgram, launchBrowser, requirePageElement } from './browser.js';
 export { consoleText } from './consoleText.js';
 export {
   htmlJudgePreset,

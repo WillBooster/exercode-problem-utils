@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { launchBrowser } from './browser.js';
+import { evaluateBrowserProgram, launchBrowser } from './browser.js';
 import { startEmptyPageServer } from './emptyPageServer.js';
 import { consoleText } from './consoleText.js';
 import path from 'node:path';
@@ -91,12 +91,13 @@ async function runInBrowser(
       await page.goto(server.url, { waitUntil: 'load' });
 
       if (context.testCase.input) {
-        await page.evaluate(context.testCase.input);
+        await evaluateBrowserProgram(page, context.testCase.input);
       }
 
       await withTimeout(
         () =>
-          page.evaluate(
+          evaluateBrowserProgram(
+            page,
             options.initializeAndVerifyDom
               ? `
           window.initializeTest?.();

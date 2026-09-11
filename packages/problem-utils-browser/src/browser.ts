@@ -30,3 +30,9 @@ export async function requirePageElement(page: Page, selector: string) {
   if (!element) throw new Error(`要素が見つかりません: ${selector}`);
   return element;
 }
+
+/** Evaluates a program with shared window state and evaluation-local lexical declarations. */
+export async function evaluateBrowserProgram(page: Page, source: string): Promise<unknown> {
+  // oxlint-disable-next-line no-eval -- Separate lexical scopes prevent setup declarations from colliding with learner declarations.
+  return page.evaluate((program) => globalThis.eval(program), source);
+}

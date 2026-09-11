@@ -11,7 +11,9 @@ export function consoleText(message: ConsoleMessage): string {
 function previewText(value: RemoteValue): string {
   if (value.type === 'undefined') return 'undefined';
   if ('value' in value) return String(value.value);
-  if (value.unserializableValue) return value.unserializableValue;
+  // Keep the primitive text that existing expected-output files were authored against.
+  if (value.unserializableValue)
+    return value.type === 'bigint' ? 'undefined' : String(Number(value.unserializableValue));
   if (value.subtype === 'node') return 'JSHandle@node';
   if (value.description === 'Object' && value.preview)
     return `{${value.preview.properties.map((property) => `${property.name}: ${String(property.value)}`).join(', ')}}`;

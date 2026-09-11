@@ -62,6 +62,7 @@ The console preview formatting in `consoleText.ts` adapts the object and sparse-
 rendering from Playwright's `crExecutionContext.ts` and `javascript.ts`. It consumes
 Puppeteer's native Chromium remote objects to preserve course output text.
 
-Copyright (c) Microsoft Corporation.
+Copyright 2017 Google Inc. All rights reserved.
+Modifications copyright (c) Microsoft Corporation.
 Licensed under the Apache License, Version 2.0; see `LICENSE`.
 Source: https://github.com/microsoft/playwright/tree/v1.62.1/packages/playwright-core/src/server
