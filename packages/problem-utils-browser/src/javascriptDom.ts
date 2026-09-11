@@ -73,8 +73,21 @@ export async function javascriptDomJudgePreset(problemDir: string): Promise<void
 
         // Run setup code from .in file (NOT wrapped - window.test etc. need global scope)
         if (input.trim()) {
-          // oxlint-disable-next-line no-eval -- Setup needs global script semantics without Playwright's function-expression normalization.
-          await page.evaluate((source) => globalThis.eval(source), input);
+          // A page script preserves global lexical bindings that an eval call would discard.
+          const session = await context.newCDPSession(page);
+          try {
+            const result = await session.send('Runtime.evaluate', {
+              expression: input,
+              awaitPromise: true,
+              userGesture: true,
+            });
+            if (result.exceptionDetails) {
+              const { exception, text } = result.exceptionDetails;
+              throw new Error(exception ? (exception.description ?? String(exception.value)) : text);
+            }
+          } finally {
+            await session.detach();
+          }
         }
 
         const autoCallTest = input.includes('window.test =') && !userProgram.includes('test()') ? 'test?.();' : '';

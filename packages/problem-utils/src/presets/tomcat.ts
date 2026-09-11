@@ -1,3 +1,10 @@
+import {
+  MAX_OUTPUT_LENGTH,
+  resolveJavaRelativePath,
+  listSubmissionFiles,
+  readOutputFiles,
+  truncateOutput,
+} from '../helpers/javaJudge.js';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -5,7 +12,6 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { DecisionCode, parseArgs, printTestCaseResult, type TestCaseResult } from '../index.js';
-import { z } from 'zod';
 
 export interface TomcatJudgePresetOptions {
   problemDirectoryPath: string;
@@ -15,7 +21,6 @@ export interface TomcatJudgePresetOptions {
 }
 
 type JudgeResult = Omit<TestCaseResult, 'testCaseId'>;
-type OutputFile = NonNullable<TestCaseResult['outputFiles']>[number];
 interface CommandResult {
   status: number | undefined;
   stdout: string;
@@ -26,7 +31,6 @@ interface CommandResult {
 const APPLICATION_NAME = 'judge';
 const BUILD_TIMEOUT_SECONDS = 60;
 const EVALUATE_TIMEOUT_SECONDS = 30;
-const MAX_OUTPUT_LENGTH = 50_000;
 const TOMCAT_BASE_URL = 'http://localhost:59000';
 const SOURCE_FILE_EXTENSIONS = new Set(['.java', '.jsp', '.html', '.htm', '.xml', '.js', '.css']);
 
@@ -134,16 +138,6 @@ async function resolveTargetPath(
   return path.join(buildDir, 'src/main/webapp', normalizedRelativePath);
 }
 
-async function resolveJavaRelativePath(sourcePath: string, fallbackRelativePath: string): Promise<string> {
-  const sourceCode = await fs.promises.readFile(sourcePath, 'utf8');
-  const packageMatch = /^\s*package\s+([a-zA-Z0-9_.]+)\s*;/m.exec(sourceCode);
-  if (!packageMatch?.[1]) {
-    return fallbackRelativePath;
-  }
-
-  return path.join(packageMatch[1].replaceAll('.', '/'), path.basename(fallbackRelativePath));
-}
-
 async function judgeByStaticAnalysis(
   submissionDir: string,
   forbiddenTexts: readonly string[]
@@ -172,27 +166,6 @@ async function judgeByStaticAnalysis(
       'ソースコード中に禁止された文字列が含まれています。\nソースコードを修正してから再度提出してください。\n\n| ファイル | 禁止パターン |\n| -------- | ------------ |\n' +
       forbiddenMatches.map((match) => `| \`${match.path}\` | \`${match.pattern}\` |`).join('\n'),
   };
-}
-
-async function listSubmissionFiles(rootDir: string): Promise<string[]> {
-  const filePaths: string[] = [];
-  await collectSubmissionFiles(rootDir, '', filePaths);
-  return filePaths.toSorted();
-}
-
-async function collectSubmissionFiles(rootDir: string, relativeDir: string, filePaths: string[]): Promise<void> {
-  const currentDir = relativeDir ? path.join(rootDir, relativeDir) : rootDir;
-  const entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
-  for (const entry of entries) {
-    const entryRelativePath = relativeDir ? path.join(relativeDir, entry.name) : entry.name;
-    if (entry.isDirectory()) {
-      await collectSubmissionFiles(rootDir, entryRelativePath, filePaths);
-      continue;
-    }
-    if (entry.isFile()) {
-      filePaths.push(entryRelativePath);
-    }
-  }
 }
 
 function buildWithMaven(buildDir: string): JudgeResult | undefined {
@@ -416,30 +389,6 @@ function validateCatalinaHome(catalinaHome: string): void {
   ) {
     throw new Error('Invalid CATALINA_HOME path');
   }
-}
-
-function readOutputFiles(filePath: string): OutputFile[] | undefined {
-  if (!fs.existsSync(filePath)) {
-    return undefined;
-  }
-
-  // Malformed evaluator JSON remains a harness error (JUDGE_NOT_AVAILABLE), not missing screenshots.
-  const parsed: unknown = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  const values = z.array(z.unknown()).safeParse(parsed);
-  if (!values.success) return undefined;
-  const outputFileSchema = z.object({
-    path: z.string(),
-    data: z.string(),
-    encoding: z.literal('base64').optional(),
-  });
-  return values.data.flatMap((value) => {
-    const result = outputFileSchema.safeParse(value);
-    return result.success ? [result.data] : [];
-  });
-}
-
-function truncateOutput(value: string): string {
-  return value.slice(0, MAX_OUTPUT_LENGTH);
 }
 
 export function buildTomcatUrl(urlPath: string): string {

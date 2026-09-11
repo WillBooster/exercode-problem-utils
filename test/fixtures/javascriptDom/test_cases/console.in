@@ -1,3 +1,4 @@
+const expectedAnswer = 42;
 function heading() {
   return 'Browser output';
 }

@@ -70,3 +70,52 @@ await htmlJudgePreset({ solutionDirectoryPath: ${JSON.stringify(solution)} });
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test(
+  'screenshot-only grading accepts invisible DOM differences and rejects visible differences',
+  { timeout: 30_000 },
+  async () => {
+    await fs.mkdir('.tmp', { recursive: true });
+    const root = await fs.mkdtemp(path.resolve('.tmp', 'html-visual-comparison-'));
+    try {
+      const solution = path.join(root, 'solution');
+      const answer = path.join(root, 'answer');
+      await fs.mkdir(solution);
+      await fs.mkdir(answer);
+      await fs.writeFile(
+        path.join(solution, 'index.html'),
+        '<!doctype html><html><body><h1>Welcome</h1></body></html>'
+      );
+      const harness = path.join(root, 'judge.ts');
+      await fs.writeFile(
+        harness,
+        `import { htmlJudgePreset } from '@exercode/problem-utils-browser';
+await htmlJudgePreset({ solutionDirectoryPath: ${JSON.stringify(solution)}, compareDom: false });
+`
+      );
+      for (const [heading, expected] of [
+        ['Welcome', DecisionCode.ACCEPTED],
+        ['Different', DecisionCode.WRONG_ANSWER],
+      ] as const) {
+        await fs.writeFile(
+          path.join(answer, 'index.html'),
+          `<!doctype html><html><body><h1 data-note="learner markup">${heading}</h1></body></html>`
+        );
+        const result = spawnSync('bun', [harness, answer, '{}'], { encoding: 'utf8', timeout: 20_000 });
+        expect(result.status, result.stderr).toBe(0);
+        const verdicts = result.stdout
+          .trim()
+          .split('\n')
+          .map((line) => {
+            expect(line.startsWith(TEST_CASE_RESULT_PREFIX)).toBe(true);
+            return testCaseResultSchema.parse(JSON.parse(line.slice(TEST_CASE_RESULT_PREFIX.length)));
+          });
+        expect(verdicts.map(({ testCaseId, decisionCode }) => ({ testCaseId, decisionCode }))).toEqual([
+          { testCaseId: 'screenshot', decisionCode: expected },
+        ]);
+      }
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  }
+);

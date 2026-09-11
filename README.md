@@ -44,16 +44,21 @@ non-accepted result; capture failures are recorded in `stderr` without replacing
 own HTTP server or test loop.
 
 The browser package depends on `playwright-core`; installing the package does not
-install Chromium. Install the matching Chromium with `playwright-core install chromium`
-in the environment containing that dependency. Docker/CI should install its OS
-libraries at image build/setup time. Browser versions must match the installed
-Playwright version. Install the fonts required by the course content in that environment.
+install Chromium. Before running browser judges or PDF export, install its browser:
+
+```sh
+bun run exercode-browser install chromium
+```
+
+`exercode-browser` runs this package's Playwright CLI, independently of an application's
+E2E test version. Docker/CI should install Chromium's OS libraries at image build/setup
+time. Install the fonts required by the course content in that environment.
 
 ## HTML comparison
 
-`htmlJudgePreset({ solutionDirectoryPath, requiredFiles? })` compares the submitted
+`htmlJudgePreset({ solutionDirectoryPath, requiredFiles?, compareDom? })` compares the submitted
 page with the specified model-answer directory. It reports `snapshot_body` first,
-then `screenshot`, stopping on the first difference. The DOM comparison ignores
+then `screenshot`, stopping on the first difference. Set `compareDom: false` for exercises that grade only the rendered appearance. The DOM comparison ignores
 comments and normalizes text whitespace and attribute order. Screenshots render
 formatted HTML at 800×600, with CSS animations disabled and fonts loaded; a difference
 includes both PNG files. HTML decoding honors a BOM or declared HTTP/meta charset, defaulting to UTF-8 when
@@ -78,6 +83,27 @@ for custom checks. The screenshot pair takes two `{ page, url }` targets and ret
 PNGs in that order, formatting both documents or neither. Give those pages matching
 viewport options and separate fresh browser contexts. See the [HTML example](example/web_page_comparison/judge.ts).
 
+## Custom browser pages and lifecycle hooks
+
+`browserJudgePreset` accepts `directoryPath` to serve an assembled exercise directory,
+`entryPath` to select its initial page, and `navigationOptions` for native Playwright
+navigation settings. `initializePage` runs before navigation, so it can register console
+and page-error listeners. `afterTests` runs after the checks, including a failing verdict,
+while the page remains open. An exception in initialization, navigation, or a check
+propagates to the caller and skips `afterTests`; browser cleanup still runs.
+
+## Spring Boot courses
+
+Import `springBootJudgePreset` from `@exercode/problem-utils/presets/springBoot` and pass
+`problemDirectoryPath` plus an async `evaluate` callback. The preset builds the problem's
+Maven project offline, starts its Spring Boot JAR on port 59000, and invokes the problem's
+`judge.ts --evaluate`. It preserves the course build, startup, and evaluation limits
+(90, 60, and 60 seconds) and emitted screenshot metadata. The host provides Java, Maven,
+Bun, cached dependencies, an exclusive execution slot, and interrupted-run cleanup.
+Evaluators can build their request URLs with `buildSpringBootUrl` from the same core subpath.
+Browser evaluation can use `launchBrowser` and `captureTomcatScreenshots` from the browser
+package; the Spring Boot preset itself adds no browser dependency to core.
+
 ## JavaScript and Tomcat courses
 
 `javascriptJudgePreset(problemDirectoryPath, options)` from `@exercode/problem-utils-browser`
@@ -87,7 +113,8 @@ call the setup's `initializeTest` and `verifyDom` hooks, and `waitForConsoleIdle
 for exercises whose asynchronous console output must settle before comparison.
 
 `javascriptDomJudgePreset(problemDirectoryPath)` supports DOM exercises whose `.in`
-files define `initializeTest`, `verifyDom`, or `window.test`. It exposes top-level
+files define `initializeTest`, `verifyDom`, or `window.test`. Setup scripts retain global
+declarations for submitted code and verification hooks. The preset exposes top-level
 function declarations to those callbacks, captures console output, and stops at the
 first failing case. Both JavaScript presets require a host-enforced overall timeout:
 the console-idle heuristics do not bound programs that keep emitting output.
@@ -117,6 +144,8 @@ const pdf = await markdownToPdf(markdown, {
 });
 await Bun.write('material.pdf', pdf);
 ```
+
+PDF assets are served on IPv4 loopback, and encoded paths cannot escape the asset directory. Intentional asset symlinks remain usable. Core also exports `startLocalHttpServer` for callers that need the same local-only server; await its startup before using its address.
 
 The PDF entry point removes YAML mapping frontmatter, renders Markdown with syntax highlighting, and resolves relative
 images against `assetDirectoryPath`, and waits for fonts and images before printing. Missing or invalid images leave

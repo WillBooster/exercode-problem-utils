@@ -7,7 +7,7 @@ import {
   DecisionCode,
   parseArgs,
   printTestCaseResult,
-  startHttpServer,
+  startLocalHttpServer,
   type TestCaseResult,
 } from '@exercode/problem-utils';
 import sniffHtmlEncoding from 'html-encoding-sniffer';
@@ -27,9 +27,10 @@ interface JudgeContext {
 export interface HtmlJudgePresetOptions {
   solutionDirectoryPath: string;
   requiredFiles?: readonly string[];
+  compareDom?: boolean;
 }
 
-/** Compares a submitted HTML page with its model answer's DOM and rendered screenshot. */
+/** Compares a submitted HTML page with its model answer's screenshot and, by default, DOM. */
 export async function htmlJudgePreset(options: HtmlJudgePresetOptions): Promise<void> {
   const args = parseArgs(process.argv);
   const submissionDirectoryPath = args.cwd;
@@ -45,9 +46,9 @@ export async function htmlJudgePreset(options: HtmlJudgePresetOptions): Promise<
     return;
   }
   await using submissionDirectory = await createHtmlServedDirectory(submissionDirectoryPath);
-  await using submissionServer = startHttpServer(submissionDirectory.path);
+  await using submissionServer = await startLocalHttpServer(submissionDirectory.path);
   await using solutionDirectory = await createHtmlServedDirectory(options.solutionDirectoryPath);
-  await using solutionServer = startHttpServer(solutionDirectory.path);
+  await using solutionServer = await startLocalHttpServer(solutionDirectory.path);
   const browser = await launchBrowser();
   try {
     const pageOptions = { viewport: { width: 800, height: 600 } };
@@ -57,6 +58,7 @@ export async function htmlJudgePreset(options: HtmlJudgePresetOptions): Promise<
       ['screenshot', testScreenshot],
     ] as const;
     for (const [testCaseId, check] of checks) {
+      if (testCaseId === 'snapshot_body' && options.compareDom === false) continue;
       const actualPage = await browser.newPage(pageOptions);
       const solutionPage = await browser.newPage(pageOptions);
       try {
