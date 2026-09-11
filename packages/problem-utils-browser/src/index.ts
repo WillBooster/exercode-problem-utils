@@ -28,6 +28,11 @@ export type BrowserJudgeTestCase = readonly [string, (page: Page) => Promise<Bro
 export interface BrowserJudgePresetOptions {
   testCases: readonly BrowserJudgeTestCase[];
   timeoutMs?: number;
+  directoryPath?: string;
+  initializePage?: (page: Page) => void | Promise<void>;
+  afterTests?: (page: Page) => void | Promise<void>;
+  entryPath?: string;
+  navigationOptions?: Parameters<Page['goto']>[1];
   launchOptions?: LaunchOptions;
   contextOptions?: BrowserContextOptions;
   /** Capture the page as an output file when a test fails. */
@@ -37,14 +42,19 @@ export interface BrowserJudgePresetOptions {
 /** Runs browser checks against the submitted directory and emits judge stream results. */
 export async function browserJudgePreset(options: BrowserJudgePresetOptions): Promise<void> {
   const args = parseArgs(process.argv);
-  if (!args.cwd) throw new Error('cwd argument required');
-  await using server = startHttpServer(args.cwd);
+  const directoryPath = options.directoryPath ?? args.cwd;
+  if (!directoryPath) throw new Error('cwd argument required');
+  await using server = startHttpServer(directoryPath);
   const browser = await launchBrowser(options.launchOptions);
   try {
     const context = await browser.newContext(options.contextOptions);
     const page = await context.newPage();
     page.setDefaultTimeout(options.timeoutMs ?? 5000);
-    await page.goto(server.url, { waitUntil: 'domcontentloaded' });
+    await options.initializePage?.(page);
+    await page.goto(new URL(options.entryPath ?? '/', server.url).href, {
+      waitUntil: 'domcontentloaded',
+      ...options.navigationOptions,
+    });
     for (const [testCaseId, test] of options.testCases) {
       const result = { ...(await test(page)) };
       if (options.screenshotOnFailure && result.decisionCode !== DecisionCode.ACCEPTED) {
@@ -58,6 +68,7 @@ export async function browserJudgePreset(options: BrowserJudgePresetOptions): Pr
       printTestCaseResult({ testCaseId, ...result });
       if (result.decisionCode !== DecisionCode.ACCEPTED) break;
     }
+    await options.afterTests?.(page);
   } finally {
     await browser.close();
   }

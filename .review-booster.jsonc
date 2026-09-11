@@ -9,5 +9,6 @@
     "[risk] JavaScript course presets retain the existing console-idle heuristics and test-case conventions. The host bounds the entire harness process, including submissions that emit output indefinitely; per-operation Playwright timeouts are not an overall JavaScript execution deadline.",
     "[risk] Tomcat course grading requires an exclusive host slot for port 59000, the judge application name, GNU timeout/time, Maven offline dependencies, and CATALINA_HOME. The request host owns interrupted process and scratch-directory cleanup; this preset is not a concurrent Tomcat service manager.",
     "[risk] Tomcat startup must leave its Java server running after startup.sh returns. The synchronous Tomcat command runner preserves that lifecycle; the submission runner spawnWithLimits kills the entire subprocess group on child exit and cannot replace Tomcat startup without terminating its server.",
+    "[risk] Spring Boot course grading requires Java, offline Maven dependencies, Bun, and an exclusive host slot for port 59000. The host owns interrupted subprocess and temporary-directory cleanup; the preset preserves the existing course build/startup/evaluation limits and verdict conventions, and is not a concurrent application supervisor.",
   ],
 }

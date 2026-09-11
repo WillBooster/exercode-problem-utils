@@ -78,6 +78,26 @@ for custom checks. The screenshot pair takes two `{ page, url }` targets and ret
 PNGs in that order, formatting both documents or neither. Give those pages matching
 viewport options and separate fresh browser contexts. See the [HTML example](example/web_page_comparison/judge.ts).
 
+## Custom browser pages and lifecycle hooks
+
+`browserJudgePreset` accepts `directoryPath` to serve an assembled exercise directory,
+`entryPath` to select its initial page, and `navigationOptions` for native Playwright
+navigation settings. `initializePage` runs before navigation, so it can register console
+and page-error listeners. `afterTests` runs after the checks, including a failing verdict,
+while the page remains open. An exception in initialization, navigation, or a check
+propagates to the caller and skips `afterTests`; browser cleanup still runs.
+
+## Spring Boot courses
+
+Import `springBootJudgePreset` from `@exercode/problem-utils/presets/springBoot` and pass
+`problemDirectoryPath` plus an async `evaluate` callback. The preset builds the problem's
+Maven project offline, starts its Spring Boot JAR on port 59000, and invokes the problem's
+`judge.ts --evaluate`. It preserves the course build, startup, and evaluation limits
+(90, 60, and 60 seconds) and emitted screenshot metadata. The host provides Java, Maven,
+Bun, cached dependencies, an exclusive execution slot, and interrupted-run cleanup.
+Browser evaluation can use `launchBrowser` and `captureTomcatScreenshots` from the browser
+package; the Spring Boot preset itself adds no browser dependency to core.
+
 ## JavaScript and Tomcat courses
 
 `javascriptJudgePreset(problemDirectoryPath, options)` from `@exercode/problem-utils-browser`

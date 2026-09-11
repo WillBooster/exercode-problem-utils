@@ -47,7 +47,8 @@
     "zod": "4.5.2"
   },
   "devDependencies": {
-    "build-ts": "21.0.12"
+    "build-ts": "21.0.12",
+    "undici-types": "8.3.0"
   },
   "engines": {
     "node": ">=24"
