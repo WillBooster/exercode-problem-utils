@@ -213,7 +213,7 @@ async function startSpringBootApplication(
 
 async function isServerResponding(): Promise<boolean> {
   try {
-    // Spring Boot answers 404 for an unmapped path, which already proves the port is serving.
+    // Accept 404 so applications without a root endpoint can finish startup.
     const response = await fetch(SERVER_BASE_URL, { signal: AbortSignal.timeout(1000) });
     await response.body?.cancel();
     return response.ok || response.status === 404;
