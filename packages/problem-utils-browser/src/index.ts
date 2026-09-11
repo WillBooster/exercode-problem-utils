@@ -62,3 +62,7 @@ export async function browserJudgePreset(options: BrowserJudgePresetOptions): Pr
     await browser.close();
   }
 }
+
+export { javascriptJudgePreset, type JavascriptJudgePresetOptions } from './javascript.js';
+export { javascriptDomJudgePreset } from './javascriptDom.js';
+export { captureTomcatScreenshots, verifyTomcatHtml } from './tomcat.js';

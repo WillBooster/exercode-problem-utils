@@ -78,6 +78,55 @@ for custom checks. The screenshot pair takes two `{ page, url }` targets and ret
 PNGs in that order, formatting both documents or neither. Give those pages matching
 viewport options and separate fresh browser contexts. See the [HTML example](example/web_page_comparison/judge.ts).
 
+## JavaScript and Tomcat courses
+
+`javascriptJudgePreset(problemDirectoryPath, options)` from `@exercode/problem-utils-browser`
+runs `main.mjs` or `main.js` in Chromium and compares console output with `test_cases/*.out`.
+The `.in` files contain browser setup JavaScript. Set `initializeAndVerifyDom: true` to
+call the setup's `initializeTest` and `verifyDom` hooks, and `waitForConsoleIdle: true`
+for exercises whose asynchronous console output must settle before comparison.
+
+`javascriptDomJudgePreset(problemDirectoryPath)` supports DOM exercises whose `.in`
+files define `initializeTest`, `verifyDom`, or `window.test`. It exposes top-level
+function declarations to those callbacks, captures console output, and stops at the
+first failing case. Both JavaScript presets require a host-enforced overall timeout:
+the console-idle heuristics do not bound programs that keep emitting output.
+
+`tomcatJudgePreset` and `buildTomcatUrl` are available from
+`@exercode/problem-utils/presets/tomcat`, without browser dependencies. The preset
+accepts `problemDirectoryPath`, `jspDirectory` (`''` or `'WEB-INF/jsp'`), optional
+`forbiddenTexts`, and an asynchronous `evaluate` callback. It builds the problem's
+`pom.xml` with Maven offline, serves the `judge` application on port 59000, and invokes
+the same `judge.ts` with `--evaluate`. The host must provide Maven, GNU time, GNU
+timeout, Bun, `CATALINA_HOME`, and exclusive access to that port. Build and evaluation
+limits are 60 and 30 seconds respectively.
+
+Browser evaluations can use native Playwright pages together with
+`captureTomcatScreenshots` or `verifyTomcatHtml` from the browser package. The latter
+compares document markup with whitespace removed and records screenshots for the
+verdict. All interrupted-run cleanup remains the host's responsibility.
+
+## PDF export
+
+```typescript
+import { markdownToPdf } from '@exercode/problem-utils-browser/pdf';
+
+const pdf = await markdownToPdf(markdown, {
+  assetDirectoryPath: import.meta.dirname,
+  pdfOptions: { format: 'A4' },
+});
+await Bun.write('material.pdf', pdf);
+```
+
+The PDF entry point removes YAML mapping frontmatter, renders Markdown with syntax highlighting, and resolves relative
+images against `assetDirectoryPath`, and waits for fonts and images before printing. Missing or invalid images leave
+browser placeholders without preventing the document from exporting.
+Pass `mermaidScriptPath` pointing to a Mermaid browser bundle to render diagrams,
+`css` to customize styling, and `pdfOptions` for native Playwright PDF settings.
+The defaults use screen media, A4 paper when no custom dimensions are supplied, printed backgrounds, and margins of
+30 mm top/bottom, 40 mm right, and 20 mm left. PDF rendering dependencies are loaded
+through this subpath; importing the browser judging entry point does not load them.
+
 ## CLI
 
 The package ships an `exercode-problem` command for problem authors (run it with `bun x` in a repository that depends on `@exercode/problem-utils`):

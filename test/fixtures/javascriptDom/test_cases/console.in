@@ -1,0 +1,10 @@
+function heading() {
+  return 'Browser output';
+}
+window.initializeTest = () => {
+  document.body.innerHTML = '<h1>' + heading() + '</h1>';
+};
+window.verifyDom = () => {
+  console.log(document.querySelector('h1').textContent);
+  console.log(describeAnswer());
+};

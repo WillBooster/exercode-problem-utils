@@ -18,3 +18,4 @@ export * from './learningMaterial/validationResult.js';
 export * from './types/decisionCode.js';
 export * from './types/problem.js';
 export * from './types/testCaseResult.js';
+export { parseFrontmatter } from './learningMaterial/frontmatter.js';
