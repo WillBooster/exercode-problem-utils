@@ -78,7 +78,8 @@ export async function javascriptDomJudgePreset(problemDir: string): Promise<void
           try {
             const result = await session.send('Runtime.evaluate', { expression: input, awaitPromise: true });
             if (result.exceptionDetails) {
-              throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text);
+              const { exception, text } = result.exceptionDetails;
+              throw new Error(exception ? (exception.description ?? String(exception.value)) : text);
             }
           } finally {
             await session.detach();
