@@ -75,23 +75,28 @@ test('caught browser timeouts produce readable wrong-answer feedback', { timeout
   expect(verdict.stderr).not.toContain('\u001B');
 });
 
-test('read-only callback errors keep their original identity and diagnostics', { timeout: 30_000 }, () => {
-  const result = spawnSync(
-    'bun',
-    ['test/fixtures/browserReadonlyErrors.ts', path.resolve('example/web_page_weather/model_answers/default'), '{}'],
-    { encoding: 'utf8', timeout: 20_000 }
-  );
-  expect(result.status, result.stderr).toBe(0);
-  expect(
-    result.stdout
+test.each(['bun', 'node'])(
+  'read-only callback errors retain identity and clean writable stacks in %s',
+  { timeout: 30_000 },
+  (runtime) => {
+    const result = spawnSync(
+      runtime,
+      ['test/fixtures/browserReadonlyErrors.ts', path.resolve('example/web_page_weather/model_answers/default'), '{}'],
+      { encoding: 'utf8', timeout: 20_000 }
+    );
+    expect(result.status, result.stderr).toBe(0);
+    const errors = result.stdout
       .trim()
       .split('\n')
-      .map((line) => JSON.parse(line))
-  ).toEqual([
-    { sameError: true, name: 'AbortError', message: 'Browser operation aborted' },
-    { sameError: true, name: 'Error', message: '\u001B[2mFrozen failure\u001B[22m' },
-  ]);
-});
+      .map((line) => JSON.parse(line));
+    expect(errors).toHaveLength(2);
+    expect(errors).toMatchObject([
+      { sameError: true, name: 'AbortError', message: '\u001B[2mBrowser operation aborted\u001B[22m' },
+      { sameError: true, name: 'Error', message: '\u001B[2mFrozen failure\u001B[22m' },
+    ]);
+    expect(errors[0].stack ?? '').not.toContain('\u001B');
+  }
+);
 
 test('top-level browser failures print plain diagnostics without forced runtime color', { timeout: 30_000 }, () => {
   const result = spawnSync(

@@ -45,17 +45,18 @@ export async function browserJudgePreset(options: BrowserJudgePresetOptions): Pr
   try {
     await runBrowserJudge(options);
   } catch (error) {
-    try {
-      if (error instanceof Error) {
-        const message = stripVTControlCharacters(error.message);
-        if (message !== error.message) error.message = message;
-        if (error.stack) {
-          const stack = stripVTControlCharacters(error.stack);
-          if (stack !== error.stack) error.stack = stack;
+    if (error instanceof Error) {
+      for (const field of ['message', 'stack'] as const) {
+        try {
+          const value = error[field];
+          if (typeof value === 'string') {
+            const plain = stripVTControlCharacters(value);
+            if (plain !== value) error[field] = plain;
+          }
+        } catch {
+          // A read-only field must not replace the original failure or prevent cleaning the other field.
         }
       }
-    } catch {
-      // A read-only diagnostic must not replace the original failure.
     }
     throw error;
   }
