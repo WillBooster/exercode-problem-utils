@@ -6,7 +6,7 @@ import { expect, test } from 'vitest';
 import { DecisionCode, TEST_CASE_RESULT_PREFIX, testCaseResultSchema } from '@exercode/problem-utils';
 
 test(
-  'the distributed DOM preset captures console output and exposes submitted functions to verification hooks',
+  'the distributed DOM preset preserves setup bindings and exposes submitted functions to verification hooks',
   { timeout: 30_000 },
   () => {
     const result = spawnSync(

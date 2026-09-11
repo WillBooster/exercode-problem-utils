@@ -278,3 +278,7 @@ function runJudgeScript(buildDir: string, problemDirectoryPath: string): JudgeRe
 function isTimeoutError(error: Error | undefined): boolean {
   return !!error && 'code' in error && error.code === 'ETIMEDOUT';
 }
+
+export function buildSpringBootUrl(urlPath: string): string {
+  return `${SERVER_BASE_URL}${urlPath.startsWith('/') ? urlPath : `/${urlPath}`}`;
+}

@@ -95,6 +95,7 @@ Maven project offline, starts its Spring Boot JAR on port 59000, and invokes the
 `judge.ts --evaluate`. It preserves the course build, startup, and evaluation limits
 (90, 60, and 60 seconds) and emitted screenshot metadata. The host provides Java, Maven,
 Bun, cached dependencies, an exclusive execution slot, and interrupted-run cleanup.
+Evaluators can build their request URLs with `buildSpringBootUrl` from the same core subpath.
 Browser evaluation can use `launchBrowser` and `captureTomcatScreenshots` from the browser
 package; the Spring Boot preset itself adds no browser dependency to core.
 
@@ -107,7 +108,8 @@ call the setup's `initializeTest` and `verifyDom` hooks, and `waitForConsoleIdle
 for exercises whose asynchronous console output must settle before comparison.
 
 `javascriptDomJudgePreset(problemDirectoryPath)` supports DOM exercises whose `.in`
-files define `initializeTest`, `verifyDom`, or `window.test`. It exposes top-level
+files define `initializeTest`, `verifyDom`, or `window.test`. Setup scripts retain global
+declarations for submitted code and verification hooks. The preset exposes top-level
 function declarations to those callbacks, captures console output, and stops at the
 first failing case. Both JavaScript presets require a host-enforced overall timeout:
 the console-idle heuristics do not bound programs that keep emitting output.

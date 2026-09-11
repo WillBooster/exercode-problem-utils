@@ -1,3 +1,3 @@
 function describeAnswer() {
-  return 42;
+  return expectedAnswer;
 }
