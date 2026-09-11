@@ -6,8 +6,11 @@ export async function launchBrowser(options: LaunchOptions = {}): Promise<Browse
   return launch({
     headless: 'shell',
     defaultViewport: { width: 1280, height: 720 },
-    args: process.env.CI || process.env.WB_DOCKER === '1' ? ['--no-sandbox', '--disable-setuid-sandbox'] : [],
     ...options,
+    args: [
+      ...(process.env.CI || process.env.WB_DOCKER === '1' ? ['--no-sandbox', '--disable-setuid-sandbox'] : []),
+      ...(options.args ?? []),
+    ],
   });
 }
 

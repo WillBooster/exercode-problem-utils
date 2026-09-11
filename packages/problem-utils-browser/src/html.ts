@@ -208,8 +208,9 @@ async function capturePreparedHtmlScreenshot(page: Page, url: string, formattedH
   } else {
     // Keep the document URL so relative base elements and asset URLs resolve as served.
     // Interception stays active until subresources finish loading.
+    const targetUrl = new URL(url).href;
     const renderHtml = async (request: HTTPRequest) => {
-      await (request.url() === url && request.isNavigationRequest() && request.frame() === page.mainFrame()
+      await (request.url() === targetUrl && request.isNavigationRequest() && request.frame() === page.mainFrame()
         ? request.respond({ contentType: 'text/html; charset=utf-8', body: formattedHtml })
         : request.continue());
     };
