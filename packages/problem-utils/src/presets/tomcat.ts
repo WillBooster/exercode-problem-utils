@@ -341,6 +341,7 @@ function runCommand(
 ): CommandResult {
   const startAt = Date.now();
   const timeCommand = process.platform === 'darwin' ? 'gtime' : '/usr/bin/time';
+  // Hosts provide GNU timeout on PATH; Homebrew coreutils also installs the unprefixed command.
   const timedResult = spawnSync('timeout', [timeoutSeconds.toFixed(3), timeCommand, '--format', '%e %M', ...command], {
     cwd,
     env,
@@ -422,6 +423,7 @@ function readOutputFiles(filePath: string): OutputFile[] | undefined {
     return undefined;
   }
 
+  // Malformed evaluator JSON remains a harness error (JUDGE_NOT_AVAILABLE), not missing screenshots.
   const parsed: unknown = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   const values = z.array(z.unknown()).safeParse(parsed);
   if (!values.success) return undefined;

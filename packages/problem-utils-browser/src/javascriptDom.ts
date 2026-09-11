@@ -79,8 +79,7 @@ export async function javascriptDomJudgePreset(problemDir: string): Promise<void
 
         const autoCallTest = input.includes('window.test =') && !userProgram.includes('test()') ? 'test?.();' : '';
 
-        // Extract top-level function declarations and expose them on window
-        // so they're accessible from verifyDom/test callbacks defined in .in
+        // The course script format exposes top-level synchronous declarations to .in verification hooks.
         const funcNames = [...userProgram.matchAll(/^function\s+(\w+)\s*\(/gm)].map((m) => m[1]);
         const funcExports = funcNames.map((name) => `window.${name} = ${name};`).join('\n');
 
