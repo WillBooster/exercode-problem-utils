@@ -21,7 +21,10 @@ test('JavaScript grading preserves console previews in expected output files', {
   );
 });
 
-for (const preset of ['javascriptConsole', 'javascriptDom']) {
+for (const [preset, entryFile] of [
+  ['javascriptConsole', 'main.js'],
+  ['javascriptDom', 'main.mjs'],
+] as const) {
   test.each([
     ['undefinedVar;', 'ReferenceError: undefinedVar is not defined'],
     ['null.x;', "TypeError: Cannot read properties of null (reading 'x')"],
@@ -30,7 +33,7 @@ for (const preset of ['javascriptConsole', 'javascriptDom']) {
     const fixture = fs.mkdtempSync(path.resolve('.tmp/browserRuntimeError-'));
     try {
       fs.cpSync(path.join('test/fixtures', preset), fixture, { recursive: true });
-      fs.writeFileSync(path.join(fixture, 'answer/main.js'), source);
+      fs.writeFileSync(path.join(fixture, 'answer', entryFile), source);
       const result = spawnSync('bun', [path.join(fixture, 'judge.ts'), path.join(fixture, 'answer'), '{}'], {
         encoding: 'utf8',
         timeout: 20_000,
