@@ -133,7 +133,12 @@ limits are 60 and 30 seconds respectively.
 Browser evaluations can use native Playwright pages together with
 `captureTomcatScreenshots` or `verifyTomcatHtml` from the browser package. The latter
 compares document markup with whitespace removed and records screenshots for the
-verdict. All interrupted-run cleanup remains the host's responsibility.
+verdict. `verifyTomcatPath(page, endpoint)` waits up to five seconds for the endpoint's
+path and parsed document, reporting the expected and current paths in Japanese if navigation fails;
+query strings do not affect the check. All interrupted-run cleanup remains the host's
+responsibility. `requirePageElement(page, selector)` immediately returns a native
+Playwright element handle or reports the missing selector in Japanese; callers use
+the handle's native actions for course-specific interactions.
 
 ## PDF export
 
@@ -149,7 +154,7 @@ await Bun.write('material.pdf', pdf);
 
 PDF assets are served on IPv4 loopback, and encoded paths cannot escape the asset directory. Intentional asset symlinks remain usable. Core also exports `startLocalHttpServer` for callers that need the same local-only server; await its startup before using its address.
 
-The PDF entry point removes YAML mapping frontmatter, renders Markdown with syntax highlighting, and resolves relative
+The PDF entry point removes YAML mapping frontmatter, renders Markdown with syntax highlighting and CJK-friendly emphasis, and resolves relative
 images against `assetDirectoryPath`, and waits for fonts and images before printing. Missing or invalid images leave
 browser placeholders without preventing the document from exporting.
 Pass `mermaidScriptPath` pointing to a Mermaid browser bundle to render diagrams,

@@ -16,6 +16,7 @@ export interface MarkdownPdfOptions {
 }
 
 export async function markdownToPdf(markdown: string, options: MarkdownPdfOptions): Promise<Buffer> {
+  const { default: markedCjkFriendly } = await import('marked-cjk-friendly');
   const marked = new Marked({
     renderer: {
       code({ text, lang }) {
@@ -27,7 +28,7 @@ export async function markdownToPdf(markdown: string, options: MarkdownPdfOption
       },
     },
   });
-  marked.use(gfmHeadingId());
+  marked.use(markedCjkFriendly(), gfmHeadingId());
   const body = await marked.parse(markdownBody(markdown));
   await using server = await startLocalHttpServer(options.assetDirectoryPath);
   const browser = await launchBrowser();

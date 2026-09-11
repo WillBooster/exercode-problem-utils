@@ -42,3 +42,17 @@ export async function verifyTomcatHtml(endpoint: string, expectedHtml: string): 
     await browser.close();
   }
 }
+
+/** Waits for a course endpoint and reports the expected and actual paths on failure. */
+export async function verifyTomcatPath(page: Page, endpoint: string): Promise<void> {
+  const expectedPath = new URL(buildTomcatUrl(endpoint)).pathname;
+  try {
+    await page.waitForURL((url) => url.pathname === expectedPath, { timeout: 5000, waitUntil: 'domcontentloaded' });
+  } catch (error) {
+    if (!(error instanceof Error) || error.name !== 'TimeoutError') throw error;
+    const currentPath = new URL(page.url()).pathname;
+    if (currentPath === expectedPath)
+      throw new Error(`ページの読み込み（DOM解析）が5秒以内に完了しませんでした。現在のURL: ${currentPath}`);
+    throw new Error(`URL遷移に失敗しました。期待されるURL: ${expectedPath}、現在のURL: ${currentPath}`);
+  }
+}

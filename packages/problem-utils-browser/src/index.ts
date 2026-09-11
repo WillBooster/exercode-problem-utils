@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util';
 import {
   DecisionCode,
   parseArgs,
@@ -9,7 +10,7 @@ import type { BrowserContextOptions, LaunchOptions, Page } from 'playwright-core
 
 import { captureScreenshot, launchBrowser } from './browser.js';
 
-export { captureScreenshot, launchBrowser } from './browser.js';
+export { captureScreenshot, launchBrowser, requirePageElement } from './browser.js';
 export {
   htmlJudgePreset,
   captureHtmlBodySnapshot,
@@ -41,6 +42,27 @@ export interface BrowserJudgePresetOptions {
 
 /** Runs browser checks against the submitted directory and emits judge stream results. */
 export async function browserJudgePreset(options: BrowserJudgePresetOptions): Promise<void> {
+  try {
+    await runBrowserJudge(options);
+  } catch (error) {
+    if (error instanceof Error) {
+      for (const field of ['message', 'stack'] as const) {
+        try {
+          const value = error[field];
+          if (typeof value === 'string') {
+            const plain = stripVTControlCharacters(value);
+            if (plain !== value) error[field] = plain;
+          }
+        } catch {
+          // A read-only field must not replace the original failure or prevent cleaning the other field.
+        }
+      }
+    }
+    throw error;
+  }
+}
+
+async function runBrowserJudge(options: BrowserJudgePresetOptions): Promise<void> {
   const args = parseArgs(process.argv);
   const directoryPath = options.directoryPath ?? args.cwd;
   if (!directoryPath) throw new Error('cwd argument required');
@@ -65,6 +87,7 @@ export async function browserJudgePreset(options: BrowserJudgePresetOptions): Pr
           result.stderr = result.stderr ? `${result.stderr}\n${message}` : message;
         }
       }
+      if (result.stderr) result.stderr = stripVTControlCharacters(result.stderr);
       printTestCaseResult({ testCaseId, ...result });
       if (result.decisionCode !== DecisionCode.ACCEPTED) break;
     }
@@ -76,4 +99,4 @@ export async function browserJudgePreset(options: BrowserJudgePresetOptions): Pr
 
 export { javascriptJudgePreset, type JavascriptJudgePresetOptions } from './javascript.js';
 export { javascriptDomJudgePreset } from './javascriptDom.js';
-export { captureTomcatScreenshots, verifyTomcatHtml } from './tomcat.js';
+export { captureTomcatScreenshots, verifyTomcatHtml, verifyTomcatPath } from './tomcat.js';
