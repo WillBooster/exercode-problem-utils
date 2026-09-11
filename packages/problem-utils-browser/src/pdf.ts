@@ -1,6 +1,7 @@
 import { parseFrontmatter, startLocalHttpServer } from '@exercode/problem-utils';
 import type { Page } from 'playwright-core';
 import { Marked } from 'marked';
+import markedCjkFriendly from 'marked-cjk-friendly';
 import { gfmHeadingId } from 'marked-gfm-heading-id';
 import hljs from 'highlight.js';
 import { z } from 'zod';
@@ -27,7 +28,7 @@ export async function markdownToPdf(markdown: string, options: MarkdownPdfOption
       },
     },
   });
-  marked.use(gfmHeadingId());
+  marked.use(markedCjkFriendly(), gfmHeadingId());
   const body = await marked.parse(markdownBody(markdown));
   await using server = await startLocalHttpServer(options.assetDirectoryPath);
   const browser = await launchBrowser();

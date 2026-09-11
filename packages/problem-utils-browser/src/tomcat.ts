@@ -47,7 +47,7 @@ export async function verifyTomcatHtml(endpoint: string, expectedHtml: string): 
 export async function verifyTomcatPath(page: Page, endpoint: string): Promise<void> {
   const expectedPath = new URL(buildTomcatUrl(endpoint)).pathname;
   try {
-    await page.waitForURL((url) => url.pathname === expectedPath, { timeout: 5000, waitUntil: 'commit' });
+    await page.waitForURL((url) => url.pathname === expectedPath, { timeout: 5000, waitUntil: 'domcontentloaded' });
   } catch {
     throw new Error(
       `URL遷移に失敗しました。期待されるURL: ${expectedPath}、現在のURL: ${new URL(page.url()).pathname}`

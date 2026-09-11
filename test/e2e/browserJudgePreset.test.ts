@@ -92,3 +92,19 @@ test('read-only callback errors keep their original identity and diagnostics', {
     { sameError: true, name: 'Error', message: '\u001B[2mFrozen failure\u001B[22m' },
   ]);
 });
+
+test('top-level browser failures print plain diagnostics without forced runtime color', { timeout: 30_000 }, () => {
+  const result = spawnSync(
+    'bun',
+    ['test/fixtures/browserUncaughtTimeout.ts', path.resolve('example/web_page_weather/model_answers/default'), '{}'],
+    {
+      encoding: 'utf8',
+      timeout: 20_000,
+      env: { ...process.env, FORCE_COLOR: undefined, NO_COLOR: undefined, CI: undefined, TERM: 'xterm-256color' },
+    }
+  );
+  expect(result.status).toBe(1);
+  expect(result.stdout).toBe('');
+  expect(result.stderr).toContain('#missing-submission-element');
+  expect(result.stderr).not.toContain('\u001B');
+});

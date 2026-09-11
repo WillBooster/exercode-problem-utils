@@ -10,7 +10,7 @@ import type { BrowserContextOptions, LaunchOptions, Page } from 'playwright-core
 
 import { captureScreenshot, launchBrowser } from './browser.js';
 
-export { captureScreenshot, launchBrowser } from './browser.js';
+export { captureScreenshot, launchBrowser, requirePageElement } from './browser.js';
 export {
   htmlJudgePreset,
   captureHtmlBodySnapshot,

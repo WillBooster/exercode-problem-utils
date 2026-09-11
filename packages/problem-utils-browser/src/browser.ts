@@ -18,3 +18,10 @@ export async function captureScreenshot(
   const screenshot = await page.screenshot({ fullPage: true });
   return { path: filename, data: screenshot.toString('base64'), encoding: 'base64' };
 }
+
+/** Finds a required course control immediately and reports its selector when absent. */
+export async function requirePageElement(page: Page, selector: string) {
+  const element = await page.$(selector);
+  if (!element) throw new Error(`要素が見つかりません: ${selector}`);
+  return element;
+}
