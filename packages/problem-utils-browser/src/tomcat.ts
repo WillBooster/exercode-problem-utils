@@ -52,7 +52,12 @@ export async function verifyTomcatPath(page: Page, endpoint: string): Promise<vo
   const expectedPath = new URL(buildTomcatUrl(endpoint)).pathname;
   try {
     await page.waitForFunction(
-      (pathname) => location.pathname === pathname && document.readyState !== 'loading',
+      (pathname) => {
+        if (location.pathname !== pathname) return false;
+        // Interactive documents can still be waiting for deferred scripts.
+        const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+        return document.readyState === 'complete' || (navigation?.domContentLoadedEventEnd ?? 0) > 0;
+      },
       { timeout: 5000 },
       expectedPath
     );

@@ -6,7 +6,7 @@ import {
   startLocalHttpServer,
   type TestCaseResult,
 } from '@exercode/problem-utils';
-import type { BrowserContextOptions, LaunchOptions, Page, Viewport } from 'puppeteer';
+import type { BrowserContextOptions, LaunchOptions, Page } from 'puppeteer';
 
 import { captureScreenshot, launchBrowser } from './browser.js';
 
@@ -36,7 +36,7 @@ export interface BrowserJudgePresetOptions {
   navigationOptions?: Parameters<Page['goto']>[1];
   launchOptions?: LaunchOptions;
   contextOptions?: BrowserContextOptions;
-  viewport?: Viewport;
+  viewport?: Parameters<Page['setViewport']>[0];
   /** Capture the page as an output file when a test fails. */
   screenshotOnFailure?: boolean;
 }
@@ -72,7 +72,7 @@ async function runBrowserJudge(options: BrowserJudgePresetOptions): Promise<void
   try {
     const context = await browser.createBrowserContext(options.contextOptions);
     const page = await context.newPage();
-    if (options.viewport) await page.setViewport(options.viewport);
+    if (options.viewport !== undefined) await page.setViewport(options.viewport);
     page.setDefaultTimeout(options.timeoutMs ?? 5000);
     await options.initializePage?.(page);
     await page.goto(new URL(options.entryPath ?? '/', server.url).href, {

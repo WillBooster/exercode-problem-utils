@@ -8,6 +8,7 @@ const TEST_CASES: readonly [string, (page: Page) => Promise<Omit<TestCaseResult,
     '01_h1',
     async (page) => {
       try {
+        await page.waitForSelector('h1');
         const heading = await page.$eval('h1', (element) => element.textContent);
         const h1Text = heading?.trim() ?? '';
         assert.strictEqual(h1Text, '今日の天気予報');

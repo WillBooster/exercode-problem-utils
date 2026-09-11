@@ -4,6 +4,7 @@ import { launch, type Browser, type LaunchOptions, type Page } from 'puppeteer';
 /** Launches the Chrome headless shell installed for this Puppeteer version. */
 export async function launchBrowser(options: LaunchOptions = {}): Promise<Browser> {
   return launch({
+    browser: 'chrome',
     headless: 'shell',
     defaultViewport: { width: 1280, height: 720 },
     ...options,

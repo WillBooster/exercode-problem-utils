@@ -55,3 +55,13 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+## Chromium console preview formatting
+
+The console preview formatting in `consoleText.ts` adapts the object and sparse-array
+rendering from Playwright's `crExecutionContext.ts` and `javascript.ts`. It consumes
+Puppeteer's native Chromium remote objects to preserve course output text.
+
+Copyright (c) Microsoft Corporation.
+Licensed under the Apache License, Version 2.0; see `LICENSE`.
+Source: https://github.com/microsoft/playwright/tree/v1.62.1/packages/playwright-core/src/server

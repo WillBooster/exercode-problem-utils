@@ -6,10 +6,13 @@ import { launchBrowser, verifyTomcatPath } from '@exercode/problem-utils-browser
 
 test('course navigation accepts the endpoint path and reports a wrong destination', { timeout: 30_000 }, async () => {
   await using server = http.createServer((request, response) => {
-    if (request.url?.includes('result.jsp')) {
+    if (request.url === '/deferred.js') {
+      response.writeHead(200, { 'Content-Type': 'text/javascript' });
+      setTimeout(() => response.end('document.querySelector("h1").textContent = "Course page";'), 150);
+    } else if (request.url?.includes('result.jsp')) {
       response.writeHead(200, { 'Content-Type': 'text/html' });
-      response.write('<html><body>');
-      setTimeout(() => response.end('<h1>Course page</h1></body></html>'), 150);
+      response.write('<html><head><script defer src="/deferred.js"></script></head><body>');
+      setTimeout(() => response.end('<h1>Pending script</h1></body></html>'), 150);
     } else {
       response.end('<h1>Course page</h1>');
     }
@@ -33,7 +36,7 @@ test('course navigation accepts the endpoint path and reports a wrong destinatio
       `URL遷移に失敗しました。期待されるURL: ${expectedPath}、現在のURL: /wrong`
     );
     await page.close();
-    await expect(verifyTomcatPath(page, '/result.jsp')).rejects.toThrow();
+    await expect(verifyTomcatPath(page, '/result.jsp')).rejects.toThrow(/detached|closed/);
   } finally {
     await browser.close();
   }

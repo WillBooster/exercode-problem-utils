@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { launchBrowser } from './browser.js';
 import { startEmptyPageServer } from './emptyPageServer.js';
+import { consoleText } from './consoleText.js';
 import path from 'node:path';
 
 import { DecisionCode } from '@exercode/problem-utils';
@@ -70,11 +71,11 @@ async function runInBrowser(
     page.on('console', (message) => {
       isRunning = true;
       if (message.type() === 'log') {
-        stdout.push(message.text());
+        stdout.push(consoleText(message));
         return;
       }
       if (message.type() === 'error') {
-        stderr.push(message.text());
+        stderr.push(consoleText(message));
       }
     });
     page.on('pageerror', (error) => {
