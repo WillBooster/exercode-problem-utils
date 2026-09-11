@@ -73,7 +73,7 @@ export async function javascriptDomJudgePreset(problemDir: string): Promise<void
 
         // Run setup code from .in file (NOT wrapped - window.test etc. need global scope)
         if (input.trim()) {
-          // A page script preserves global lexical bindings that an eval call would discard.
+          // Keep the setup exception type and stack in grader feedback, which page.evaluate omits.
           const session = await page.createCDPSession();
           try {
             const result = await session.send('Runtime.evaluate', {
