@@ -2,7 +2,7 @@ import {
   DecisionCode,
   parseArgs,
   printTestCaseResult,
-  startHttpServer,
+  startLocalHttpServer,
   type TestCaseResult,
 } from '@exercode/problem-utils';
 import type { BrowserContextOptions, LaunchOptions, Page } from 'playwright-core';
@@ -44,7 +44,7 @@ export async function browserJudgePreset(options: BrowserJudgePresetOptions): Pr
   const args = parseArgs(process.argv);
   const directoryPath = options.directoryPath ?? args.cwd;
   if (!directoryPath) throw new Error('cwd argument required');
-  await using server = startHttpServer(directoryPath);
+  await using server = await startLocalHttpServer(directoryPath);
   const browser = await launchBrowser(options.launchOptions);
   try {
     const context = await browser.newContext(options.contextOptions);

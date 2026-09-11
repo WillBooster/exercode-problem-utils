@@ -1,4 +1,4 @@
-import { parseFrontmatter, startHttpServer } from '@exercode/problem-utils';
+import { parseFrontmatter, startLocalHttpServer } from '@exercode/problem-utils';
 import type { Page } from 'playwright-core';
 import { Marked } from 'marked';
 import hljs from 'highlight.js';
@@ -27,7 +27,7 @@ export async function markdownToPdf(markdown: string, options: MarkdownPdfOption
     },
   });
   const body = await marked.parse(markdownBody(markdown));
-  await using server = startHttpServer(options.assetDirectoryPath);
+  await using server = await startLocalHttpServer(options.assetDirectoryPath);
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage();

@@ -44,10 +44,15 @@ non-accepted result; capture failures are recorded in `stderr` without replacing
 own HTTP server or test loop.
 
 The browser package depends on `playwright-core`; installing the package does not
-install Chromium. Install the matching Chromium with `playwright-core install chromium`
-in the environment containing that dependency. Docker/CI should install its OS
-libraries at image build/setup time. Browser versions must match the installed
-Playwright version. Install the fonts required by the course content in that environment.
+install Chromium. Before running browser judges or PDF export, install its browser:
+
+```sh
+bun run exercode-browser install chromium
+```
+
+`exercode-browser` runs this package's Playwright CLI, independently of an application's
+E2E test version. Docker/CI should install Chromium's OS libraries at image build/setup
+time. Install the fonts required by the course content in that environment.
 
 ## HTML comparison
 
@@ -139,6 +144,8 @@ const pdf = await markdownToPdf(markdown, {
 });
 await Bun.write('material.pdf', pdf);
 ```
+
+PDF assets are served on IPv4 loopback, and encoded paths cannot escape the asset directory. Intentional asset symlinks remain usable. Core also exports `startLocalHttpServer` for callers that need the same local-only server; await its startup before using its address.
 
 The PDF entry point removes YAML mapping frontmatter, renders Markdown with syntax highlighting, and resolves relative
 images against `assetDirectoryPath`, and waits for fonts and images before printing. Missing or invalid images leave

@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -71,5 +71,24 @@ test('PDF export preserves prose after leading Markdown thematic breaks', { time
     });
     const pages = pdf.toString('latin1').match(/\/Type\s*\/Page\b/g);
     expect(pages?.length).toBeGreaterThan(1);
+  }
+});
+
+test('asset requests cannot read a file outside the served directory', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'asset-root-'));
+  try {
+    const publicDirectory = path.join(directory, 'public');
+    await mkdir(publicDirectory);
+    await writeFile(path.join(directory, 'private.txt'), 'outside the asset root');
+    await writeFile(path.join(publicDirectory, 'index.html'), 'public page');
+    await using server = startHttpServer(publicDirectory);
+    for (const urlPath of ['/..%2fprivate.txt', '/%2e%2e%2fprivate.txt']) {
+      const response = await fetch(`${server.url}${urlPath}`);
+      expect(response.status).toBe(403);
+      expect(await response.text()).not.toContain('outside the asset root');
+    }
+    expect(await fetch(server.url).then((response) => response.text())).toBe('public page');
+  } finally {
+    await rm(directory, { recursive: true, force: true });
   }
 });

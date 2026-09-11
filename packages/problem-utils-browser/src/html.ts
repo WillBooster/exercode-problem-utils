@@ -7,7 +7,7 @@ import {
   DecisionCode,
   parseArgs,
   printTestCaseResult,
-  startHttpServer,
+  startLocalHttpServer,
   type TestCaseResult,
 } from '@exercode/problem-utils';
 import sniffHtmlEncoding from 'html-encoding-sniffer';
@@ -45,9 +45,9 @@ export async function htmlJudgePreset(options: HtmlJudgePresetOptions): Promise<
     return;
   }
   await using submissionDirectory = await createHtmlServedDirectory(submissionDirectoryPath);
-  await using submissionServer = startHttpServer(submissionDirectory.path);
+  await using submissionServer = await startLocalHttpServer(submissionDirectory.path);
   await using solutionDirectory = await createHtmlServedDirectory(options.solutionDirectoryPath);
-  await using solutionServer = startHttpServer(solutionDirectory.path);
+  await using solutionServer = await startLocalHttpServer(solutionDirectory.path);
   const browser = await launchBrowser();
   try {
     const pageOptions = { viewport: { width: 800, height: 600 } };

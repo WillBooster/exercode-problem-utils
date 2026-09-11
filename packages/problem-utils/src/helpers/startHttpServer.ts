@@ -8,11 +8,29 @@ export interface HttpServer {
   port: number | undefined;
 }
 
-/**
- * Start a HTTP server for testing web pages.
- */
+/** Starts a web-page test server and returns its address synchronously. */
 export function startHttpServer(dir: string): HttpServer {
-  const server = http.createServer((request, response) => {
+  const server = createAssetServer(dir);
+  server.listen();
+  return createServerHandle(server);
+}
+
+/** Starts an asset server reachable only from the local machine. */
+export async function startLocalHttpServer(dir: string): Promise<HttpServer> {
+  const server = createAssetServer(dir);
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      server.off('error', reject);
+      resolve();
+    });
+  });
+  return createServerHandle(server);
+}
+
+function createAssetServer(dir: string): http.Server {
+  const rootPath = path.resolve(dir);
+  return http.createServer((request, response) => {
     let pathname: string;
     try {
       const encodedPathname = new URL(request.url ?? '/', 'http://127.0.0.1').pathname;
@@ -29,7 +47,13 @@ export function startHttpServer(dir: string): HttpServer {
 
     const pathnameWithIndexHtml = pathname.endsWith('/') ? path.join(pathname, 'index.html') : pathname;
 
-    const filePath = path.join(dir, pathnameWithIndexHtml);
+    const filePath = path.resolve(rootPath, `.${pathnameWithIndexHtml}`);
+    const relativePath = path.relative(rootPath, filePath);
+    if (relativePath === '..' || relativePath.startsWith(`..${path.sep}`)) {
+      response.writeHead(403);
+      response.end();
+      return;
+    }
 
     if (fs.existsSync(filePath)) {
       try {
@@ -50,9 +74,9 @@ export function startHttpServer(dir: string): HttpServer {
       response.end();
     }
   });
+}
 
-  server.listen();
-
+function createServerHandle(server: http.Server): HttpServer {
   const address = server.address();
   if (!address) throw new Error('server has been unexpectedly closed');
 
