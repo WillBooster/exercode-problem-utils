@@ -50,8 +50,9 @@ export async function verifyTomcatPath(page: Page, endpoint: string): Promise<vo
     await page.waitForURL((url) => url.pathname === expectedPath, { timeout: 5000, waitUntil: 'domcontentloaded' });
   } catch (error) {
     if (!(error instanceof Error) || error.name !== 'TimeoutError') throw error;
-    throw new Error(
-      `URL遷移に失敗しました。期待されるURL: ${expectedPath}、現在のURL: ${new URL(page.url()).pathname}`
-    );
+    const currentPath = new URL(page.url()).pathname;
+    if (currentPath === expectedPath)
+      throw new Error(`ページの読み込み（DOM解析）が5秒以内に完了しませんでした。現在のURL: ${currentPath}`);
+    throw new Error(`URL遷移に失敗しました。期待されるURL: ${expectedPath}、現在のURL: ${currentPath}`);
   }
 }
