@@ -56,9 +56,9 @@ time. Install the fonts required by the course content in that environment.
 
 ## HTML comparison
 
-`htmlJudgePreset({ solutionDirectoryPath, requiredFiles? })` compares the submitted
+`htmlJudgePreset({ solutionDirectoryPath, requiredFiles?, compareDom? })` compares the submitted
 page with the specified model-answer directory. It reports `snapshot_body` first,
-then `screenshot`, stopping on the first difference. The DOM comparison ignores
+then `screenshot`, stopping on the first difference. Set `compareDom: false` for exercises that grade only the rendered appearance. The DOM comparison ignores
 comments and normalizes text whitespace and attribute order. Screenshots render
 formatted HTML at 800×600, with CSS animations disabled and fonts loaded; a difference
 includes both PNG files. HTML decoding honors a BOM or declared HTTP/meta charset, defaulting to UTF-8 when

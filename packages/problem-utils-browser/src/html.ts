@@ -27,9 +27,10 @@ interface JudgeContext {
 export interface HtmlJudgePresetOptions {
   solutionDirectoryPath: string;
   requiredFiles?: readonly string[];
+  compareDom?: boolean;
 }
 
-/** Compares a submitted HTML page with its model answer's DOM and rendered screenshot. */
+/** Compares a submitted HTML page with its model answer's screenshot and, by default, DOM. */
 export async function htmlJudgePreset(options: HtmlJudgePresetOptions): Promise<void> {
   const args = parseArgs(process.argv);
   const submissionDirectoryPath = args.cwd;
@@ -57,6 +58,7 @@ export async function htmlJudgePreset(options: HtmlJudgePresetOptions): Promise<
       ['screenshot', testScreenshot],
     ] as const;
     for (const [testCaseId, check] of checks) {
+      if (testCaseId === 'snapshot_body' && options.compareDom === false) continue;
       const actualPage = await browser.newPage(pageOptions);
       const solutionPage = await browser.newPage(pageOptions);
       try {
