@@ -100,7 +100,7 @@ test('top-level browser failures print plain diagnostics without forced runtime 
     {
       encoding: 'utf8',
       timeout: 20_000,
-      env: { ...process.env, FORCE_COLOR: undefined, NO_COLOR: undefined, CI: undefined, TERM: 'xterm-256color' },
+      env: { ...process.env, FORCE_COLOR: undefined, NO_COLOR: undefined, TERM: 'xterm-256color' },
     }
   );
   expect(result.status).toBe(1);

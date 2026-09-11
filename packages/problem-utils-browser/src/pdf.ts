@@ -1,7 +1,6 @@
 import { parseFrontmatter, startLocalHttpServer } from '@exercode/problem-utils';
 import type { Page } from 'playwright-core';
 import { Marked } from 'marked';
-import markedCjkFriendly from 'marked-cjk-friendly';
 import { gfmHeadingId } from 'marked-gfm-heading-id';
 import hljs from 'highlight.js';
 import { z } from 'zod';
@@ -17,6 +16,7 @@ export interface MarkdownPdfOptions {
 }
 
 export async function markdownToPdf(markdown: string, options: MarkdownPdfOptions): Promise<Buffer> {
+  const { default: markedCjkFriendly } = await import('marked-cjk-friendly');
   const marked = new Marked({
     renderer: {
       code({ text, lang }) {
