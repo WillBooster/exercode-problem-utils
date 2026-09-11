@@ -32,6 +32,8 @@ test('course navigation accepts the endpoint path and reports a wrong destinatio
     await expect(verifyTomcatPath(page, '/result.jsp')).rejects.toThrow(
       `URL遷移に失敗しました。期待されるURL: ${expectedPath}、現在のURL: /wrong`
     );
+    await page.close();
+    await expect(verifyTomcatPath(page, '/result.jsp')).rejects.toThrow('has been closed');
   } finally {
     await browser.close();
   }
