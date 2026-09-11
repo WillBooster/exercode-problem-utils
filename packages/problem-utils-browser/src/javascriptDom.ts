@@ -35,7 +35,7 @@ export async function javascriptDomJudgePreset(problemDir: string): Promise<void
   await using server = await startEmptyPageServer();
   const browser = await launchBrowser();
   try {
-    const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+    const context = await browser.createBrowserContext();
     for (const testCaseId of testCaseIds) {
       const input = fs.readFileSync(path.join(testCasesDir, `${testCaseId}.in`), 'utf8');
       const expectedOutput = fs.readFileSync(path.join(testCasesDir, `${testCaseId}.out`), 'utf8').replace(/\n$/, '');
@@ -74,7 +74,7 @@ export async function javascriptDomJudgePreset(problemDir: string): Promise<void
         // Run setup code from .in file (NOT wrapped - window.test etc. need global scope)
         if (input.trim()) {
           // A page script preserves global lexical bindings that an eval call would discard.
-          const session = await context.newCDPSession(page);
+          const session = await page.createCDPSession();
           try {
             const result = await session.send('Runtime.evaluate', {
               expression: input,

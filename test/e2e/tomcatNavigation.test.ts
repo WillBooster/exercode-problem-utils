@@ -24,7 +24,7 @@ test('course navigation accepts the endpoint path and reports a wrong destinatio
     const expectedPath = new URL(buildTomcatUrl('/result.jsp')).pathname;
     const baseUrl = `http://127.0.0.1:${address.port}`;
     await page.goto(`${baseUrl}/initial`);
-    const navigation = page.goto(`${baseUrl}${expectedPath}?answer=42`, { waitUntil: 'commit' });
+    const navigation = page.goto(`${baseUrl}${expectedPath}?answer=42`, { waitUntil: 'domcontentloaded' });
     await verifyTomcatPath(page, '/result.jsp');
     expect(await page.evaluate('document.querySelector("h1")?.textContent')).toBe('Course page');
     await navigation;
@@ -33,7 +33,7 @@ test('course navigation accepts the endpoint path and reports a wrong destinatio
       `URL遷移に失敗しました。期待されるURL: ${expectedPath}、現在のURL: /wrong`
     );
     await page.close();
-    await expect(verifyTomcatPath(page, '/result.jsp')).rejects.toThrow('has been closed');
+    await expect(verifyTomcatPath(page, '/result.jsp')).rejects.toThrow();
   } finally {
     await browser.close();
   }

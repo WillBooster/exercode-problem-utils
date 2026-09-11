@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { captureScreenshot, launchBrowser } from './browser.js';
-import type { Page } from 'playwright-core';
+import type { Page } from 'puppeteer';
 import type { TestCaseResult } from '@exercode/problem-utils';
 import { buildTomcatUrl } from '@exercode/problem-utils/presets/tomcat';
 
@@ -23,11 +23,15 @@ export async function captureTomcatScreenshots(pages: readonly [Page, ...Page[]]
 export async function verifyTomcatHtml(endpoint: string, expectedHtml: string): Promise<void> {
   const browser = await launchBrowser();
   try {
-    const context = await browser.newContext({ viewport: { width: 800, height: 600 } });
+    const context = await browser.createBrowserContext();
     const actualPage = await context.newPage();
     const expectedPage = await context.newPage();
+    await Promise.all([
+      actualPage.setViewport({ width: 800, height: 600 }),
+      expectedPage.setViewport({ width: 800, height: 600 }),
+    ]);
     try {
-      await actualPage.goto(buildTomcatUrl(endpoint), { waitUntil: 'networkidle' });
+      await actualPage.goto(buildTomcatUrl(endpoint), { waitUntil: 'networkidle0' });
       await expectedPage.setContent(expectedHtml);
       const actual = await actualPage.evaluate(() => document.documentElement.outerHTML);
       const expected = await expectedPage.evaluate(() => document.documentElement.outerHTML);
@@ -47,7 +51,11 @@ export async function verifyTomcatHtml(endpoint: string, expectedHtml: string): 
 export async function verifyTomcatPath(page: Page, endpoint: string): Promise<void> {
   const expectedPath = new URL(buildTomcatUrl(endpoint)).pathname;
   try {
-    await page.waitForURL((url) => url.pathname === expectedPath, { timeout: 5000, waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(
+      (pathname) => location.pathname === pathname && document.readyState !== 'loading',
+      { timeout: 5000 },
+      expectedPath
+    );
   } catch (error) {
     if (!(error instanceof Error) || error.name !== 'TimeoutError') throw error;
     const currentPath = new URL(page.url()).pathname;

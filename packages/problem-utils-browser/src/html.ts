@@ -11,7 +11,7 @@ import {
   type TestCaseResult,
 } from '@exercode/problem-utils';
 import sniffHtmlEncoding from 'html-encoding-sniffer';
-import type { Page, Route } from 'playwright-core';
+import type { Page, HTTPRequest } from 'puppeteer';
 import { format } from 'prettier';
 import prettierPluginOrganizeAttributes from 'prettier-plugin-organize-attributes';
 
@@ -54,7 +54,7 @@ export async function htmlJudgePreset(options: HtmlJudgePresetOptions): Promise<
   await using solutionServer = await startLocalHttpServer(solutionDirectory.path);
   const browser = await launchBrowser();
   try {
-    const pageOptions = { viewport: { width: 800, height: 600 } };
+    const viewport = { width: 800, height: 600 };
     const ctx: JudgeContext = {
       solutionUrl: solutionServer.url,
       submissionUrl: submissionServer.url,
@@ -66,14 +66,17 @@ export async function htmlJudgePreset(options: HtmlJudgePresetOptions): Promise<
     ] as const;
     for (const [testCaseId, check] of checks) {
       if (testCaseId === 'snapshot_body' && options.compareDom === false) continue;
-      const actualPage = await browser.newPage(pageOptions);
-      const solutionPage = await browser.newPage(pageOptions);
+      const actualContext = await browser.createBrowserContext();
+      const solutionContext = await browser.createBrowserContext();
+      const actualPage = await actualContext.newPage();
+      const solutionPage = await solutionContext.newPage();
+      await Promise.all([actualPage.setViewport(viewport), solutionPage.setViewport(viewport)]);
       try {
         const result = await check(actualPage, solutionPage, ctx);
         printTestCaseResult({ testCaseId, ...result });
         if (result.decisionCode !== DecisionCode.ACCEPTED) break;
       } finally {
-        await Promise.all([actualPage.close(), solutionPage.close()]);
+        await Promise.all([actualContext.close(), solutionContext.close()]);
       }
     }
   } finally {
@@ -205,13 +208,18 @@ async function capturePreparedHtmlScreenshot(page: Page, url: string, formattedH
   } else {
     // Keep the document URL so relative base elements and asset URLs resolve as served.
     // Interception stays active until subresources finish loading.
-    const renderHtml = async (route: Route) =>
-      route.fulfill({ contentType: 'text/html; charset=utf-8', body: formattedHtml });
-    await page.route(url, renderHtml);
+    const renderHtml = async (request: HTTPRequest) => {
+      await (request.url() === url && request.isNavigationRequest() && request.frame() === page.mainFrame()
+        ? request.respond({ contentType: 'text/html; charset=utf-8', body: formattedHtml })
+        : request.continue());
+    };
+    await page.setRequestInterception(true);
+    page.on('request', renderHtml);
     try {
       await page.goto(url, { waitUntil: 'load' });
     } finally {
-      await page.unroute(url, renderHtml);
+      await page.setRequestInterception(false);
+      page.off('request', renderHtml);
     }
   }
 

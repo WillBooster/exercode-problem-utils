@@ -80,7 +80,7 @@ async function runInBrowser(
     page.on('pageerror', (error) => {
       isRunning = true;
       pageErrorOccurred = true;
-      stderr.push(error.message);
+      stderr.push(error instanceof Error ? error.message : String(error));
     });
 
     const runStartedAt = Date.now();

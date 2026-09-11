@@ -1,5 +1,5 @@
 import { parseFrontmatter, startLocalHttpServer } from '@exercode/problem-utils';
-import type { Page } from 'playwright-core';
+import type { Page } from 'puppeteer';
 import { Marked } from 'marked';
 import { gfmHeadingId } from 'marked-gfm-heading-id';
 import hljs from 'highlight.js';
@@ -34,12 +34,21 @@ export async function markdownToPdf(markdown: string, options: MarkdownPdfOption
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage();
-    await page.route(`${server.url}/`, (route) =>
-      route.fulfill({
+    await page.setRequestInterception(true);
+    page.on('request', async (request) => {
+      if (
+        request.url() !== `${server.url}/` ||
+        !request.isNavigationRequest() ||
+        request.frame() !== page.mainFrame()
+      ) {
+        await request.continue();
+        return;
+      }
+      await request.respond({
         contentType: 'text/html; charset=utf-8',
         body: `<!doctype html><html><head><meta charset="utf-8"></head><body>${body}</body></html>`,
-      })
-    );
+      });
+    });
     await page.goto(`${server.url}/`, { waitUntil: 'load' });
     await page.addStyleTag({ content: markdownStyles + highlightStyles });
     if (options.css) await page.addStyleTag({ content: options.css });
@@ -59,17 +68,19 @@ export async function markdownToPdf(markdown: string, options: MarkdownPdfOption
         await mermaid.run();
       });
     }
-    await page.emulateMedia({ media: 'screen' });
+    await page.emulateMediaType('screen');
     await page.evaluate(async () => {
       await document.fonts.ready;
       await Promise.allSettled(Array.from(document.images, (image) => image.decode()));
     });
-    return await page.pdf({
-      printBackground: true,
-      format: options.pdfOptions?.width || options.pdfOptions?.height ? undefined : 'A4',
-      margin: { top: '30mm', right: '40mm', bottom: '30mm', left: '20mm' },
-      ...options.pdfOptions,
-    });
+    return Buffer.from(
+      await page.pdf({
+        printBackground: true,
+        format: options.pdfOptions?.width || options.pdfOptions?.height ? undefined : 'A4',
+        margin: { top: '30mm', right: '40mm', bottom: '30mm', left: '20mm' },
+        ...options.pdfOptions,
+      })
+    );
   } finally {
     await browser.close();
   }

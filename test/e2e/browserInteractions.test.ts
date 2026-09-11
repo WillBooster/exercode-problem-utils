@@ -16,8 +16,8 @@ test(
       const input = await requirePageElement(page, '#answer');
       await input.type('42');
       const button = await requirePageElement(page, 'button');
-      await button.click({ force: true });
-      expect(await page.locator('body').getAttribute('data-answer')).toBe('42');
+      await button.click();
+      expect(await page.$eval('body', (element) => element.dataset.answer)).toBe('42');
     } finally {
       await browser.close();
     }

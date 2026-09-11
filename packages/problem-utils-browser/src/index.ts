@@ -6,7 +6,7 @@ import {
   startLocalHttpServer,
   type TestCaseResult,
 } from '@exercode/problem-utils';
-import type { BrowserContextOptions, LaunchOptions, Page } from 'playwright-core';
+import type { BrowserContextOptions, LaunchOptions, Page, Viewport } from 'puppeteer';
 
 import { captureScreenshot, launchBrowser } from './browser.js';
 
@@ -21,7 +21,7 @@ export {
   type ServedDirectory,
 } from './html.js';
 
-export type { Browser, BrowserContext, BrowserContextOptions, LaunchOptions, Locator, Page } from 'playwright-core';
+export type { Browser, BrowserContext, BrowserContextOptions, LaunchOptions, Locator, Page, Viewport } from 'puppeteer';
 
 export type BrowserJudgeResult = Omit<TestCaseResult, 'testCaseId'>;
 export type BrowserJudgeTestCase = readonly [string, (page: Page) => Promise<BrowserJudgeResult>];
@@ -36,6 +36,7 @@ export interface BrowserJudgePresetOptions {
   navigationOptions?: Parameters<Page['goto']>[1];
   launchOptions?: LaunchOptions;
   contextOptions?: BrowserContextOptions;
+  viewport?: Viewport;
   /** Capture the page as an output file when a test fails. */
   screenshotOnFailure?: boolean;
 }
@@ -69,8 +70,9 @@ async function runBrowserJudge(options: BrowserJudgePresetOptions): Promise<void
   await using server = await startLocalHttpServer(directoryPath);
   const browser = await launchBrowser(options.launchOptions);
   try {
-    const context = await browser.newContext(options.contextOptions);
+    const context = await browser.createBrowserContext(options.contextOptions);
     const page = await context.newPage();
+    if (options.viewport) await page.setViewport(options.viewport);
     page.setDefaultTimeout(options.timeoutMs ?? 5000);
     await options.initializePage?.(page);
     await page.goto(new URL(options.entryPath ?? '/', server.url).href, {

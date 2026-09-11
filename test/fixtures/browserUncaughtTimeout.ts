@@ -7,7 +7,7 @@ await browserJudgePreset({
     [
       'missing',
       async (page) => {
-        await page.locator('#missing-submission-element').waitFor();
+        await page.waitForSelector('#missing-submission-element');
         return { decisionCode: DecisionCode.ACCEPTED };
       },
     ],

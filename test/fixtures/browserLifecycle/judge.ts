@@ -12,8 +12,8 @@ await browserJudgePreset({
   },
   testCases: [
     ['page', async (page) => {
-      const heading = await page.locator('h1').innerText();
-      await page.locator('h1').evaluate((element) => { element.textContent = 'Checked'; });
+      const heading = await page.$eval('h1', (element) => element.innerText);
+      await page.$eval('h1', (element) => { element.textContent = 'Checked'; });
       return { decisionCode: DecisionCode.ACCEPTED, stdout: heading };
     }],
   ],
@@ -21,7 +21,7 @@ await browserJudgePreset({
     printTestCaseResult({
       testCaseId: 'after',
       decisionCode: DecisionCode.ACCEPTED,
-      stdout: [...messages, await page.locator('h1').innerText()].join('\n'),
+      stdout: [...messages, await page.$eval('h1', (element) => element.innerText)].join('\n'),
     });
   },
 });

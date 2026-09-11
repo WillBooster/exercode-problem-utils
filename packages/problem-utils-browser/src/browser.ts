@@ -1,11 +1,12 @@
 import type { TestCaseResult } from '@exercode/problem-utils';
-import { chromium, type Browser, type LaunchOptions, type Page } from 'playwright-core';
+import { launch, type Browser, type LaunchOptions, type Page } from 'puppeteer';
 
-/** Launches the Chromium installed for this Playwright version. */
+/** Launches the Chrome headless shell installed for this Puppeteer version. */
 export async function launchBrowser(options: LaunchOptions = {}): Promise<Browser> {
-  return chromium.launch({
-    headless: true,
-    chromiumSandbox: !process.env.CI && process.env.WB_DOCKER !== '1',
+  return launch({
+    headless: 'shell',
+    defaultViewport: { width: 1280, height: 720 },
+    args: process.env.CI || process.env.WB_DOCKER === '1' ? ['--no-sandbox', '--disable-setuid-sandbox'] : [],
     ...options,
   });
 }
@@ -16,7 +17,7 @@ export async function captureScreenshot(
   filename = 'screenshot_received.png'
 ): Promise<NonNullable<TestCaseResult['outputFiles']>[number]> {
   const screenshot = await page.screenshot({ fullPage: true });
-  return { path: filename, data: screenshot.toString('base64'), encoding: 'base64' };
+  return { path: filename, data: Buffer.from(screenshot).toString('base64'), encoding: 'base64' };
 }
 
 /** Finds a required course control immediately and reports its selector when absent. */
