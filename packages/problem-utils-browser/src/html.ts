@@ -15,7 +15,7 @@ import type { Page } from 'puppeteer';
 import { format } from 'prettier';
 import prettierPluginOrganizeAttributes from 'prettier-plugin-organize-attributes';
 
-import { launchBrowser } from './browser.js';
+import { capturePngScreenshot, launchBrowser } from './browser.js';
 import { createTemporaryDirectory } from './temporaryDirectory.js';
 
 type JudgeCaseResult = Omit<TestCaseResult, 'testCaseId'>;
@@ -240,8 +240,7 @@ async function capturePreparedHtmlScreenshot(page: Page, url: string, formattedH
     document.head.append(style);
     if ('fonts' in document) await document.fonts.ready;
   });
-  const screenshot = await page.screenshot({ fullPage: true, type: 'png' });
-  return Buffer.from(screenshot);
+  return capturePngScreenshot(page);
 }
 
 async function loadFormattedHtmlForScreenshot(url: string): Promise<string | undefined> {

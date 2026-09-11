@@ -113,3 +113,28 @@ test('top-level browser failures print plain diagnostics without forced runtime 
   expect(result.stderr).toContain('#missing-submission-element');
   expect(result.stderr).not.toContain('\u001B');
 });
+
+test('a blocked renderer cannot discard a verdict while capturing its failure screenshot', { timeout: 30_000 }, () => {
+  const result = spawnSync(
+    'bun',
+    [
+      'test/fixtures/browserBlockedRenderer/judge.ts',
+      path.resolve('example/web_page_weather/model_answers/default'),
+      '{}',
+    ],
+    { encoding: 'utf8', timeout: 20_000 }
+  );
+  expect(result.status, result.stderr).toBe(0);
+  const lines = result.stdout.trim().split('\n');
+  expect(lines).toHaveLength(1);
+  expect(lines[0]).toMatch(/^TEST_CASE_RESULT /);
+  const verdict = testCaseResultSchema.parse(JSON.parse(lines[0]!.slice(TEST_CASE_RESULT_PREFIX.length)));
+  expect(verdict).toMatchObject({
+    testCaseId: 'blocked_renderer',
+    decisionCode: DecisionCode.WRONG_ANSWER,
+    feedbackMarkdown: 'The required element is missing.',
+  });
+  expect(verdict.stderr).toContain('Screenshot capture failed:');
+  expect(verdict.stderr).toContain('200 ms');
+  expect(verdict.outputFiles).toBeUndefined();
+});
