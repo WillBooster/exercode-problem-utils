@@ -45,3 +45,32 @@ test('browser hooks observe startup and completed checks on a custom entry page'
   ]);
   expect(records).toHaveLength(2);
 });
+
+test('an uncaught browser timeout remains a failure with readable CLI diagnostics', { timeout: 30_000 }, () => {
+  const result = spawnSync(
+    'bun',
+    ['test/fixtures/browserTimeoutJudge.ts', path.resolve('example/web_page_weather/model_answers/default'), '{}'],
+    { encoding: 'utf8', timeout: 20_000, env: { ...process.env, FORCE_COLOR: '1' } }
+  );
+  expect(result.status).toBe(1);
+  expect(result.stdout).toBe('');
+  expect(result.stderr).toContain('TimeoutError:');
+  expect(result.stderr).toContain('#missing-submission-element');
+  expect(result.stderr).not.toContain('\u001B');
+});
+
+test('caught browser timeouts produce readable wrong-answer feedback', { timeout: 30_000 }, () => {
+  const result = spawnSync(
+    'bun',
+    ['test/fixtures/browserTimeoutFeedback.ts', path.resolve('example/web_page_weather/model_answers/default'), '{}'],
+    { encoding: 'utf8', timeout: 20_000, env: { ...process.env, FORCE_COLOR: '1' } }
+  );
+  expect(result.status, result.stderr).toBe(0);
+  const lines = result.stdout.trim().split('\n');
+  expect(lines).toHaveLength(1);
+  expect(lines[0]).toMatch(/^TEST_CASE_RESULT /);
+  const verdict = testCaseResultSchema.parse(JSON.parse(lines[0]!.slice(TEST_CASE_RESULT_PREFIX.length)));
+  expect(verdict.decisionCode).toBe(DecisionCode.WRONG_ANSWER);
+  expect(verdict.stderr).toContain('#missing-submission-element');
+  expect(verdict.stderr).not.toContain('\u001B');
+});

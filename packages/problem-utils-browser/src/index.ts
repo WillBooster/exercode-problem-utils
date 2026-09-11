@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util';
 import {
   DecisionCode,
   parseArgs,
@@ -41,6 +42,18 @@ export interface BrowserJudgePresetOptions {
 
 /** Runs browser checks against the submitted directory and emits judge stream results. */
 export async function browserJudgePreset(options: BrowserJudgePresetOptions): Promise<void> {
+  try {
+    await runBrowserJudge(options);
+  } catch (error) {
+    if (error instanceof Error) {
+      error.message = stripVTControlCharacters(error.message);
+      if (error.stack) error.stack = stripVTControlCharacters(error.stack);
+    }
+    throw error;
+  }
+}
+
+async function runBrowserJudge(options: BrowserJudgePresetOptions): Promise<void> {
   const args = parseArgs(process.argv);
   const directoryPath = options.directoryPath ?? args.cwd;
   if (!directoryPath) throw new Error('cwd argument required');
@@ -65,6 +78,7 @@ export async function browserJudgePreset(options: BrowserJudgePresetOptions): Pr
           result.stderr = result.stderr ? `${result.stderr}\n${message}` : message;
         }
       }
+      if (result.stderr) result.stderr = stripVTControlCharacters(result.stderr);
       printTestCaseResult({ testCaseId, ...result });
       if (result.decisionCode !== DecisionCode.ACCEPTED) break;
     }
