@@ -4,6 +4,7 @@ import {
   PuppeteerError,
   TimeoutError,
   type Browser,
+  type BrowserContext,
   type CDPSession,
   type LaunchOptions,
   type Page,
@@ -99,4 +100,17 @@ export async function evaluateBrowserProgram(page: Page, source: string): Promis
     // Presets expose the message as feedback; include the browser exception type there.
     throw error instanceof Error ? new Error(String(error), { cause: error }) : error;
   }
+}
+
+/** Creates a native page that dismisses dialogs unless the grader handles them. */
+export async function createBrowserPage(browser: Browser | BrowserContext): Promise<Page> {
+  const page = await browser.newPage();
+  page.on('dialog', (dialog) => {
+    if (page.listenerCount('dialog') === 1 && !dialog.handled) {
+      void dialog.dismiss().catch(() => {
+        // The page may close while Chrome is processing dismissal.
+      });
+    }
+  });
+  return page;
 }
