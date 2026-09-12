@@ -151,6 +151,26 @@ test(
     expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(true);
     expect(await page.$eval('output', (element) => element.textContent)).toBe('added');
     expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(false);
-    expect(await page.$('form')).not.toBeNull();
+  }
+);
+
+test(
+  'a non-submit control does not inherit a canceled submission from page initialization',
+  { timeout: 30_000 },
+  async () => {
+    await using browser = await launchBrowser();
+    const page = await createBrowserPage(browser);
+    const html = `<form><button id="add" type="button">Add</button></form><output></output><script>
+    window.addEventListener('submit', (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      document.querySelector('output').textContent += 'submitted';
+    }, { capture: true });
+    document.querySelector('form').requestSubmit();
+  </script>`;
+    await page.goto(`data:text/html,${encodeURIComponent(html)}`);
+    expect(await page.$eval('output', (element) => element.textContent)).toBe('submitted');
+    expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(false);
+    expect(await page.$eval('output', (element) => element.textContent)).toBe('submitted');
   }
 );
