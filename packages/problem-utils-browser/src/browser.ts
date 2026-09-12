@@ -11,6 +11,8 @@ import {
   type Page,
 } from 'puppeteer';
 
+const submitEventsKey = '@exercode/problem-utils-browser/submit-events';
+
 /** Launches the Chrome headless shell installed for this Puppeteer version. */
 export async function launchBrowser(options: LaunchOptions = {}): Promise<Browser> {
   return launch({
@@ -113,15 +115,29 @@ export async function createBrowserPage(browser: Browser | BrowserContext): Prom
       });
     }
   });
+  // Observe before learner listeners, which may stop immediate propagation on window.
+  await page.evaluateOnNewDocument((key) => {
+    const events = new WeakMap<EventTarget, Event>();
+    Object.defineProperty(globalThis, key, { value: events, configurable: true });
+    globalThis.addEventListener(
+      'submit',
+      (event) => {
+        if (event.target) events.set(event.target, event);
+      },
+      true
+    );
+  }, submitEventsKey);
   return page;
 }
 
 /** Activates a form control and reports whether the submitted event was canceled by the page. */
 export async function clickAndDetectCanceledSubmit(page: Page, buttonSelector: string): Promise<boolean> {
   await using button = await requirePageElement(page, buttonSelector);
-  return await button.evaluate((button) => {
+  return await button.evaluate((button, key) => {
     const form = (button as HTMLButtonElement).form;
     if (!form) return false;
+    const earlyEvents = (globalThis as unknown as Record<string, WeakMap<EventTarget, Event> | undefined>)[key];
+    earlyEvents?.delete(form);
     const submission: { event?: Event; canceled?: boolean } = {};
     const onSubmit = (event: Event): void => {
       if (event.target === form) submission.event = event;
@@ -136,12 +152,13 @@ export async function clickAndDetectCanceledSubmit(page: Page, buttonSelector: s
     globalThis.addEventListener('submit', preventNavigation);
     try {
       (button as HTMLElement).click();
-      return submission.canceled ?? submission.event?.defaultPrevented ?? false;
+      return submission.canceled ?? (submission.event ?? earlyEvents?.get(form))?.defaultPrevented ?? false;
     } finally {
       globalThis.removeEventListener('submit', onSubmit, true);
       globalThis.removeEventListener('submit', preventNavigation);
+      earlyEvents?.delete(form);
     }
-  });
+  }, submitEventsKey);
 }
 
 export interface CapturedFormRequest {
