@@ -11,6 +11,7 @@ import type { BrowserContextOptions, LaunchOptions, Page } from 'puppeteer';
 import { createBrowserPage, captureScreenshot, launchBrowser } from './browser.js';
 
 export {
+  clickAndDetectCanceledSubmit,
   createBrowserPage,
   captureScreenshot,
   evaluateBrowserProgram,

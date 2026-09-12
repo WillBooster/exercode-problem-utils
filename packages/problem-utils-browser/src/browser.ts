@@ -114,3 +114,31 @@ export async function createBrowserPage(browser: Browser | BrowserContext): Prom
   });
   return page;
 }
+
+/** Activates a form control and reports whether the submitted event was canceled by the page. */
+export async function clickAndDetectCanceledSubmit(page: Page, buttonSelector: string): Promise<boolean> {
+  const button = await page.locator(buttonSelector).waitHandle();
+  return await button.evaluate((button) => {
+    const form = (button as HTMLButtonElement).form;
+    if (!form) return false;
+    const submission: { event?: Event; canceled?: boolean } = {};
+    const onSubmit = (event: Event): void => {
+      submission.event = event;
+    };
+    const preventNavigation = (event: Event): void => {
+      if (event !== submission.event) return;
+      submission.canceled = event.defaultPrevented;
+      event.preventDefault();
+    };
+    form.addEventListener('submit', onSubmit, true);
+    // Delegated document/window handlers must run before cancellation is inspected.
+    globalThis.addEventListener('submit', preventNavigation);
+    try {
+      (button as HTMLElement).click();
+      return submission.canceled ?? submission.event?.defaultPrevented ?? false;
+    } finally {
+      form.removeEventListener('submit', onSubmit, true);
+      globalThis.removeEventListener('submit', preventNavigation);
+    }
+  });
+}
