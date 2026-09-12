@@ -71,9 +71,9 @@ export async function javascriptDomJudgePreset(problemDir: string): Promise<void
         // Clear localStorage for each test case
         await page.evaluate(() => localStorage.clear());
 
-        // Run setup code from .in file (NOT wrapped - window.test etc. need global scope)
         if (input.trim()) {
-          // Keep the setup exception type and stack in grader feedback, which page.evaluate omits.
+          // Raw setup preserves global let/const for the submission and exception details for grader feedback.
+          // evaluateBrowserProgram discards lexical bindings; native page.evaluate omits the exception type.
           const session = await page.createCDPSession();
           try {
             const result = await session.send('Runtime.evaluate', {
