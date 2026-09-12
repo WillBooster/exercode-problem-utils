@@ -141,6 +141,8 @@ test(
     await using browser = await launchBrowser();
     const page = await createBrowserPage(browser);
     const html = `<form><button id="add">Add</button></form><output></output><script>
+    var Symbol = 1;
+    const Reflect = {};
     window.addEventListener('submit', (event) => {
       event.preventDefault();
       event.stopImmediatePropagation();

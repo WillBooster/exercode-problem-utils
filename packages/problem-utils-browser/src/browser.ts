@@ -118,7 +118,7 @@ export async function createBrowserPage(browser: Browser | BrowserContext): Prom
   // Observe before learner listeners, which may stop immediate propagation on window.
   await page.evaluateOnNewDocument((key) => {
     const events = new WeakMap<EventTarget, Event>();
-    Reflect.set(globalThis, Symbol.for(key), events);
+    Object.defineProperty(globalThis, key, { value: events, configurable: true });
     globalThis.addEventListener(
       'submit',
       (event) => {
@@ -136,7 +136,7 @@ export async function clickAndDetectCanceledSubmit(page: Page, buttonSelector: s
   return await button.evaluate((button, key) => {
     const form = (button as HTMLButtonElement).form;
     if (!form) return false;
-    const earlyEvents = Reflect.get(globalThis, Symbol.for(key)) as WeakMap<EventTarget, Event> | undefined;
+    const earlyEvents = (globalThis as unknown as Record<string, WeakMap<EventTarget, Event> | undefined>)[key];
     earlyEvents?.delete(form);
     const submission: { event?: Event; canceled?: boolean } = {};
     const onSubmit = (event: Event): void => {
