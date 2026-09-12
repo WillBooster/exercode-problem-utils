@@ -48,7 +48,7 @@
   },
   "devDependencies": {
     "build-ts": "21.0.12",
-    "undici-types": "8.3.0"
+    "undici-types": "8.10.2"
   },
   "engines": {
     "node": ">=24"
