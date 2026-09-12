@@ -11,11 +11,14 @@ import type { BrowserContextOptions, LaunchOptions, Page } from 'puppeteer';
 import { createBrowserPage, captureScreenshot, launchBrowser } from './browser.js';
 
 export {
+  clickAndDetectCanceledSubmit,
   createBrowserPage,
   captureScreenshot,
   evaluateBrowserProgram,
   launchBrowser,
   requirePageElement,
+  submitFormAndCaptureRequest,
+  type CapturedFormRequest,
 } from './browser.js';
 export { consoleText } from './consoleText.js';
 export {
