@@ -77,11 +77,11 @@ for (const target of ['form', 'document', 'window', 'stopped-form', 'capturing-d
   });
 }
 
-test('form observers are removed between canceled and uncanceled submissions', { timeout: 30_000 }, async () => {
+test('form checks distinguish canceled and uncanceled submissions on the same page', { timeout: 30_000 }, async () => {
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage();
-    await page.setContent('<form><button id="add">Add</button></form>');
+    await page.setContent('<form action="javascript:void(0)"><button id="add">Add</button></form>');
     await page.evaluate(
       "document.querySelector('form').addEventListener('submit', (event) => event.preventDefault(), { once: true })"
     );
@@ -174,5 +174,118 @@ test(
     expect(await page.$eval('output', (element) => element.textContent)).toBe('submitted');
     expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(false);
     expect(await page.$eval('output', (element) => element.textContent)).toBe('submitted');
+  }
+);
+
+test('form grading activates only controls reachable by a native pointer click', { timeout: 30_000 }, async () => {
+  await using browser = await launchBrowser();
+  const page = await createBrowserPage(browser);
+  await page.goto(
+    `data:text/html,${encodeURIComponent(`<form><button id="add" hidden>Add</button></form><output></output>
+    <script>
+      document.querySelector('button').addEventListener('click', (event) => {
+        document.querySelector('output').textContent += event.isTrusted ? 'clicked' : 'synthetic';
+      });
+      document.querySelector('form').addEventListener('submit', (event) => event.preventDefault());
+    </script>`)}`
+  );
+  expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(false);
+  expect(await page.$eval('output', (element) => element.textContent)).toBe('');
+  await page.$eval('button', (button) => {
+    button.hidden = false;
+    button.style.pointerEvents = 'none';
+  });
+  expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(false);
+  expect(await page.$eval('output', (element) => element.textContent)).toBe('');
+  await page.$eval('button', (button) => {
+    button.style.removeProperty('pointer-events');
+    button.style.position = 'absolute';
+    button.style.left = '-9999px';
+  });
+  expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(false);
+  expect(await page.$eval('output', (element) => element.textContent)).toBe('');
+  await page.$eval('button', (button) => button.removeAttribute('style'));
+  expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(true);
+  expect(await page.$eval('output', (element) => element.textContent)).toBe('clicked');
+  await page.$eval('button', (button) => button.ownerDocument.body.append(button));
+  expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(false);
+  expect(await page.$eval('output', (element) => element.textContent)).toBe('clicked');
+});
+
+test('concurrent form checks preserve independent cancellation results', { timeout: 30_000 }, async () => {
+  await using browser = await launchBrowser();
+  const page = await createBrowserPage(browser);
+  await page.setContent(
+    '<form action="javascript:void(0)"><button id="a">A</button><button id="b">B</button></form><output></output>'
+  );
+  await page.evaluate(`document.querySelector('form').addEventListener('submit', event => {
+    document.querySelector('output').textContent += event.submitter.textContent;
+    if (event.submitter.id === 'a') event.preventDefault();
+  })`);
+  expect(
+    await Promise.all([clickAndDetectCanceledSubmit(page, '#a'), clickAndDetectCanceledSubmit(page, '#b')])
+  ).toEqual([true, false]);
+  expect(await page.$eval('output', (element) => element.textContent)).toBe('AB');
+  await expect(clickAndDetectCanceledSubmit(page, '#missing')).rejects.toThrow('要素が見つかりません');
+  expect(await clickAndDetectCanceledSubmit(page, '#a')).toBe(true);
+  expect(await page.$eval('output', (element) => element.textContent)).toBe('ABA');
+});
+
+test('submission cancellation is preserved when navigation replaces the document', { timeout: 30_000 }, async () => {
+  await using browser = await launchBrowser({ slowMo: 5 });
+  const server = createServer((request, response) => {
+    response.setHeader('Content-Type', 'text/html');
+    if (request.url?.startsWith('/done')) {
+      response.end('<output>submitted</output>');
+      return;
+    }
+    const handler =
+      request.url === '/capture'
+        ? `window.addEventListener('submit', event => event.stopImmediatePropagation(), true)`
+        : `document.querySelector('form').addEventListener('submit', event => {
+          event.stopPropagation();
+          ${request.url === '/canceled-redirect' ? 'event.preventDefault();' : ''}
+          ${request.url?.includes('redirect') ? "location.replace('/done')" : ''}
+        })`;
+    response.end(`<form action="/done"><button id="add">Add</button></form><script>${handler}</script>`);
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Expected TCP address');
+  try {
+    const page = await createBrowserPage(browser);
+    for (const path of ['/form', '/capture', '/redirect', '/canceled-redirect']) {
+      await page.goto(`http://127.0.0.1:${address.port}${path}`);
+      const [canceled] = await Promise.all([
+        clickAndDetectCanceledSubmit(page, '#add'),
+        page.waitForNavigation({ waitUntil: 'load' }),
+      ]);
+      expect(canceled).toBe(path === '/canceled-redirect');
+      expect(await page.$eval('output', (element) => element.textContent)).toBe('submitted');
+    }
+    await page.close();
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test(
+  'submit handlers installed during pointer activation determine the cancellation verdict',
+  { timeout: 30_000 },
+  async () => {
+    await using browser = await launchBrowser();
+    const page = await createBrowserPage(browser);
+    await page.goto(
+      `data:text/html,${encodeURIComponent(`<form><button>Add</button></form><output></output><script>
+    document.querySelector('button').addEventListener('mousedown', () => {
+      window.addEventListener('submit', event => {
+        event.preventDefault();
+        document.querySelector('output').textContent = 'canceled';
+      });
+    }, { once: true });
+  </script>`)}`
+    );
+    expect(await clickAndDetectCanceledSubmit(page, 'button')).toBe(true);
+    expect(await page.$eval('output', (element) => element.textContent)).toBe('canceled');
   }
 );

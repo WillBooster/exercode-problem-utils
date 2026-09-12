@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { TestCaseResult } from '@exercode/problem-utils';
 import {
   launch,
@@ -12,6 +13,7 @@ import {
 } from 'puppeteer';
 
 const submitEventsKey = '@exercode/problem-utils-browser/submit-events';
+const pendingSubmitChecks = new WeakMap<Page, Promise<void>>();
 
 /** Launches the Chrome headless shell installed for this Puppeteer version. */
 export async function launchBrowser(options: LaunchOptions = {}): Promise<Browser> {
@@ -132,33 +134,98 @@ export async function createBrowserPage(browser: Browser | BrowserContext): Prom
 
 /** Activates a form control and reports whether the submitted event was canceled by the page. */
 export async function clickAndDetectCanceledSubmit(page: Page, buttonSelector: string): Promise<boolean> {
+  const previous = pendingSubmitChecks.get(page);
+  const { promise, resolve } = Promise.withResolvers<void>();
+  pendingSubmitChecks.set(page, promise);
+  try {
+    await previous;
+    return await checkCanceledSubmit(page, buttonSelector);
+  } finally {
+    resolve();
+    if (pendingSubmitChecks.get(page) === promise) pendingSubmitChecks.delete(page);
+  }
+}
+
+async function checkCanceledSubmit(page: Page, buttonSelector: string): Promise<boolean> {
   await using button = await requirePageElement(page, buttonSelector);
-  return await button.evaluate((button, key) => {
-    const form = (button as HTMLButtonElement).form;
-    if (!form) return false;
-    const earlyEvents = (globalThis as unknown as Record<string, WeakMap<EventTarget, Event> | undefined>)[key];
-    earlyEvents?.delete(form);
-    const submission: { event?: Event; canceled?: boolean } = {};
-    const onSubmit = (event: Event): void => {
-      if (event.target === form) submission.event = event;
-    };
-    const preventNavigation = (event: Event): void => {
-      if (event !== submission.event) return;
-      submission.canceled = event.defaultPrevented;
-      event.preventDefault();
-    };
-    globalThis.addEventListener('submit', onSubmit, true);
-    // Delegated document/window handlers must run before cancellation is inspected.
-    globalThis.addEventListener('submit', preventNavigation);
+  if (!(await button.isVisible())) return false;
+  const session = await page.createCDPSession();
+  const bindingName = `__exercode_submit_${randomUUID().replaceAll('-', '')}`;
+  let canceledBeforeNavigation = false;
+  session.on('Runtime.bindingCalled', (event) => {
+    if (event.name === bindingName) canceledBeforeNavigation = event.payload === 'true';
+  });
+  try {
+    await session.send('Runtime.addBinding', { name: bindingName });
+    await using observer = await button.evaluateHandle(
+      (button, { key, bindingName }) => {
+        const form = (button as HTMLButtonElement).form;
+        if (!form) return;
+        const earlyEvents = (globalThis as unknown as Record<string, WeakMap<EventTarget, Event> | undefined>)[key];
+        earlyEvents?.delete(form);
+        const submission: { event?: Event } = {};
+        const onSubmit = (event: Event): void => {
+          if (event.target === form) submission.event = event;
+        };
+        const read = (): boolean => (submission.event ?? earlyEvents?.get(form))?.defaultPrevented ?? false;
+        const beforeUnload = (): void => {
+          (globalThis as unknown as Record<string, (payload: string) => void>)[bindingName]!(read() ? 'true' : 'false');
+        };
+        globalThis.addEventListener('submit', onSubmit, true);
+        // Keep the verdict when an explicit redirect replaces the document before the result read.
+        globalThis.addEventListener('beforeunload', beforeUnload, true);
+        return {
+          read,
+          cleanup: () => {
+            globalThis.removeEventListener('submit', onSubmit, true);
+            globalThis.removeEventListener('beforeunload', beforeUnload, true);
+            earlyEvents?.delete(form);
+          },
+        };
+      },
+      { key: submitEventsKey, bindingName }
+    );
     try {
-      (button as HTMLElement).click();
-      return submission.canceled ?? (submission.event ?? earlyEvents?.get(form))?.defaultPrevented ?? false;
+      if (!(await page.evaluate((state) => state !== undefined, observer))) return false;
+      await button.click();
+      return await page.evaluate((state) => state?.read() ?? false, observer);
+    } catch (error) {
+      if (error instanceof Error) {
+        if (
+          error.message === 'Node is either not clickable or not an Element' ||
+          error.message === 'Node is detached from document'
+        )
+          return false;
+        if (
+          error.message === 'Execution context was destroyed, most likely because of a navigation.' ||
+          error.message === 'Protocol error (Runtime.callFunctionOn): Could not find object with given id'
+        ) {
+          return canceledBeforeNavigation;
+        }
+      }
+      throw error;
     } finally {
-      globalThis.removeEventListener('submit', onSubmit, true);
-      globalThis.removeEventListener('submit', preventNavigation);
-      earlyEvents?.delete(form);
+      await page
+        .evaluate((state) => state?.cleanup(), observer)
+        .catch(() => {
+          // Navigation or page closure discards the document's temporary listeners.
+        });
     }
-  }, submitEventsKey);
+  } finally {
+    await session.send('Runtime.removeBinding', { name: bindingName }).catch(() => {
+      // A closed target already discards the binding.
+    });
+    await page
+      .evaluate((name) => {
+        delete (globalThis as unknown as Record<string, unknown>)[name];
+      }, bindingName)
+      .catch(() => {
+        // A closed page has no surviving global binding to remove.
+      });
+    await session.detach().catch(() => {
+      // The target may have closed during navigation.
+    });
+  }
 }
 
 export interface CapturedFormRequest {
