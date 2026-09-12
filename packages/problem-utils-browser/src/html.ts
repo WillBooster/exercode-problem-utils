@@ -211,20 +211,26 @@ async function capturePreparedHtmlScreenshot(page: Page, url: string, formattedH
     try {
       const targetUrl = new URL(url).href;
       const { frameTree } = await session.send('Page.getFrameTree');
-      session.on('Fetch.requestPaused', async (event) => {
-        await (event.request.url === targetUrl && event.frameId === frameTree.frame.id
-          ? session.send('Fetch.fulfillRequest', {
-              requestId: event.requestId,
-              responseCode: 200,
-              responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }],
-              body: Buffer.from(formattedHtml).toString('base64'),
-            })
-          : session.send('Fetch.continueRequest', { requestId: event.requestId }));
+      session.on('Fetch.requestPaused', (event) => {
+        void (
+          event.request.url === targetUrl && event.frameId === frameTree.frame.id
+            ? session.send('Fetch.fulfillRequest', {
+                requestId: event.requestId,
+                responseCode: 200,
+                responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }],
+                body: Buffer.from(formattedHtml).toString('base64'),
+              })
+            : session.send('Fetch.continueRequest', { requestId: event.requestId })
+        ).catch(() => {
+          // Removed frames and closed pages can cancel an already-paused request.
+        });
       });
       await session.send('Fetch.enable', { patterns: [{ resourceType: 'Document', requestStage: 'Request' }] });
       await page.goto(url, { waitUntil: 'load' });
     } finally {
-      await session.detach();
+      await session.detach().catch(() => {
+        // Closing the page also detaches this session; preserve the navigation outcome.
+      });
     }
   }
 

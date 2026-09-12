@@ -43,7 +43,9 @@ export async function capturePngScreenshot(page: Page): Promise<Buffer> {
     return Buffer.from(result.data, 'base64');
   } finally {
     clearTimeout(timer);
-    await session.detach();
+    await session.detach().catch(() => {
+      // Closing the page also detaches this session; preserve the capture outcome.
+    });
   }
 }
 
