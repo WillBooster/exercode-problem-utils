@@ -43,8 +43,12 @@ when a check throws. Checks return learner-facing verdicts; uncaught harness err
 propagate to the caller. Use `timeoutMs`, `viewport`, `contextOptions`, and `launchOptions` to set
 problem-specific requirements. `screenshotOnFailure` attaches a full-page image to a
 non-accepted result; capture failures are recorded in `stderr` without replacing the verdict.
-`launchBrowser` and `captureScreenshot` are also exported for harnesses that manage their
-own HTTP server or test loop.
+`launchBrowser`, `createBrowserPage`, and `captureScreenshot` are also exported for harnesses
+that manage their own HTTP server or test loop. Use `await createBrowserPage(browser)`
+(or pass a browser context) to create a native Puppeteer page with the same dialog handling
+as the presets. These pages dismiss dialogs by default. Registering a `dialog` listener takes
+over handling: the listener must call `dialog.accept()` or `dialog.dismiss()`, even when it
+only inspects the message. Asynchronous handlers retain control until they handle the dialog.
 
 The browser package depends on `puppeteer`. Before running browser judges or PDF export,
 install its version-matched Chrome headless shell explicitly when package installation scripts are disabled:
