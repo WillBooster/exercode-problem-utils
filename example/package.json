@@ -1,10 +1,34 @@
 {
   "name": "example",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WillBooster/exercode-problem-utils.git"
+  },
+  "license": "UNLICENSED",
+  "author": "WillBooster Inc.",
   "type": "module",
+  "main": "./src",
+  "scripts": {
+    "cleanup": "bun wb lint --fix --format",
+    "format": "bun wb lint --format",
+    "lint": "bun wb lint",
+    "lint-fix": "bun wb lint --fix",
+    "test": "bun wb test",
+    "verify": "bun wb verify",
+    "verify-full": "bun wb verify --full"
+  },
+  "prettier": "@willbooster/prettier-config",
   "dependencies": {
     "@exercode/problem-utils": "workspace:*",
     "@exercode/problem-utils-browser": "workspace:*",
     "@exercode/problem-utils-llm": "workspace:*"
+  },
+  "devDependencies": {
+    "@willbooster/prettier-config": "10.4.0",
+    "@willbooster/wb": "22.3.3",
+    "prettier": "3.9.6",
+    "prettier-plugin-java": "2.10.3",
+    "sort-package-json": "4.0.0"
   }
 }

@@ -38,7 +38,15 @@
     "dist/"
   ],
   "scripts": {
-    "build": "build-ts lib --input src/index.ts src/presets/*.ts src/cli/*.ts"
+    "build": "build-ts lib --input src/index.ts src/presets/*.ts src/cli/*.ts",
+    "cleanup": "bun wb lint --fix --format",
+    "format": "bun wb lint --format",
+    "lint": "bun wb lint",
+    "lint-fix": "bun wb lint --fix",
+    "test": "bun wb test",
+    "typecheck": "bun wb typecheck",
+    "verify": "bun wb verify",
+    "verify-full": "bun wb verify --full"
   },
   "prettier": "@willbooster/prettier-config",
   "dependencies": {
@@ -47,7 +55,17 @@
     "zod": "4.5.4"
   },
   "devDependencies": {
-    "build-ts": "21.0.12",
+    "@tsconfig/bun": "1.0.11",
+    "@types/bun": "1.4.1",
+    "@willbooster/oxfmt-config": "1.2.2",
+    "@willbooster/oxlint-config": "1.4.8",
+    "@willbooster/wb": "22.3.3",
+    "build-ts": "21.0.13",
+    "oxfmt": "0.66.0",
+    "oxlint": "1.81.0",
+    "oxlint-tsgolint": "7.0.2001",
+    "sort-package-json": "4.0.0",
+    "typescript": "7.0.2",
     "undici-types": "8.10.2"
   },
   "engines": {
