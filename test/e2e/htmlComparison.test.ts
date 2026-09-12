@@ -27,6 +27,11 @@ test.each([
     submission: '<!doctype html><html><body><span>A</span><span>B</span></div></body></html>',
   },
   {
+    name: 'inter-element whitespace formatting',
+    model: '<!doctype html><html><body><span>A</span><span>B</span></body></html>',
+    submission: '<!doctype html><html><body><span>A</span>\n<span>B</span></body></html>',
+  },
+  {
     name: 'default text whitespace normalization',
     model: '<!doctype html><html><body><span>Hello world</span></body></html>',
     submission: '<!doctype html><html><body><span>Hello  world</span></body></html>',

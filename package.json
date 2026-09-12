@@ -22,7 +22,7 @@
     "start": "bun packages/problem-utils/src/index.ts",
     "test": "bun run build && bun wb test",
     "test/ci": "bun run check-authoring && bun wb test-on-ci",
-    "test/ci-setup": "bun run build && bunx playwright-core install chromium",
+    "test/ci-setup": "bun run build && bun exercode-browser browsers install chrome-headless-shell",
     "typecheck": "bun run build && bun tsc --noEmit && bun tsc --noEmit -p example/tsconfig.json && bun tsc --noEmit -p packages/problem-utils-browser/tsconfig.json",
     "verify": "bun run check-authoring && bun wb verify",
     "verify-full": "bun run check-authoring && bun wb verify --full"
@@ -49,13 +49,13 @@
     "oxfmt": "0.66.0",
     "oxlint": "1.81.0",
     "oxlint-tsgolint": "7.0.2001",
-    "playwright-core": "1.63.0",
     "prettier": "3.9.6",
     "prettier-plugin-java": "2.10.3",
     "semantic-release": "25.0.9",
     "sort-package-json": "4.0.0",
     "typescript": "7.0.2",
-    "vitest": "5.0.0"
+    "vitest": "5.0.0",
+    "zod": "4.5.4"
   },
   "engines": {
     "node": ">=24"

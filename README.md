@@ -12,11 +12,11 @@
 | Package                           | Purpose                                                                                                  |
 | --------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | `@exercode/problem-utils`         | CLI, validation, result types, and stdio/command/GUI/evaluation presets; no browser or AI SDK dependency |
-| `@exercode/problem-utils-browser` | Playwright Chromium lifecycle, browser judging, and screenshots                                          |
+| `@exercode/problem-utils-browser` | Puppeteer Chromium lifecycle, browser judging, and screenshots                                           |
 | `@exercode/problem-utils-llm`     | LLM judging and AI SDK providers                                                                         |
 
 Install only the packages the problem uses. Import `llmJudgePreset` from
-`@exercode/problem-utils-llm`. Browser judges receive Playwright's native `Page`:
+`@exercode/problem-utils-llm`. Browser judges receive Puppeteer's native `Page`:
 
 ```ts
 import { DecisionCode } from '@exercode/problem-utils';
@@ -27,7 +27,10 @@ await browserJudgePreset({
     [
       'heading',
       async (page) => ({
-        decisionCode: (await page.locator('h1').count()) === 1 ? DecisionCode.ACCEPTED : DecisionCode.WRONG_ANSWER,
+        decisionCode:
+          (await page.$$eval('h1', (elements) => elements.length)) === 1
+            ? DecisionCode.ACCEPTED
+            : DecisionCode.WRONG_ANSWER,
       }),
     ],
   ],
@@ -37,22 +40,22 @@ await browserJudgePreset({
 The browser preset serves the submitted directory, runs checks in order on one page,
 prints each result, stops on the first non-accepted result, and closes the browser even
 when a check throws. Checks return learner-facing verdicts; uncaught harness errors
-propagate to the caller. Use `timeoutMs`, `contextOptions`, and `launchOptions` to set
+propagate to the caller. Use `timeoutMs`, `viewport`, `contextOptions`, and `launchOptions` to set
 problem-specific requirements. `screenshotOnFailure` attaches a full-page image to a
 non-accepted result; capture failures are recorded in `stderr` without replacing the verdict.
 `launchBrowser` and `captureScreenshot` are also exported for harnesses that manage their
 own HTTP server or test loop.
 
-The browser package depends on `playwright-core`; installing the package does not
-install Chromium. Before running browser judges or PDF export, install its browser:
+The browser package depends on `puppeteer`. Before running browser judges or PDF export,
+install its version-matched Chrome headless shell explicitly when package installation scripts are disabled:
 
 ```sh
-bun run exercode-browser install chromium
+bun run exercode-browser browsers install chrome-headless-shell
 ```
 
-`exercode-browser` runs this package's Playwright CLI, independently of an application's
-E2E test version. Docker/CI should install Chromium's OS libraries at image build/setup
-time. Install the fonts required by the course content in that environment.
+`exercode-browser` runs this package's Puppeteer CLI, independently of an application's
+E2E test version. Docker/CI should install `unzip` before this command and Chrome's OS
+libraries at image build/setup time. Install the fonts required by the course content in that environment.
 
 ## HTML comparison
 
@@ -88,7 +91,7 @@ viewport options and separate fresh browser contexts. See the [HTML example](exa
 ## Custom browser pages and lifecycle hooks
 
 `browserJudgePreset` accepts `directoryPath` to serve an assembled exercise directory,
-`entryPath` to select its initial page, and `navigationOptions` for native Playwright
+`entryPath` to select its initial page, and `navigationOptions` for native Puppeteer
 navigation settings. `initializePage` runs before navigation, so it can register console
 and page-error listeners. `afterTests` runs after the checks, including a failing verdict,
 while the page remains open. An exception in initialization, navigation, or a check
@@ -130,14 +133,14 @@ the same `judge.ts` with `--evaluate`. The host must provide Maven, GNU time, GN
 timeout, Bun, `CATALINA_HOME`, and exclusive access to that port. Build and evaluation
 limits are 60 and 30 seconds respectively.
 
-Browser evaluations can use native Playwright pages together with
+Browser evaluations can use native Puppeteer pages together with
 `captureTomcatScreenshots` or `verifyTomcatHtml` from the browser package. The latter
 compares document markup with whitespace removed and records screenshots for the
 verdict. `verifyTomcatPath(page, endpoint)` waits up to five seconds for the endpoint's
 path and parsed document, reporting the expected and current paths in Japanese if navigation fails;
 query strings do not affect the check. All interrupted-run cleanup remains the host's
 responsibility. `requirePageElement(page, selector)` immediately returns a native
-Playwright element handle or reports the missing selector in Japanese; callers use
+Puppeteer element handle or reports the missing selector in Japanese; callers use
 the handle's native actions for course-specific interactions.
 
 ## PDF export
@@ -158,7 +161,7 @@ The PDF entry point removes YAML mapping frontmatter, renders Markdown with synt
 images against `assetDirectoryPath`, and waits for fonts and images before printing. Missing or invalid images leave
 browser placeholders without preventing the document from exporting.
 Pass `mermaidScriptPath` pointing to a Mermaid browser bundle to render diagrams,
-`css` to customize styling, and `pdfOptions` for native Playwright PDF settings.
+`css` to customize styling, and `pdfOptions` for native Puppeteer PDF settings.
 The defaults use screen media, A4 paper when no custom dimensions are supplied, printed backgrounds, and margins of
 30 mm top/bottom, 40 mm right, and 20 mm left. PDF rendering dependencies are loaded
 through this subpath; importing the browser judging entry point does not load them.
@@ -243,4 +246,4 @@ How a missing expectation is treated depends on the harness:
 
 `stdioJudgePreset`, `stdioDebugPreset`, and `commandJudgePreset` (with its default runner; a custom `runCommand` decides whether its results carry `cpuTimeSeconds`) run a program under GNU time (`/usr/bin/time` on Linux, `gtime` on macOS) and report its wall time (`timeSeconds`), user plus system CPU time (`cpuTimeSeconds`), and peak resident set size (`memoryBytes`, at least the footprint of the GNU `timeout` wrapper the program runs under, about 1 MiB) in every test case result; `guiCommandJudgePreset` reports the wall time and the peak resident set size, and `llmJudgePreset` the wall time only. Time limits are judged by wall time. The CPU time is recorded even for a run that exceeded its limit, so a judge server sharing CPUs between programs can tell a program that used up its limit (its CPU time, summed over its threads, reaches the limit, so it would exceed it on any single CPU) from one that may only have waited for a CPU (its CPU time stays below the limit) and re-run just the latter alone.
 
-`browserJudgePreset` forwards measurements returned by each check; it does not measure elapsed time, CPU time, or memory automatically. Its `timeoutMs` bounds individual Playwright operations, not the complete check. Checks that require their own measurements or time-limit verdicts must provide them explicitly. The hosting judge can independently limit the overall harness process.
+`browserJudgePreset` forwards measurements returned by each check; it does not measure elapsed time, CPU time, or memory automatically. Its `timeoutMs` sets the page default timeout for navigation, waiting and shared screenshot capture. Other native operations follow Puppeteer’s own timeout behavior; this option does not bound the complete check. Checks that require their own measurements or time-limit verdicts must provide them explicitly. The hosting judge can independently limit the overall harness process.

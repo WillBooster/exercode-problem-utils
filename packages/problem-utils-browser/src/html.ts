@@ -11,11 +11,11 @@ import {
   type TestCaseResult,
 } from '@exercode/problem-utils';
 import sniffHtmlEncoding from 'html-encoding-sniffer';
-import type { Page, Route } from 'playwright-core';
+import type { Page } from 'puppeteer';
 import { format } from 'prettier';
 import prettierPluginOrganizeAttributes from 'prettier-plugin-organize-attributes';
 
-import { launchBrowser } from './browser.js';
+import { capturePngScreenshot, launchBrowser } from './browser.js';
 import { createTemporaryDirectory } from './temporaryDirectory.js';
 
 type JudgeCaseResult = Omit<TestCaseResult, 'testCaseId'>;
@@ -54,7 +54,7 @@ export async function htmlJudgePreset(options: HtmlJudgePresetOptions): Promise<
   await using solutionServer = await startLocalHttpServer(solutionDirectory.path);
   const browser = await launchBrowser();
   try {
-    const pageOptions = { viewport: { width: 800, height: 600 } };
+    const viewport = { width: 800, height: 600 };
     const ctx: JudgeContext = {
       solutionUrl: solutionServer.url,
       submissionUrl: submissionServer.url,
@@ -66,14 +66,17 @@ export async function htmlJudgePreset(options: HtmlJudgePresetOptions): Promise<
     ] as const;
     for (const [testCaseId, check] of checks) {
       if (testCaseId === 'snapshot_body' && options.compareDom === false) continue;
-      const actualPage = await browser.newPage(pageOptions);
-      const solutionPage = await browser.newPage(pageOptions);
+      const actualContext = await browser.createBrowserContext();
+      const solutionContext = await browser.createBrowserContext();
+      const actualPage = await actualContext.newPage();
+      const solutionPage = await solutionContext.newPage();
+      await Promise.all([actualPage.setViewport(viewport), solutionPage.setViewport(viewport)]);
       try {
         const result = await check(actualPage, solutionPage, ctx);
         printTestCaseResult({ testCaseId, ...result });
         if (result.decisionCode !== DecisionCode.ACCEPTED) break;
       } finally {
-        await Promise.all([actualPage.close(), solutionPage.close()]);
+        await Promise.all([actualContext.close(), solutionContext.close()]);
       }
     }
   } finally {
@@ -203,15 +206,31 @@ async function capturePreparedHtmlScreenshot(page: Page, url: string, formattedH
   if (formattedHtml === undefined) {
     await page.goto(url, { waitUntil: 'load' });
   } else {
-    // Keep the document URL so relative base elements and asset URLs resolve as served.
-    // Interception stays active until subresources finish loading.
-    const renderHtml = async (route: Route) =>
-      route.fulfill({ contentType: 'text/html; charset=utf-8', body: formattedHtml });
-    await page.route(url, renderHtml);
+    // A separate CDP session leaves the caller's Puppeteer request handlers and interception state intact.
+    const session = await page.createCDPSession();
     try {
+      const targetUrl = new URL(url).href;
+      const { frameTree } = await session.send('Page.getFrameTree');
+      session.on('Fetch.requestPaused', (event) => {
+        void (
+          event.request.url === targetUrl && event.frameId === frameTree.frame.id
+            ? session.send('Fetch.fulfillRequest', {
+                requestId: event.requestId,
+                responseCode: 200,
+                responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }],
+                body: Buffer.from(formattedHtml).toString('base64'),
+              })
+            : session.send('Fetch.continueRequest', { requestId: event.requestId })
+        ).catch(() => {
+          // Removed frames and closed pages can cancel an already-paused request.
+        });
+      });
+      await session.send('Fetch.enable', { patterns: [{ resourceType: 'Document', requestStage: 'Request' }] });
       await page.goto(url, { waitUntil: 'load' });
     } finally {
-      await page.unroute(url, renderHtml);
+      await session.detach().catch(() => {
+        // Closing the page also detaches this session; preserve the navigation outcome.
+      });
     }
   }
 
@@ -227,8 +246,7 @@ async function capturePreparedHtmlScreenshot(page: Page, url: string, formattedH
     document.head.append(style);
     if ('fonts' in document) await document.fonts.ready;
   });
-  const screenshot = await page.screenshot({ fullPage: true, type: 'png' });
-  return Buffer.from(screenshot);
+  return capturePngScreenshot(page);
 }
 
 async function loadFormattedHtmlForScreenshot(url: string): Promise<string | undefined> {

@@ -8,7 +8,8 @@ const TEST_CASES: readonly [string, (page: Page) => Promise<Omit<TestCaseResult,
     '01_h1',
     async (page) => {
       try {
-        const heading = await page.locator('h1').first().textContent();
+        await page.waitForSelector('h1');
+        const heading = await page.$eval('h1', (element) => element.textContent);
         const h1Text = heading?.trim() ?? '';
         assert.strictEqual(h1Text, '今日の天気予報');
       } catch (error) {
@@ -25,7 +26,7 @@ const TEST_CASES: readonly [string, (page: Page) => Promise<Omit<TestCaseResult,
     '02_hr',
     async (page) => {
       try {
-        await page.locator('hr').first().waitFor({ state: 'attached' });
+        await page.waitForSelector('hr');
       } catch (error) {
         return {
           decisionCode: DecisionCode.WRONG_ANSWER,

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { DecisionCode, parseArgs, printTestCaseResult } from '@exercode/problem-utils';
-import { launchBrowser } from './browser.js';
+import { evaluateBrowserProgram, launchBrowser } from './browser.js';
 import { startEmptyPageServer } from './emptyPageServer.js';
 
 export async function javascriptDomJudgePreset(problemDir: string): Promise<void> {
@@ -35,7 +35,7 @@ export async function javascriptDomJudgePreset(problemDir: string): Promise<void
   await using server = await startEmptyPageServer();
   const browser = await launchBrowser();
   try {
-    const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+    const context = await browser.createBrowserContext();
     for (const testCaseId of testCaseIds) {
       const input = fs.readFileSync(path.join(testCasesDir, `${testCaseId}.in`), 'utf8');
       const expectedOutput = fs.readFileSync(path.join(testCasesDir, `${testCaseId}.out`), 'utf8').replace(/\n$/, '');
@@ -71,10 +71,10 @@ export async function javascriptDomJudgePreset(problemDir: string): Promise<void
         // Clear localStorage for each test case
         await page.evaluate(() => localStorage.clear());
 
-        // Run setup code from .in file (NOT wrapped - window.test etc. need global scope)
         if (input.trim()) {
-          // A page script preserves global lexical bindings that an eval call would discard.
-          const session = await context.newCDPSession(page);
+          // Raw setup preserves global let/const for the submission and exception details for grader feedback.
+          // evaluateBrowserProgram discards lexical bindings; native page.evaluate omits the exception type.
+          const session = await page.createCDPSession();
           try {
             const result = await session.send('Runtime.evaluate', {
               expression: input,
@@ -96,13 +96,16 @@ export async function javascriptDomJudgePreset(problemDir: string): Promise<void
         const funcNames = [...userProgram.matchAll(/^function\s+(\w+)\s*\(/gm)].map((m) => m[1]);
         const funcExports = funcNames.map((name) => `window.${name} = ${name};`).join('\n');
 
-        await page.evaluate(`(async () => {
+        await evaluateBrowserProgram(
+          page,
+          `(async () => {
 window.initializeTest?.();
 ${userProgram}
 ${funcExports}
 ${autoCallTest}
 await window.verifyDom?.();
-})()`);
+})()`
+        );
 
         // Wait for async operations if setTimeout/setInterval is used
         if (/\b(?:setInterval|setTimeout)\b/.test(userProgram) || /\b(?:setInterval|setTimeout)\b/.test(input)) {
