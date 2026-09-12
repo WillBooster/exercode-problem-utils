@@ -8,10 +8,10 @@ import {
 } from '@exercode/problem-utils';
 import type { BrowserContextOptions, LaunchOptions, Page } from 'puppeteer';
 
-import { dismissUnhandledDialogs, captureScreenshot, launchBrowser } from './browser.js';
+import { createBrowserPage, captureScreenshot, launchBrowser } from './browser.js';
 
 export {
-  dismissUnhandledDialogs,
+  createBrowserPage,
   captureScreenshot,
   evaluateBrowserProgram,
   launchBrowser,
@@ -28,7 +28,16 @@ export {
   type ServedDirectory,
 } from './html.js';
 
-export type { Browser, BrowserContext, BrowserContextOptions, LaunchOptions, Locator, Page, Viewport } from 'puppeteer';
+export type {
+  Browser,
+  BrowserContext,
+  BrowserContextOptions,
+  Dialog,
+  LaunchOptions,
+  Locator,
+  Page,
+  Viewport,
+} from 'puppeteer';
 
 export type BrowserJudgeResult = Omit<TestCaseResult, 'testCaseId'>;
 export type BrowserJudgeTestCase = readonly [string, (page: Page) => Promise<BrowserJudgeResult>];
@@ -78,8 +87,7 @@ async function runBrowserJudge(options: BrowserJudgePresetOptions): Promise<void
   const browser = await launchBrowser(options.launchOptions);
   try {
     const context = await browser.createBrowserContext(options.contextOptions);
-    const page = await context.newPage();
-    dismissUnhandledDialogs(page);
+    const page = await createBrowserPage(context);
     if (options.viewport !== undefined) await page.setViewport(options.viewport);
     page.setDefaultTimeout(options.timeoutMs ?? 5000);
     await options.initializePage?.(page);

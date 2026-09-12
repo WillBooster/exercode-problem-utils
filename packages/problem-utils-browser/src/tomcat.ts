@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { dismissUnhandledDialogs, captureScreenshot, launchBrowser } from './browser.js';
+import { createBrowserPage, captureScreenshot, launchBrowser } from './browser.js';
 import type { Page } from 'puppeteer';
 import type { TestCaseResult } from '@exercode/problem-utils';
 import { buildTomcatUrl } from '@exercode/problem-utils/presets/tomcat';
@@ -24,10 +24,8 @@ export async function verifyTomcatHtml(endpoint: string, expectedHtml: string): 
   const browser = await launchBrowser();
   try {
     const context = await browser.createBrowserContext();
-    const actualPage = await context.newPage();
-    dismissUnhandledDialogs(actualPage);
-    const expectedPage = await context.newPage();
-    dismissUnhandledDialogs(expectedPage);
+    const actualPage = await createBrowserPage(context);
+    const expectedPage = await createBrowserPage(context);
     await Promise.all([
       actualPage.setViewport({ width: 800, height: 600 }),
       expectedPage.setViewport({ width: 800, height: 600 }),

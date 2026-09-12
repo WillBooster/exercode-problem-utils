@@ -140,8 +140,9 @@ test('a blocked renderer cannot discard a verdict while capturing its failure sc
 });
 
 test.each([
-  ['default', '{"confirmed":false,"value":null}'],
-  ['custom', '{"confirmed":true,"value":"learner input"}'],
+  ['default', '{"confirmed":false,"value":null,"handledDialogs":0}'],
+  ['once', '{"confirmed":false,"value":null,"handledDialogs":1}'],
+  ['custom', '{"confirmed":true,"value":"learner input","handledDialogs":3}'],
 ] as const)('browser grading completes with %s dialog handling', { timeout: 30_000 }, (mode, expected) => {
   const result = spawnSync('bun', ['test/fixtures/browserDialogs/judge.ts', '.', '{}', mode], {
     encoding: 'utf8',

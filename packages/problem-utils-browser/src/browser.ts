@@ -4,6 +4,7 @@ import {
   PuppeteerError,
   TimeoutError,
   type Browser,
+  type BrowserContext,
   type CDPSession,
   type LaunchOptions,
   type Page,
@@ -101,8 +102,9 @@ export async function evaluateBrowserProgram(page: Page, source: string): Promis
   }
 }
 
-/** Dismisses dialogs when the grader has not installed its own dialog handler. */
-export function dismissUnhandledDialogs(page: Page): void {
+/** Creates a native page that dismisses dialogs unless the grader handles them. */
+export async function createBrowserPage(browser: Browser | BrowserContext): Promise<Page> {
+  const page = await browser.newPage();
   page.on('dialog', (dialog) => {
     if (page.listenerCount('dialog') === 1 && !dialog.handled) {
       void dialog.dismiss().catch(() => {
@@ -110,4 +112,5 @@ export function dismissUnhandledDialogs(page: Page): void {
       });
     }
   });
+  return page;
 }

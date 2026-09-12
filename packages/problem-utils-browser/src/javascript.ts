@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { dismissUnhandledDialogs, evaluateBrowserProgram, launchBrowser } from './browser.js';
+import { createBrowserPage, evaluateBrowserProgram, launchBrowser } from './browser.js';
 import { startEmptyPageServer } from './emptyPageServer.js';
 import { consoleText } from './consoleText.js';
 import path from 'node:path';
@@ -62,8 +62,7 @@ async function runInBrowser(
   await using server = await startEmptyPageServer();
   const browser = await launchBrowser();
   try {
-    const page = await browser.newPage();
-    dismissUnhandledDialogs(page);
+    const page = await createBrowserPage(browser);
     const stdout: string[] = [];
     const stderr: string[] = [];
     let pageErrorOccurred = false;

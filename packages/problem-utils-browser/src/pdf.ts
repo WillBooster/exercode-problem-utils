@@ -4,7 +4,7 @@ import { Marked } from 'marked';
 import { gfmHeadingId } from 'marked-gfm-heading-id';
 import hljs from 'highlight.js';
 import { z } from 'zod';
-import { dismissUnhandledDialogs, launchBrowser } from './browser.js';
+import { createBrowserPage, launchBrowser } from './browser.js';
 import { markdownStyles, highlightStyles } from './markdownStyles.js';
 
 type PdfOptions = NonNullable<Parameters<Page['pdf']>[0]>;
@@ -33,8 +33,7 @@ export async function markdownToPdf(markdown: string, options: MarkdownPdfOption
   await using server = await startLocalHttpServer(options.assetDirectoryPath);
   const browser = await launchBrowser();
   try {
-    const page = await browser.newPage();
-    dismissUnhandledDialogs(page);
+    const page = await createBrowserPage(browser);
     await page.setRequestInterception(true);
     page.on('request', async (request) => {
       if (
