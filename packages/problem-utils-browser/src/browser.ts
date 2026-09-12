@@ -153,23 +153,15 @@ async function checkCanceledSubmit(page: Page, buttonSelector: string): Promise<
     if (!form) return;
     const earlyEvents = (globalThis as unknown as Record<string, WeakMap<EventTarget, Event> | undefined>)[key];
     earlyEvents?.delete(form);
-    const submission: { event?: Event; canceled?: boolean } = {};
+    const submission: { event?: Event } = {};
     const onSubmit = (event: Event): void => {
       if (event.target === form) submission.event = event;
     };
-    const preventNavigation = (event: Event): void => {
-      if (event !== submission.event) return;
-      submission.canceled = event.defaultPrevented;
-      event.preventDefault();
-    };
     globalThis.addEventListener('submit', onSubmit, true);
-    // Delegated document/window handlers must run before cancellation is inspected.
-    globalThis.addEventListener('submit', preventNavigation);
     return {
-      read: () => submission.canceled ?? (submission.event ?? earlyEvents?.get(form))?.defaultPrevented ?? false,
+      read: () => (submission.event ?? earlyEvents?.get(form))?.defaultPrevented ?? false,
       cleanup: () => {
         globalThis.removeEventListener('submit', onSubmit, true);
-        globalThis.removeEventListener('submit', preventNavigation);
         earlyEvents?.delete(form);
       },
     };
@@ -182,6 +174,7 @@ async function checkCanceledSubmit(page: Page, buttonSelector: string): Promise<
     if (
       error instanceof Error &&
       (error.message === 'Node is either not clickable or not an Element' ||
+        error.message === 'Node is detached from document' ||
         error.message === 'Execution context was destroyed, most likely because of a navigation.' ||
         error.message === 'Protocol error (Runtime.callFunctionOn): Could not find object with given id')
     ) {
