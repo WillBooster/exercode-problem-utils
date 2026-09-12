@@ -8,7 +8,7 @@ test('course navigation accepts the endpoint path and reports a wrong destinatio
   await using server = http.createServer((request, response) => {
     if (request.url === '/deferred.js') {
       response.writeHead(200, { 'Content-Type': 'text/javascript' });
-      setTimeout(() => response.end('document.querySelector("h1").textContent = "Course page";'), 150);
+      setTimeout(() => response.end('document.querySelector("h1").textContent = "Course page";'), 400);
     } else if (request.url?.includes('result.jsp')) {
       response.writeHead(200, { 'Content-Type': 'text/html' });
       response.write('<html><head><script defer src="/deferred.js"></script></head><body>');
