@@ -54,8 +54,8 @@ bun run exercode-browser browsers install chrome-headless-shell
 ```
 
 `exercode-browser` runs this package's Puppeteer CLI, independently of an application's
-E2E test version. Docker/CI should install Chrome's OS libraries at image build/setup
-time. Install the fonts required by the course content in that environment.
+E2E test version. Docker/CI should install `unzip` before this command and Chrome's OS
+libraries at image build/setup time. Install the fonts required by the course content in that environment.
 
 ## HTML comparison
 

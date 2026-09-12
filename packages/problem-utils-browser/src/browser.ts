@@ -1,5 +1,5 @@
 import type { TestCaseResult } from '@exercode/problem-utils';
-import { launch, type Browser, type CDPSession, type LaunchOptions, type Page } from 'puppeteer';
+import { launch, TimeoutError, type Browser, type CDPSession, type LaunchOptions, type Page } from 'puppeteer';
 
 /** Launches the Chrome headless shell installed for this Puppeteer version. */
 export async function launchBrowser(options: LaunchOptions = {}): Promise<Browser> {
@@ -37,7 +37,10 @@ export async function capturePngScreenshot(page: Page): Promise<Buffer> {
       : Promise.race([
           screenshot,
           new Promise<never>((_resolve, reject) => {
-            timer = setTimeout(() => reject(new Error(`Screenshot capture timed out after ${timeout} ms`)), timeout);
+            timer = setTimeout(
+              () => reject(new TimeoutError(`Screenshot capture timed out after ${timeout} ms`)),
+              timeout
+            );
           }),
         ]));
     return Buffer.from(result.data, 'base64');

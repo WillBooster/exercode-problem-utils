@@ -30,6 +30,7 @@ test(
         }, 0);
       });
       await expect(actual.waitForSelector('#missing')).rejects.toThrow();
+      await expect(captureScreenshot(actual)).rejects.toMatchObject({ name: 'TimeoutError' });
       await captureTomcatScreenshots([actual, expected]);
       const files = testCaseResultSchema.shape.outputFiles
         .unwrap()
