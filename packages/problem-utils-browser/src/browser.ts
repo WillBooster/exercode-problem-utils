@@ -50,11 +50,19 @@ export async function capturePngScreenshot(page: Page): Promise<Buffer> {
 }
 
 async function captureFullPagePng(page: Page, session: CDPSession) {
-  const [{ cssContentSize }, scale] = await Promise.all([
+  const [{ cssContentSize, contentSize }, { screenInfos }] = await Promise.all([
     session.send('Page.getLayoutMetrics'),
-    page.evaluate(() => window.devicePixelRatio),
+    session.send('Emulation.getScreenInfos'),
   ]);
-  // Device scale belongs to Puppeteer's session; carry it into the independent capture session.
+  // A fresh session uses the physical display scale; Puppeteer's viewport emulation belongs to its own session.
+  // Device-pixel content sizes are rounded, so use their ratio only to identify the display's exact scale.
+  const approximateScale = contentSize.width / cssContentSize.width;
+  const screen = screenInfos.toSorted(
+    (a, b) => Math.abs(a.devicePixelRatio - approximateScale) - Math.abs(b.devicePixelRatio - approximateScale)
+  )[0]!;
+  const viewport = page.viewport();
+  const scale =
+    viewport && viewport.deviceScaleFactor !== 0 ? (viewport.deviceScaleFactor ?? 1) / screen.devicePixelRatio : 1;
   return session.send('Page.captureScreenshot', {
     format: 'png',
     fromSurface: true,
