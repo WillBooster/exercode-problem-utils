@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { DecisionCode, parseArgs, printTestCaseResult } from '@exercode/problem-utils';
-import { evaluateBrowserProgram, launchBrowser } from './browser.js';
+import { dismissUnhandledDialogs, evaluateBrowserProgram, launchBrowser } from './browser.js';
 import { startEmptyPageServer } from './emptyPageServer.js';
 
 export async function javascriptDomJudgePreset(problemDir: string): Promise<void> {
@@ -41,6 +41,7 @@ export async function javascriptDomJudgePreset(problemDir: string): Promise<void
       const expectedOutput = fs.readFileSync(path.join(testCasesDir, `${testCaseId}.out`), 'utf8').replace(/\n$/, '');
 
       const page = await context.newPage();
+      dismissUnhandledDialogs(page);
       page.setDefaultTimeout(5000);
 
       try {

@@ -138,3 +138,20 @@ test('a blocked renderer cannot discard a verdict while capturing its failure sc
   expect(verdict.stderr).toContain('200 ms');
   expect(verdict.outputFiles).toBeUndefined();
 });
+
+test.each([
+  ['default', '{"confirmed":false,"value":null}'],
+  ['custom', '{"confirmed":true,"value":"learner input"}'],
+] as const)('browser grading completes with %s dialog handling', { timeout: 30_000 }, (mode, expected) => {
+  const result = spawnSync('bun', ['test/fixtures/browserDialogs/judge.ts', '.', '{}', mode], {
+    encoding: 'utf8',
+    timeout: 20_000,
+  });
+  expect(result.status, result.stderr).toBe(0);
+  const lines = result.stdout.trim().split('\n');
+  expect(lines).toHaveLength(1);
+  expect(lines[0]).toMatch(/^TEST_CASE_RESULT /);
+  const verdict = testCaseResultSchema.parse(JSON.parse(lines[0]!.slice(TEST_CASE_RESULT_PREFIX.length)));
+  expect(verdict.decisionCode).toBe(DecisionCode.ACCEPTED);
+  expect(verdict.stdout).toBe(expected);
+});

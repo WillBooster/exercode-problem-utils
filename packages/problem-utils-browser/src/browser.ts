@@ -100,3 +100,14 @@ export async function evaluateBrowserProgram(page: Page, source: string): Promis
     throw error instanceof Error ? new Error(String(error), { cause: error }) : error;
   }
 }
+
+/** Dismisses dialogs when the grader has not installed its own dialog handler. */
+export function dismissUnhandledDialogs(page: Page): void {
+  page.on('dialog', (dialog) => {
+    if (page.listenerCount('dialog') === 1 && !dialog.handled) {
+      void dialog.dismiss().catch(() => {
+        // The page may close while Chrome is processing dismissal.
+      });
+    }
+  });
+}

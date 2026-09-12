@@ -15,7 +15,7 @@ import type { Page } from 'puppeteer';
 import { format } from 'prettier';
 import prettierPluginOrganizeAttributes from 'prettier-plugin-organize-attributes';
 
-import { capturePngScreenshot, launchBrowser } from './browser.js';
+import { dismissUnhandledDialogs, capturePngScreenshot, launchBrowser } from './browser.js';
 import { createTemporaryDirectory } from './temporaryDirectory.js';
 
 type JudgeCaseResult = Omit<TestCaseResult, 'testCaseId'>;
@@ -69,7 +69,9 @@ export async function htmlJudgePreset(options: HtmlJudgePresetOptions): Promise<
       const actualContext = await browser.createBrowserContext();
       const solutionContext = await browser.createBrowserContext();
       const actualPage = await actualContext.newPage();
+      dismissUnhandledDialogs(actualPage);
       const solutionPage = await solutionContext.newPage();
+      dismissUnhandledDialogs(solutionPage);
       await Promise.all([actualPage.setViewport(viewport), solutionPage.setViewport(viewport)]);
       try {
         const result = await check(actualPage, solutionPage, ctx);

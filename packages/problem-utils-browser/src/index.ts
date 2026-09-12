@@ -8,9 +8,15 @@ import {
 } from '@exercode/problem-utils';
 import type { BrowserContextOptions, LaunchOptions, Page } from 'puppeteer';
 
-import { captureScreenshot, launchBrowser } from './browser.js';
+import { dismissUnhandledDialogs, captureScreenshot, launchBrowser } from './browser.js';
 
-export { captureScreenshot, evaluateBrowserProgram, launchBrowser, requirePageElement } from './browser.js';
+export {
+  dismissUnhandledDialogs,
+  captureScreenshot,
+  evaluateBrowserProgram,
+  launchBrowser,
+  requirePageElement,
+} from './browser.js';
 export { consoleText } from './consoleText.js';
 export {
   htmlJudgePreset,
@@ -73,6 +79,7 @@ async function runBrowserJudge(options: BrowserJudgePresetOptions): Promise<void
   try {
     const context = await browser.createBrowserContext(options.contextOptions);
     const page = await context.newPage();
+    dismissUnhandledDialogs(page);
     if (options.viewport !== undefined) await page.setViewport(options.viewport);
     page.setDefaultTimeout(options.timeoutMs ?? 5000);
     await options.initializePage?.(page);
