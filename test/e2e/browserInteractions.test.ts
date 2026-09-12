@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { launchBrowser, requirePageElement } from '@exercode/problem-utils-browser';
+import { evaluateBrowserProgram, launchBrowser, requirePageElement } from '@exercode/problem-utils-browser';
 
 test(
   'required course controls fail when absent and support native input and click actions',
@@ -23,3 +23,17 @@ test(
     }
   }
 );
+
+test('closing a page preserves the evaluator target-close error', { timeout: 30_000 }, async () => {
+  const browser = await launchBrowser();
+  try {
+    const page = await browser.newPage();
+    const started = new Promise<void>((resolve) => page.once('console', () => resolve()));
+    const evaluation = evaluateBrowserProgram(page, 'console.log("started"); new Promise(() => {});');
+    const rejected = expect(evaluation).rejects.toMatchObject({ name: 'TargetCloseError' });
+    await started;
+    await Promise.all([rejected, page.close()]);
+  } finally {
+    await browser.close();
+  }
+});

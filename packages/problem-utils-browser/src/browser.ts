@@ -1,5 +1,13 @@
 import type { TestCaseResult } from '@exercode/problem-utils';
-import { launch, TimeoutError, type Browser, type CDPSession, type LaunchOptions, type Page } from 'puppeteer';
+import {
+  launch,
+  PuppeteerError,
+  TimeoutError,
+  type Browser,
+  type CDPSession,
+  type LaunchOptions,
+  type Page,
+} from 'puppeteer';
 
 /** Launches the Chrome headless shell installed for this Puppeteer version. */
 export async function launchBrowser(options: LaunchOptions = {}): Promise<Browser> {
@@ -87,6 +95,7 @@ export async function evaluateBrowserProgram(page: Page, source: string): Promis
     // oxlint-disable-next-line no-eval -- Separate lexical scopes prevent setup declarations from colliding with learner declarations.
     return await page.evaluate((program) => globalThis.eval(program), source);
   } catch (error) {
+    if (error instanceof PuppeteerError) throw error;
     // Presets expose the message as feedback; include the browser exception type there.
     throw error instanceof Error ? new Error(String(error), { cause: error }) : error;
   }
