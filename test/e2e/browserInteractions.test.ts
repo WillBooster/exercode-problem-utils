@@ -122,6 +122,8 @@ for (const method of ['GET', 'POST']) {
       expect(requests).toContain('/after');
       await page.setContent('<button type="button">No submission</button>');
       expect(await submitFormAndCaptureRequest(page, 'button', 100)).toBeUndefined();
+      await page.goto(`${url}/after-timeout`);
+      expect(requests).toContain('/after-timeout');
       await expect(submitFormAndCaptureRequest(page, '#missing', 100)).rejects.toThrow();
       await page.goto(`${url}/after-error`);
       expect(requests).toContain('/after-error');

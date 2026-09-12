@@ -165,6 +165,7 @@ export async function submitFormAndCaptureRequest(
       await request.continue();
       return;
     }
+    clearTimeout(timer);
     const url = new URL(request.url());
     const result = {
       method: request.method(),
