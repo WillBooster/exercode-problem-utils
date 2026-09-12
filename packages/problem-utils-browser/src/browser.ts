@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { TestCaseResult } from '@exercode/problem-utils';
 import {
   launch,
@@ -148,45 +149,82 @@ export async function clickAndDetectCanceledSubmit(page: Page, buttonSelector: s
 async function checkCanceledSubmit(page: Page, buttonSelector: string): Promise<boolean> {
   await using button = await requirePageElement(page, buttonSelector);
   if (!(await button.isVisible())) return false;
-  await using observer = await button.evaluateHandle((button, key) => {
-    const form = (button as HTMLButtonElement).form;
-    if (!form) return;
-    const earlyEvents = (globalThis as unknown as Record<string, WeakMap<EventTarget, Event> | undefined>)[key];
-    earlyEvents?.delete(form);
-    const submission: { event?: Event } = {};
-    const onSubmit = (event: Event): void => {
-      if (event.target === form) submission.event = event;
-    };
-    globalThis.addEventListener('submit', onSubmit, true);
-    return {
-      read: () => (submission.event ?? earlyEvents?.get(form))?.defaultPrevented ?? false,
-      cleanup: () => {
-        globalThis.removeEventListener('submit', onSubmit, true);
-        earlyEvents?.delete(form);
-      },
-    };
-  }, submitEventsKey);
+  const session = await page.createCDPSession();
+  const bindingName = `__exercode_submit_${randomUUID().replaceAll('-', '')}`;
+  let canceledBeforeNavigation = false;
+  session.on('Runtime.bindingCalled', (event) => {
+    if (event.name === bindingName) canceledBeforeNavigation = event.payload === 'true';
+  });
   try {
-    if (!(await page.evaluate((state) => state !== undefined, observer))) return false;
-    await button.click();
-    return await page.evaluate((state) => state?.read() ?? false, observer);
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      (error.message === 'Node is either not clickable or not an Element' ||
-        error.message === 'Node is detached from document' ||
-        error.message === 'Execution context was destroyed, most likely because of a navigation.' ||
-        error.message === 'Protocol error (Runtime.callFunctionOn): Could not find object with given id')
-    ) {
-      return false;
+    await session.send('Runtime.addBinding', { name: bindingName });
+    await using observer = await button.evaluateHandle(
+      (button, { key, bindingName }) => {
+        const form = (button as HTMLButtonElement).form;
+        if (!form) return;
+        const earlyEvents = (globalThis as unknown as Record<string, WeakMap<EventTarget, Event> | undefined>)[key];
+        earlyEvents?.delete(form);
+        const submission: { event?: Event } = {};
+        const onSubmit = (event: Event): void => {
+          if (event.target === form) submission.event = event;
+        };
+        const read = (): boolean => (submission.event ?? earlyEvents?.get(form))?.defaultPrevented ?? false;
+        const beforeUnload = (): void => {
+          (globalThis as unknown as Record<string, (payload: string) => void>)[bindingName]!(read() ? 'true' : 'false');
+        };
+        globalThis.addEventListener('submit', onSubmit, true);
+        // Keep the verdict when an explicit redirect replaces the document before the result read.
+        globalThis.addEventListener('beforeunload', beforeUnload, true);
+        return {
+          read,
+          cleanup: () => {
+            globalThis.removeEventListener('submit', onSubmit, true);
+            globalThis.removeEventListener('beforeunload', beforeUnload, true);
+            earlyEvents?.delete(form);
+          },
+        };
+      },
+      { key: submitEventsKey, bindingName }
+    );
+    try {
+      if (!(await page.evaluate((state) => state !== undefined, observer))) return false;
+      await button.click();
+      return await page.evaluate((state) => state?.read() ?? false, observer);
+    } catch (error) {
+      if (error instanceof Error) {
+        if (
+          error.message === 'Node is either not clickable or not an Element' ||
+          error.message === 'Node is detached from document'
+        )
+          return false;
+        if (
+          error.message === 'Execution context was destroyed, most likely because of a navigation.' ||
+          error.message === 'Protocol error (Runtime.callFunctionOn): Could not find object with given id'
+        ) {
+          return canceledBeforeNavigation;
+        }
+      }
+      throw error;
+    } finally {
+      await page
+        .evaluate((state) => state?.cleanup(), observer)
+        .catch(() => {
+          // Navigation or page closure discards the document's temporary listeners.
+        });
     }
-    throw error;
   } finally {
+    await session.send('Runtime.removeBinding', { name: bindingName }).catch(() => {
+      // A closed target already discards the binding.
+    });
     await page
-      .evaluate((state) => state?.cleanup(), observer)
+      .evaluate((name) => {
+        delete (globalThis as unknown as Record<string, unknown>)[name];
+      }, bindingName)
       .catch(() => {
-        // A navigation or closed page already discards the document's temporary listeners.
+        // A closed page has no surviving global binding to remove.
       });
+    await session.detach().catch(() => {
+      // The target may have closed during navigation.
+    });
   }
 }
 

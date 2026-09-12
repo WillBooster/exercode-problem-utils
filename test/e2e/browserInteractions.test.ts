@@ -77,7 +77,7 @@ for (const target of ['form', 'document', 'window', 'stopped-form', 'capturing-d
   });
 }
 
-test('form observers are removed between canceled and uncanceled submissions', { timeout: 30_000 }, async () => {
+test('form checks distinguish canceled and uncanceled submissions on the same page', { timeout: 30_000 }, async () => {
   const browser = await launchBrowser();
   try {
     const page = await browser.newPage();
@@ -231,46 +231,43 @@ test('concurrent form checks preserve independent cancellation results', { timeo
   expect(await page.$eval('output', (element) => element.textContent)).toBe('ABA');
 });
 
-test(
-  'uncanceled submissions return a normal verdict when navigation replaces the document',
-  { timeout: 30_000 },
-  async () => {
-    await using browser = await launchBrowser({ slowMo: 5 });
-    const server = createServer((request, response) => {
-      response.setHeader('Content-Type', 'text/html');
-      if (request.url?.startsWith('/done')) {
-        response.end('<output>submitted</output>');
-        return;
-      }
-      const handler =
-        request.url === '/capture'
-          ? `window.addEventListener('submit', event => event.stopImmediatePropagation(), true)`
-          : `document.querySelector('form').addEventListener('submit', event => {
-          event.stopPropagation();
-          ${request.url === '/redirect' ? "location.replace('/done')" : ''}
-        })`;
-      response.end(`<form action="/done"><button id="add">Add</button></form><script>${handler}</script>`);
-    });
-    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-    const address = server.address();
-    if (!address || typeof address === 'string') throw new Error('Expected TCP address');
-    try {
-      const page = await createBrowserPage(browser);
-      for (const path of ['/form', '/capture', '/redirect']) {
-        await page.goto(`http://127.0.0.1:${address.port}${path}`);
-        const [canceled] = await Promise.all([
-          clickAndDetectCanceledSubmit(page, '#add'),
-          page.waitForNavigation({ waitUntil: 'load' }),
-        ]);
-        expect(canceled).toBe(false);
-        expect(await page.$eval('output', (element) => element.textContent)).toBe('submitted');
-      }
-      await page.close();
-    } finally {
-      await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+test('submission cancellation is preserved when navigation replaces the document', { timeout: 30_000 }, async () => {
+  await using browser = await launchBrowser({ slowMo: 5 });
+  const server = createServer((request, response) => {
+    response.setHeader('Content-Type', 'text/html');
+    if (request.url?.startsWith('/done')) {
+      response.end('<output>submitted</output>');
+      return;
     }
+    const handler =
+      request.url === '/capture'
+        ? `window.addEventListener('submit', event => event.stopImmediatePropagation(), true)`
+        : `document.querySelector('form').addEventListener('submit', event => {
+          event.stopPropagation();
+          ${request.url === '/canceled-redirect' ? 'event.preventDefault();' : ''}
+          ${request.url?.includes('redirect') ? "location.replace('/done')" : ''}
+        })`;
+    response.end(`<form action="/done"><button id="add">Add</button></form><script>${handler}</script>`);
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Expected TCP address');
+  try {
+    const page = await createBrowserPage(browser);
+    for (const path of ['/form', '/capture', '/redirect', '/canceled-redirect']) {
+      await page.goto(`http://127.0.0.1:${address.port}${path}`);
+      const [canceled] = await Promise.all([
+        clickAndDetectCanceledSubmit(page, '#add'),
+        page.waitForNavigation({ waitUntil: 'load' }),
+      ]);
+      expect(canceled).toBe(path === '/canceled-redirect');
+      expect(await page.$eval('output', (element) => element.textContent)).toBe('submitted');
+    }
+    await page.close();
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
-);
+});
 
 test(
   'submit handlers installed during pointer activation determine the cancellation verdict',
