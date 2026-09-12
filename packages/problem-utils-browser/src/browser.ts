@@ -6,6 +6,7 @@ import {
   type Browser,
   type BrowserContext,
   type CDPSession,
+  type HTTPRequest,
   type LaunchOptions,
   type Page,
 } from 'puppeteer';
@@ -117,28 +118,71 @@ export async function createBrowserPage(browser: Browser | BrowserContext): Prom
 
 /** Activates a form control and reports whether the submitted event was canceled by the page. */
 export async function clickAndDetectCanceledSubmit(page: Page, buttonSelector: string): Promise<boolean> {
-  const button = await page.locator(buttonSelector).waitHandle();
+  await using button = await requirePageElement(page, buttonSelector);
   return await button.evaluate((button) => {
     const form = (button as HTMLButtonElement).form;
     if (!form) return false;
     const submission: { event?: Event; canceled?: boolean } = {};
     const onSubmit = (event: Event): void => {
-      submission.event = event;
+      if (event.target === form) submission.event = event;
     };
     const preventNavigation = (event: Event): void => {
       if (event !== submission.event) return;
       submission.canceled = event.defaultPrevented;
       event.preventDefault();
     };
-    form.addEventListener('submit', onSubmit, true);
+    globalThis.addEventListener('submit', onSubmit, true);
     // Delegated document/window handlers must run before cancellation is inspected.
     globalThis.addEventListener('submit', preventNavigation);
     try {
       (button as HTMLElement).click();
       return submission.canceled ?? submission.event?.defaultPrevented ?? false;
     } finally {
-      form.removeEventListener('submit', onSubmit, true);
+      globalThis.removeEventListener('submit', onSubmit, true);
       globalThis.removeEventListener('submit', preventNavigation);
     }
   });
+}
+
+export interface CapturedFormRequest {
+  method: string;
+  path: string;
+  params: URLSearchParams;
+}
+
+/** Captures a URL-encoded form navigation without sending it to the server. Requires exclusive request interception. */
+export async function submitFormAndCaptureRequest(
+  page: Page,
+  buttonSelector: string,
+  timeoutMs = 2000
+): Promise<CapturedFormRequest | undefined> {
+  const { promise, resolve, reject } = Promise.withResolvers<CapturedFormRequest | undefined>();
+  const captureRequest = (request: HTTPRequest): void => {
+    void handleRequest(request).catch(reject);
+  };
+  async function handleRequest(request: HTTPRequest): Promise<void> {
+    if (!request.isNavigationRequest() || request.frame() !== page.mainFrame()) {
+      await request.continue();
+      return;
+    }
+    const url = new URL(request.url());
+    const result = {
+      method: request.method(),
+      path: url.pathname,
+      params: new URLSearchParams(request.method() === 'GET' ? url.search : (request.postData() ?? '')),
+    };
+    await request.respond({ status: 200, contentType: 'text/html; charset=utf-8', body: '' });
+    resolve(result);
+  }
+  await page.setRequestInterception(true);
+  page.on('request', captureRequest);
+  const timer = setTimeout(() => resolve(undefined), timeoutMs);
+  try {
+    const [, result] = await Promise.all([page.click(buttonSelector), promise]);
+    return result;
+  } finally {
+    clearTimeout(timer);
+    page.off('request', captureRequest);
+    await page.setRequestInterception(false);
+  }
 }

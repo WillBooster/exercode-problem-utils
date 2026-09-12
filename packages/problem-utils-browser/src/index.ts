@@ -17,6 +17,8 @@ export {
   evaluateBrowserProgram,
   launchBrowser,
   requirePageElement,
+  submitFormAndCaptureRequest,
+  type CapturedFormRequest,
 } from './browser.js';
 export { consoleText } from './consoleText.js';
 export {
