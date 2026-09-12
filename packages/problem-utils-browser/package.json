@@ -35,7 +35,15 @@
     "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
-    "build": "build-ts lib --input src/index.ts src/pdf.ts"
+    "build": "build-ts lib --input src/index.ts src/pdf.ts",
+    "cleanup": "bun wb lint --fix --format",
+    "format": "bun wb lint --format",
+    "lint": "bun wb lint",
+    "lint-fix": "bun wb lint --fix",
+    "test": "bun wb test",
+    "typecheck": "bun wb typecheck",
+    "verify": "bun wb verify",
+    "verify-full": "bun wb verify --full"
   },
   "dependencies": {
     "@exercode/problem-utils": "workspace:*",
@@ -50,8 +58,18 @@
     "zod": "4.5.4"
   },
   "devDependencies": {
+    "@tsconfig/bun": "1.0.11",
+    "@types/bun": "1.4.1",
     "@types/html-encoding-sniffer": "3.0.2",
-    "build-ts": "21.0.12"
+    "@willbooster/oxfmt-config": "1.2.2",
+    "@willbooster/oxlint-config": "1.4.8",
+    "@willbooster/wb": "22.3.3",
+    "build-ts": "21.0.13",
+    "oxfmt": "0.66.0",
+    "oxlint": "1.81.0",
+    "oxlint-tsgolint": "7.0.2001",
+    "sort-package-json": "4.0.0",
+    "typescript": "7.0.2"
   },
   "engines": {
     "node": ">=24"

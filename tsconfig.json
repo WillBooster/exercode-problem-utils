@@ -13,10 +13,10 @@
     "outDir": "dist",
     "paths": {
       "@exercode/problem-utils": ["./packages/problem-utils/src/index.ts"],
-      "@exercode/problem-utils/presets/*": ["./packages/problem-utils/src/presets/*.ts"],
-      "undici-types": ["./node_modules/undici-types/index.d.ts"],
       "@exercode/problem-utils-browser": ["./packages/problem-utils-browser/dist/index.d.ts"],
-      "@exercode/problem-utils-llm": ["./packages/problem-utils-llm/src/index.ts"]
+      "@exercode/problem-utils-llm": ["./packages/problem-utils-llm/src/index.ts"],
+      "@exercode/problem-utils/presets/*": ["./packages/problem-utils/src/presets/*.ts"],
+      "undici-types": ["./node_modules/undici-types/index.d.ts"]
     },
     "resolveJsonModule": true,
     "rootDir": ".",
@@ -25,7 +25,7 @@
     "strict": true,
     "types": ["node", "vitest/globals", "bun"]
   },
-  "exclude": ["test/fixtures"],
+  "exclude": ["example/test/fixtures", "packages/*/test/fixtures", "test/fixtures"],
   "extends": [
     "@tsconfig/bun/tsconfig.json",
     "@tsconfig/node-lts/tsconfig.json",
@@ -34,9 +34,18 @@
   ],
   "include": [
     "*.config.ts",
-    "scripts/**/*",
-    "packages/problem-utils/src/**/*",
+    "example/*.config.ts",
+    "example/scripts/**/*",
+    "example/src/**/*",
+    "example/test/**/*",
+    "packages/*/*.config.ts",
+    "packages/*/scripts/**/*",
+    "packages/*/src/**/*",
+    "packages/*/test/**/*",
     "packages/problem-utils-llm/src/**/*",
+    "packages/problem-utils/src/**/*",
+    "scripts/**/*",
+    "src/**/*",
     "test/**/*"
   ]
 }

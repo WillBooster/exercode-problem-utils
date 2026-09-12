@@ -1,8 +1,11 @@
 {
   "name": "exercode-problem-utils",
   "version": "0.0.0-semantically-released",
-  "private": true,
   "description": ":100: A set of utilities for judging programs on Exercode (https://exercode.willbooster.com/).",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WillBooster/exercode-problem-utils.git"
+  },
   "license": "Apache-2.0",
   "author": "WillBooster Inc.",
   "type": "module",
@@ -23,8 +26,8 @@
     "test": "bun run build && bun wb test",
     "test/ci": "bun run check-authoring && bun wb test-on-ci",
     "test/ci-setup": "bun run build && bun exercode-browser browsers install chrome-headless-shell",
-    "typecheck": "bun run build && bun tsc --noEmit && bun tsc --noEmit -p example/tsconfig.json && bun tsc --noEmit -p packages/problem-utils-browser/tsconfig.json",
-    "verify": "bun run check-authoring && bun wb verify",
+    "typecheck": "bun wb typecheck",
+    "verify": "bun wb verify",
     "verify-full": "bun run check-authoring && bun wb verify --full"
   },
   "prettier": "@willbooster/prettier-config",
@@ -42,8 +45,8 @@
     "@willbooster/oxfmt-config": "1.2.2",
     "@willbooster/oxlint-config": "1.4.8",
     "@willbooster/prettier-config": "10.4.0",
-    "@willbooster/wb": "22.3.2",
-    "build-ts": "21.0.12",
+    "@willbooster/wb": "22.3.3",
+    "build-ts": "21.0.13",
     "conventional-changelog-conventionalcommits": "10.4.0",
     "lefthook": "2.1.12",
     "oxfmt": "0.66.0",
@@ -59,6 +62,10 @@
   },
   "engines": {
     "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "multi-release": {
     "tagFormat": "${name === '@exercode/problem-utils' ? 'v' : name + '@'}${version}",
