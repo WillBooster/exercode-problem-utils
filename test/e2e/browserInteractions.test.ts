@@ -200,4 +200,7 @@ test('form grading activates only controls reachable by a native pointer click',
   await page.$eval('button', (button) => button.style.removeProperty('pointer-events'));
   expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(true);
   expect(await page.$eval('output', (element) => element.textContent)).toBe('clicked');
+  await page.$eval('button', (button) => button.ownerDocument.body.append(button));
+  expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(false);
+  expect(await page.$eval('output', (element) => element.textContent)).toBe('clicked');
 });

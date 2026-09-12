@@ -161,6 +161,7 @@ export async function clickAndDetectCanceledSubmit(page: Page, buttonSelector: s
     };
   }, submitEventsKey);
   try {
+    if (!(await page.evaluate((state) => state !== undefined, observer))) return false;
     await button.click();
     return await page.evaluate((state) => state?.read() ?? false, observer);
   } finally {
