@@ -1,5 +1,5 @@
 import type { TestCaseResult } from '@exercode/problem-utils';
-import { launch, type Browser, type LaunchOptions, type Page } from 'puppeteer';
+import { launch, type Browser, type CDPSession, type LaunchOptions, type Page } from 'puppeteer';
 
 /** Launches the Chrome headless shell installed for this Puppeteer version. */
 export async function launchBrowser(options: LaunchOptions = {}): Promise<Browser> {
@@ -27,21 +27,38 @@ export async function captureScreenshot(
 /** Captures a full-page PNG within the page's configured default timeout. */
 export async function capturePngScreenshot(page: Page): Promise<Buffer> {
   const timeout = page.getDefaultTimeout();
-  const screenshot = page.screenshot({ fullPage: true, type: 'png' });
-  if (timeout === 0) return Buffer.from(await screenshot);
+  // A native screenshot holds a context-wide mutex even after a timeout, blocking other pages.
+  const session = await page.createCDPSession();
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    return Buffer.from(
-      await Promise.race([
-        screenshot,
-        new Promise<never>((_resolve, reject) => {
-          timer = setTimeout(() => reject(new Error(`Screenshot capture timed out after ${timeout} ms`)), timeout);
-        }),
-      ])
-    );
+    const screenshot = captureFullPagePng(page, session);
+    const result = await (timeout === 0
+      ? screenshot
+      : Promise.race([
+          screenshot,
+          new Promise<never>((_resolve, reject) => {
+            timer = setTimeout(() => reject(new Error(`Screenshot capture timed out after ${timeout} ms`)), timeout);
+          }),
+        ]));
+    return Buffer.from(result.data, 'base64');
   } finally {
     clearTimeout(timer);
+    await session.detach();
   }
+}
+
+async function captureFullPagePng(page: Page, session: CDPSession) {
+  const [{ cssContentSize }, scale] = await Promise.all([
+    session.send('Page.getLayoutMetrics'),
+    page.evaluate(() => window.devicePixelRatio),
+  ]);
+  // Device scale belongs to Puppeteer's session; carry it into the independent capture session.
+  return session.send('Page.captureScreenshot', {
+    format: 'png',
+    fromSurface: true,
+    captureBeyondViewport: true,
+    clip: { ...cssContentSize, scale },
+  });
 }
 
 /** Finds a required course control immediately and reports its selector when absent. */
