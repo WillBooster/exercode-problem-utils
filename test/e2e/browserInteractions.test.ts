@@ -94,6 +94,7 @@ test('form observers are removed between canceled and uncanceled submissions', {
 
 for (const method of ['GET', 'POST']) {
   test(`form capture reads ${method} Japanese fields without reaching the server`, { timeout: 30_000 }, async () => {
+    await using browser = await launchBrowser();
     const requests: string[] = [];
     const server = createServer((request, response) => {
       requests.push(request.url ?? '');
@@ -103,7 +104,6 @@ for (const method of ['GET', 'POST']) {
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('Expected TCP address');
     const url = `http://127.0.0.1:${address.port}`;
-    const browser = await launchBrowser();
     try {
       const page = await browser.newPage();
       await page.setContent(
@@ -126,7 +126,6 @@ for (const method of ['GET', 'POST']) {
       await page.goto(`${url}/after-error`);
       expect(requests).toContain('/after-error');
     } finally {
-      await browser.close();
       await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
     }
   });
