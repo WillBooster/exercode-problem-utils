@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { expect, test } from 'vitest';
 import {
   clickAndDetectCanceledSubmit,
+  createBrowserPage,
   evaluateBrowserProgram,
   launchBrowser,
   requirePageElement,
@@ -132,3 +133,24 @@ for (const method of ['GET', 'POST']) {
     }
   });
 }
+
+test(
+  'submit cancellation survives an earlier window capture listener stopping immediate propagation',
+  { timeout: 30_000 },
+  async () => {
+    await using browser = await launchBrowser();
+    const page = await createBrowserPage(browser);
+    const html = `<form><button id="add">Add</button></form><output></output><script>
+    window.addEventListener('submit', (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      document.querySelector('output').textContent = 'added';
+    }, { capture: true, once: true });
+  </script>`;
+    await page.goto(`data:text/html,${encodeURIComponent(html)}`);
+    expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(true);
+    expect(await page.$eval('output', (element) => element.textContent)).toBe('added');
+    expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(false);
+    expect(await page.$('form')).not.toBeNull();
+  }
+);
