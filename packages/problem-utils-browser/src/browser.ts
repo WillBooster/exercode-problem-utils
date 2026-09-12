@@ -133,9 +133,10 @@ export async function createBrowserPage(browser: Browser | BrowserContext): Prom
 /** Activates a form control and reports whether the submitted event was canceled by the page. */
 export async function clickAndDetectCanceledSubmit(page: Page, buttonSelector: string): Promise<boolean> {
   await using button = await requirePageElement(page, buttonSelector);
-  return await button.evaluate((button, key) => {
+  if (!(await button.isVisible())) return false;
+  await using observer = await button.evaluateHandle((button, key) => {
     const form = (button as HTMLButtonElement).form;
-    if (!form) return false;
+    if (!form) return;
     const earlyEvents = (globalThis as unknown as Record<string, WeakMap<EventTarget, Event> | undefined>)[key];
     earlyEvents?.delete(form);
     const submission: { event?: Event; canceled?: boolean } = {};
@@ -150,15 +151,25 @@ export async function clickAndDetectCanceledSubmit(page: Page, buttonSelector: s
     globalThis.addEventListener('submit', onSubmit, true);
     // Delegated document/window handlers must run before cancellation is inspected.
     globalThis.addEventListener('submit', preventNavigation);
-    try {
-      (button as HTMLElement).click();
-      return submission.canceled ?? (submission.event ?? earlyEvents?.get(form))?.defaultPrevented ?? false;
-    } finally {
-      globalThis.removeEventListener('submit', onSubmit, true);
-      globalThis.removeEventListener('submit', preventNavigation);
-      earlyEvents?.delete(form);
-    }
+    return {
+      read: () => submission.canceled ?? (submission.event ?? earlyEvents?.get(form))?.defaultPrevented ?? false,
+      cleanup: () => {
+        globalThis.removeEventListener('submit', onSubmit, true);
+        globalThis.removeEventListener('submit', preventNavigation);
+        earlyEvents?.delete(form);
+      },
+    };
   }, submitEventsKey);
+  try {
+    await button.click();
+    return await page.evaluate((state) => state?.read() ?? false, observer);
+  } finally {
+    await page
+      .evaluate((state) => state?.cleanup(), observer)
+      .catch(() => {
+        // A navigation or closed page already discards the document's temporary listeners.
+      });
+  }
 }
 
 export interface CapturedFormRequest {

@@ -176,3 +176,28 @@ test(
     expect(await page.$eval('output', (element) => element.textContent)).toBe('submitted');
   }
 );
+
+test('form grading activates only controls reachable by a native pointer click', { timeout: 30_000 }, async () => {
+  await using browser = await launchBrowser();
+  const page = await createBrowserPage(browser);
+  await page.goto(
+    `data:text/html,${encodeURIComponent(`<form><button id="add" hidden>Add</button></form><output></output>
+    <script>
+      document.querySelector('button').addEventListener('click', (event) => {
+        document.querySelector('output').textContent += event.isTrusted ? 'clicked' : 'synthetic';
+      });
+      document.querySelector('form').addEventListener('submit', (event) => event.preventDefault());
+    </script>`)}`
+  );
+  expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(false);
+  expect(await page.$eval('output', (element) => element.textContent)).toBe('');
+  await page.$eval('button', (button) => {
+    button.hidden = false;
+    button.style.pointerEvents = 'none';
+  });
+  expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(false);
+  expect(await page.$eval('output', (element) => element.textContent)).toBe('');
+  await page.$eval('button', (button) => button.style.removeProperty('pointer-events'));
+  expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(true);
+  expect(await page.$eval('output', (element) => element.textContent)).toBe('clicked');
+});
