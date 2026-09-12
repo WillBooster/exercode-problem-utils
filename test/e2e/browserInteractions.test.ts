@@ -109,7 +109,10 @@ for (const method of ['GET', 'POST']) {
       await page.setContent(
         `<form action="${url}/submit" method="${method}"><input name="query" value="日本語 + space"><button>Send</button></form>`
       );
-      const captured = await submitFormAndCaptureRequest(page, 'button');
+      const [, captured] = await Promise.all([
+        page.waitForNavigation({ waitUntil: 'load' }),
+        submitFormAndCaptureRequest(page, 'button'),
+      ]);
       expect(captured?.method).toBe(method);
       expect(captured?.path).toBe('/submit');
       expect(captured?.params.get('query')).toBe('日本語 + space');
