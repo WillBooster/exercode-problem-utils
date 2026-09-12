@@ -12,6 +12,7 @@ import {
 } from 'puppeteer';
 
 const submitEventsKey = '@exercode/problem-utils-browser/submit-events';
+const pendingSubmitChecks = new WeakMap<Page, Promise<void>>();
 
 /** Launches the Chrome headless shell installed for this Puppeteer version. */
 export async function launchBrowser(options: LaunchOptions = {}): Promise<Browser> {
@@ -132,6 +133,19 @@ export async function createBrowserPage(browser: Browser | BrowserContext): Prom
 
 /** Activates a form control and reports whether the submitted event was canceled by the page. */
 export async function clickAndDetectCanceledSubmit(page: Page, buttonSelector: string): Promise<boolean> {
+  const previous = pendingSubmitChecks.get(page);
+  const { promise, resolve } = Promise.withResolvers<void>();
+  pendingSubmitChecks.set(page, promise);
+  try {
+    await previous;
+    return await checkCanceledSubmit(page, buttonSelector);
+  } finally {
+    resolve();
+    if (pendingSubmitChecks.get(page) === promise) pendingSubmitChecks.delete(page);
+  }
+}
+
+async function checkCanceledSubmit(page: Page, buttonSelector: string): Promise<boolean> {
   await using button = await requirePageElement(page, buttonSelector);
   if (!(await button.isVisible())) return false;
   await using observer = await button.evaluateHandle((button, key) => {
@@ -164,6 +178,16 @@ export async function clickAndDetectCanceledSubmit(page: Page, buttonSelector: s
     if (!(await page.evaluate((state) => state !== undefined, observer))) return false;
     await button.click();
     return await page.evaluate((state) => state?.read() ?? false, observer);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message === 'Node is either not clickable or not an Element' ||
+        error.message === 'Execution context was destroyed, most likely because of a navigation.' ||
+        error.message === 'Protocol error (Runtime.callFunctionOn): Could not find object with given id')
+    ) {
+      return false;
+    }
+    throw error;
   } finally {
     await page
       .evaluate((state) => state?.cleanup(), observer)

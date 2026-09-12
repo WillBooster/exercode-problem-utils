@@ -197,10 +197,78 @@ test('form grading activates only controls reachable by a native pointer click',
   });
   expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(false);
   expect(await page.$eval('output', (element) => element.textContent)).toBe('');
-  await page.$eval('button', (button) => button.style.removeProperty('pointer-events'));
+  await page.$eval('button', (button) => {
+    button.style.removeProperty('pointer-events');
+    button.style.position = 'absolute';
+    button.style.left = '-9999px';
+  });
+  expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(false);
+  expect(await page.$eval('output', (element) => element.textContent)).toBe('');
+  await page.$eval('button', (button) => button.removeAttribute('style'));
   expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(true);
   expect(await page.$eval('output', (element) => element.textContent)).toBe('clicked');
   await page.$eval('button', (button) => button.ownerDocument.body.append(button));
   expect(await clickAndDetectCanceledSubmit(page, '#add')).toBe(false);
   expect(await page.$eval('output', (element) => element.textContent)).toBe('clicked');
 });
+
+test(
+  'concurrent form checks do not attribute the navigation guard to learner cancellation',
+  { timeout: 30_000 },
+  async () => {
+    await using browser = await launchBrowser();
+    const page = await createBrowserPage(browser);
+    await page.setContent('<form><button id="a">A</button><button id="b">B</button></form><output></output>');
+    await page.evaluate(`document.querySelector('form').addEventListener('submit', event => {
+    document.querySelector('output').textContent += event.submitter.textContent;
+  })`);
+    expect(
+      await Promise.all([clickAndDetectCanceledSubmit(page, '#a'), clickAndDetectCanceledSubmit(page, '#b')])
+    ).toEqual([false, false]);
+    expect(await page.$eval('output', (element) => element.textContent)).toBe('AB');
+    await expect(clickAndDetectCanceledSubmit(page, '#missing')).rejects.toThrow('要素が見つかりません');
+    expect(await clickAndDetectCanceledSubmit(page, '#a')).toBe(false);
+    expect(await page.$eval('output', (element) => element.textContent)).toBe('ABA');
+  }
+);
+
+test(
+  'uncanceled submissions return a normal verdict when navigation replaces the document',
+  { timeout: 30_000 },
+  async () => {
+    await using browser = await launchBrowser({ slowMo: 5 });
+    const server = createServer((request, response) => {
+      response.setHeader('Content-Type', 'text/html');
+      if (request.url?.startsWith('/done')) {
+        response.end('<output>submitted</output>');
+        return;
+      }
+      const handler =
+        request.url === '/capture'
+          ? `window.addEventListener('submit', event => event.stopImmediatePropagation(), true)`
+          : `document.querySelector('form').addEventListener('submit', event => {
+          event.stopPropagation();
+          ${request.url === '/redirect' ? "location.replace('/done')" : ''}
+        })`;
+      response.end(`<form action="/done"><button id="add">Add</button></form><script>${handler}</script>`);
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('Expected TCP address');
+    try {
+      const page = await createBrowserPage(browser);
+      for (const path of ['/form', '/capture', '/redirect']) {
+        await page.goto(`http://127.0.0.1:${address.port}${path}`);
+        const [canceled] = await Promise.all([
+          clickAndDetectCanceledSubmit(page, '#add'),
+          page.waitForNavigation({ waitUntil: 'load' }),
+        ]);
+        expect(canceled).toBe(false);
+        expect(await page.$eval('output', (element) => element.textContent)).toBe('submitted');
+      }
+      await page.close();
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+    }
+  }
+);
