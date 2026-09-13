@@ -10,10 +10,7 @@ import {
   startLocalHttpServer,
   type TestCaseResult,
 } from '@exercode/problem-utils';
-import sniffHtmlEncoding from 'html-encoding-sniffer';
 import type { Page } from 'puppeteer';
-import { format } from 'prettier';
-import prettierPluginOrganizeAttributes from 'prettier-plugin-organize-attributes';
 
 import { createBrowserPage, capturePngScreenshot, launchBrowser } from './browser.js';
 import { createTemporaryDirectory } from './temporaryDirectory.js';
@@ -258,6 +255,12 @@ async function loadFormattedHtmlForScreenshot(url: string): Promise<string | und
     if (!contentType.includes('text/html')) return undefined;
 
     const bytes = new Uint8Array(await response.arrayBuffer());
+    const [{ default: sniffHtmlEncoding }, { format }, { default: prettierPluginOrganizeAttributes }] =
+      await Promise.all([
+        import('html-encoding-sniffer'),
+        import('prettier'),
+        import('prettier-plugin-organize-attributes'),
+      ]);
     const encoding = sniffHtmlEncoding(bytes, {
       transportLayerEncodingLabel: new MIMEType(contentType).params.get('charset') ?? undefined,
       defaultEncoding: 'utf8',
