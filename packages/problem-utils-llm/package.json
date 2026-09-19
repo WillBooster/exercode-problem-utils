@@ -37,7 +37,7 @@
     "zod": "4.5.4"
   },
   "devDependencies": {
-    "build-ts": "21.0.13"
+    "build-ts": "21.0.14"
   },
   "engines": {
     "node": ">=24"
