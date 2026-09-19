@@ -34,7 +34,7 @@
     "@ai-sdk/xai": "4.0.58",
     "@exercode/problem-utils": "workspace:*",
     "ai": "7.0.99",
-    "zod": "4.5.4"
+    "zod": "4.6.2"
   },
   "devDependencies": {
     "build-ts": "21.0.14"

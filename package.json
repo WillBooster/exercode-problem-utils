@@ -42,7 +42,7 @@
     "@willbooster/oxfmt-config": "1.2.2",
     "@willbooster/oxlint-config": "1.4.8",
     "@willbooster/prettier-config": "10.4.0",
-    "@willbooster/wb": "22.3.3",
+    "@willbooster/wb": "22.4.0",
     "build-ts": "21.0.14",
     "conventional-changelog-conventionalcommits": "10.4.0",
     "lefthook": "2.1.12",
@@ -55,7 +55,7 @@
     "sort-package-json": "4.0.0",
     "typescript": "7.0.2",
     "vitest": "5.0.0",
-    "zod": "4.5.4"
+    "zod": "4.6.2"
   },
   "engines": {
     "node": ">=24"
