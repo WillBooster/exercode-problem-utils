@@ -28,12 +28,12 @@
     "build": "build-ts lib --input src/index.ts"
   },
   "dependencies": {
-    "@ai-sdk/amazon-bedrock": "5.0.75",
-    "@ai-sdk/google": "4.0.64",
-    "@ai-sdk/openai": "4.0.59",
-    "@ai-sdk/xai": "4.0.54",
+    "@ai-sdk/amazon-bedrock": "5.0.82",
+    "@ai-sdk/google": "4.0.69",
+    "@ai-sdk/openai": "4.0.66",
+    "@ai-sdk/xai": "4.0.58",
     "@exercode/problem-utils": "workspace:*",
-    "ai": "7.0.93",
+    "ai": "7.0.99",
     "zod": "4.5.4"
   },
   "devDependencies": {
