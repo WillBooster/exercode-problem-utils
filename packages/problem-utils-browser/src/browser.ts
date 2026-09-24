@@ -7,9 +7,11 @@ import {
   type Browser,
   type BrowserContext,
   type CDPSession,
+  type ElementHandle,
   type HTTPRequest,
   type LaunchOptions,
   type Page,
+  type Protocol,
 } from 'puppeteer';
 
 const submitEventsKey = '@exercode/problem-utils-browser/submit-events';
@@ -66,7 +68,7 @@ export async function capturePngScreenshot(page: Page): Promise<Buffer> {
   }
 }
 
-async function captureFullPagePng(page: Page, session: CDPSession) {
+async function captureFullPagePng(page: Page, session: CDPSession): Promise<Protocol.Page.CaptureScreenshotResponse> {
   const [{ cssContentSize, contentSize }, { screenInfos }] = await Promise.all([
     session.send('Page.getLayoutMetrics'),
     session.send('Emulation.getScreenInfos'),
@@ -89,7 +91,7 @@ async function captureFullPagePng(page: Page, session: CDPSession) {
 }
 
 /** Finds a required course control immediately and reports its selector when absent. */
-export async function requirePageElement(page: Page, selector: string) {
+export async function requirePageElement(page: Page, selector: string): Promise<ElementHandle<Element>> {
   const element = await page.$(selector);
   if (!element) throw new Error(`要素が見つかりません: ${selector}`);
   return element;

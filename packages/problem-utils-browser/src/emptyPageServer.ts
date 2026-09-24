@@ -1,6 +1,10 @@
 import http from 'node:http';
 
-export async function startEmptyPageServer() {
+interface EmptyPageServer extends AsyncDisposable {
+  url: string;
+}
+
+export async function startEmptyPageServer(): Promise<EmptyPageServer> {
   const server = http.createServer((_request, response) => {
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     response.end('<!doctype html><html><body></body></html>');
