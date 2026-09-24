@@ -1,6 +1,6 @@
 [tools]
 bun = "1.4.2"
-fnox = "1.35.2"
+fnox = "1.35.3"
 java = "temurin-25.0.4+101.0.LTS"
 kotlin = "2.4.20"
 node = "24.21.0"

@@ -1,11 +1,19 @@
 {
-  "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
+    "alwaysStrict": true,
+    "esModuleInterop": true,
+    "importHelpers": false,
+    "noEmit": true,
+    "noUncheckedIndexedAccess": true,
     "paths": {
-      "undici-types": ["./node_modules/undici-types/index.d.ts"]
+      "undici-types": ["../../node_modules/undici-types/index.d.ts"]
     },
-    "rootDir": "."
+    "resolveJsonModule": true,
+    "rootDir": "../..",
+    "types": ["bun"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["dist", "node_modules"]
+  "exclude": ["test/fixtures", "dist", "node_modules"],
+  "extends": ["@tsconfig/bun/tsconfig.json", "../../tsconfig.json"],
+  "include": ["*.config.ts", "scripts/**/*", "src/**/*", "test/**/*"]
 }
