@@ -52,7 +52,7 @@
     "marked": "18.0.12",
     "marked-cjk-friendly": "0.1.1",
     "marked-gfm-heading-id": "4.1.4",
-    "prettier": "3.9.6",
+    "prettier": "3.9.8",
     "prettier-plugin-organize-attributes": "1.0.0",
     "puppeteer": "25.10.0",
     "zod": "4.6.2"
@@ -67,7 +67,7 @@
     "build-ts": "21.0.16",
     "oxfmt": "0.68.0",
     "oxlint": "1.83.0",
-    "oxlint-tsgolint": "7.0.2001",
+    "oxlint-tsgolint": "7.0.2002",
     "sort-package-json": "4.0.0",
     "typescript": "7.0.2"
   },
