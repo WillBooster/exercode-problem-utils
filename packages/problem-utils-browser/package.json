@@ -54,7 +54,7 @@
     "marked-gfm-heading-id": "4.1.4",
     "prettier": "3.9.8",
     "prettier-plugin-organize-attributes": "1.0.0",
-    "puppeteer": "25.10.0",
+    "puppeteer": "25.11.0",
     "zod": "4.6.5"
   },
   "devDependencies": {
@@ -63,7 +63,7 @@
     "@types/html-encoding-sniffer": "3.0.2",
     "@willbooster/oxfmt-config": "1.2.2",
     "@willbooster/oxlint-config": "1.4.8",
-    "@willbooster/wb": "22.7.2",
+    "@willbooster/wb": "22.8.0",
     "build-ts": "21.0.16",
     "oxfmt": "0.68.0",
     "oxlint": "1.83.0",
