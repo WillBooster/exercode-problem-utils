@@ -32,7 +32,7 @@
   },
   "prettier": "@willbooster/prettier-config",
   "devDependencies": {
-    "@anolilab/multi-semantic-release": "4.4.13",
+    "@anolilab/multi-semantic-release": "4.4.16",
     "@exercode/problem-utils": "workspace:*",
     "@exercode/problem-utils-browser": "workspace:*",
     "@exercode/problem-utils-llm": "workspace:*",
@@ -45,7 +45,7 @@
     "@willbooster/oxfmt-config": "1.2.2",
     "@willbooster/oxlint-config": "1.4.8",
     "@willbooster/prettier-config": "10.4.0",
-    "@willbooster/wb": "22.7.0",
+    "@willbooster/wb": "22.7.2",
     "build-ts": "21.0.16",
     "conventional-changelog-conventionalcommits": "10.4.0",
     "lefthook": "2.1.14",
@@ -53,12 +53,12 @@
     "oxlint": "1.83.0",
     "oxlint-tsgolint": "7.0.2002",
     "prettier": "3.9.8",
-    "prettier-plugin-java": "2.10.3",
+    "prettier-plugin-java": "2.10.4",
     "semantic-release": "25.0.9",
     "sort-package-json": "4.0.0",
     "typescript": "7.0.2",
     "vitest": "5.0.1",
-    "zod": "4.6.2"
+    "zod": "4.6.5"
   },
   "engines": {
     "node": ">=24"
