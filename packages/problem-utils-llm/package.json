@@ -39,7 +39,7 @@
     "@ai-sdk/amazon-bedrock": "5.0.88",
     "@ai-sdk/google": "4.0.76",
     "@ai-sdk/openai": "4.0.71",
-    "@ai-sdk/xai": "4.0.59",
+    "@ai-sdk/xai": "5.0.4",
     "@exercode/problem-utils": "workspace:*",
     "ai": "7.0.107",
     "zod": "4.6.5"
