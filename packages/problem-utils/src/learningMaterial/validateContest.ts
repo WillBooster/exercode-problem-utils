@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
+import { getErrorMessage } from '@willbooster/shared-lib';
 import { parse as parseYaml } from 'yaml';
 import { collectProblemIdsFromDirectory, isFile, isRegularFile, reportDanglingProblemReferences } from './fsHelpers.js';
 import { CONTEST_MATERIAL_FILE_SUFFIX, contestFileSchema, LEARNING_MATERIAL_ID_REGEX } from './schemas.js';
@@ -58,7 +59,7 @@ export async function validateContestFile(
   try {
     rawContent = parseYaml(await readFile(contestFilePath, 'utf8'));
   } catch (error) {
-    errors.push(`invalid YAML: ${error instanceof Error ? error.message : String(error)}`);
+    errors.push(`invalid YAML: ${getErrorMessage(error)}`);
     return result;
   }
   const parsed = contestFileSchema.safeParse(rawContent);

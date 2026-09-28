@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import { MIMEType } from 'node:util';
+import { getErrorMessage } from '@willbooster/shared-lib';
 
 import {
   DecisionCode,
@@ -97,7 +98,7 @@ async function testSnapshotBody(page: Page, solutionPage: Page, ctx: JudgeContex
   } catch (error) {
     return {
       decisionCode: DecisionCode.JUDGE_NOT_AVAILABLE,
-      stderr: error instanceof Error ? error.message : String(error),
+      stderr: getErrorMessage(error),
       feedbackMarkdown: 'HTML構造の比較中にエラーが発生しました。',
     };
   }
@@ -123,7 +124,7 @@ async function testScreenshot(page: Page, solutionPage: Page, ctx: JudgeContext)
   } catch (error) {
     return {
       decisionCode: DecisionCode.JUDGE_NOT_AVAILABLE,
-      stderr: error instanceof Error ? error.message : String(error),
+      stderr: getErrorMessage(error),
       feedbackMarkdown: 'スクリーンショット比較中にエラーが発生しました。',
     };
   }

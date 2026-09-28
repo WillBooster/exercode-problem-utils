@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { hasErrorCode } from '@willbooster/shared-lib';
 
 export const MODEL_ANSWERS_DIRNAME = 'model_answers';
 export const FAILING_MODEL_ANSWERS_DIRNAME = 'model_answers.fails';
@@ -26,7 +27,7 @@ async function findAnswerDirs(problemDir: string, dirname: string): Promise<stri
   try {
     entries = await fs.readdir(modelAnswersDir, { withFileTypes: true });
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    if (hasErrorCode(error, 'ENOENT')) return [];
     throw error;
   }
   return entries

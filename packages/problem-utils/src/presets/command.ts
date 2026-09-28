@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { getErrorMessage } from '@willbooster/shared-lib';
 
 import { z } from 'zod';
 
@@ -264,7 +265,7 @@ async function runCommandJudgeForCwd<
         printTestCaseResult({
           testCaseId: prebuildTestCaseId,
           decisionCode: DecisionCode.BUILD_ERROR,
-          stderr: error instanceof Error ? error.message : String(error),
+          stderr: getErrorMessage(error),
         });
         return { allAccepted: false };
       }
@@ -314,7 +315,7 @@ async function runCommandJudgeForCwd<
         testCaseId: testCase.id,
         decisionCode: DecisionCode.RUNTIME_ERROR,
         stdin,
-        stderr: errorToMessage(error),
+        stderr: getErrorMessage(error),
       });
       await cleanWorkingDirectory(cwd, cwdSnapshot);
       return { allAccepted: false };
@@ -351,7 +352,7 @@ async function runCommandJudgeForCwd<
       } catch (error) {
         judgeResult = {
           decisionCode: DecisionCode.RUNTIME_ERROR,
-          stderr: errorToMessage(error),
+          stderr: getErrorMessage(error),
         };
       }
     }
@@ -436,10 +437,6 @@ async function runBuild(
   }
 
   return;
-}
-
-function errorToMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 async function readCommandTestCases<TTestCase extends BaseCommandTestCase = CommandTestCase>(

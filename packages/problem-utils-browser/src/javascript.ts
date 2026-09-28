@@ -4,6 +4,7 @@ import { createBrowserPage, evaluateBrowserProgram, launchBrowser } from './brow
 import { startEmptyPageServer } from './emptyPageServer.js';
 import { consoleText } from './consoleText.js';
 import path from 'node:path';
+import { getErrorMessage, raceWithTimeout } from '@willbooster/shared-lib';
 
 import { DecisionCode } from '@exercode/problem-utils';
 import { commandJudgePreset } from '@exercode/problem-utils/presets/command';
@@ -81,7 +82,7 @@ async function runInBrowser(
     page.on('pageerror', (error) => {
       isRunning = true;
       pageErrorOccurred = true;
-      stderr.push(error instanceof Error ? error.message : String(error));
+      stderr.push(getErrorMessage(error));
     });
 
     const runStartedAt = Date.now();
@@ -120,7 +121,7 @@ async function runInBrowser(
       }
     } catch (error) {
       status = 1;
-      stderr.push(error instanceof Error ? error.message : String(error));
+      stderr.push(getErrorMessage(error));
     } finally {
       await page.close();
     }
@@ -168,18 +169,7 @@ function normalize(value: string): string {
 }
 
 async function withTimeout<T>(task: () => Promise<T>, timeLimitSeconds: number): Promise<T> {
-  let timer: NodeJS.Timeout | undefined;
-  try {
-    return await Promise.race([
-      task(),
-      new Promise<T>((_resolve, reject) => {
-        timer = setTimeout(
-          () => reject(new Error(`time limit exceeded: ${timeLimitSeconds}s`)),
-          timeLimitSeconds * 1000
-        );
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
+  const result = await raceWithTimeout(task(), timeLimitSeconds * 1000);
+  if (result.timedOut) throw new Error(`time limit exceeded: ${timeLimitSeconds}s`);
+  return result.value;
 }

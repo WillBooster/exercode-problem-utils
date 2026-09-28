@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
+import { getErrorMessage } from '@willbooster/shared-lib';
 import { parse as parseYaml } from 'yaml';
 import { collectProblemIdsFromDirectory, reportDanglingProblemReferences } from './fsHelpers.js';
 import { parseFrontmatter } from './frontmatter.js';
@@ -73,7 +74,7 @@ export async function validateMaterialFile(
   try {
     ({ attributes, body } = parseFrontmatter(markdown));
   } catch (error) {
-    errors.push(`invalid YAML frontmatter: ${error instanceof Error ? error.message : String(error)}`);
+    errors.push(`invalid YAML frontmatter: ${getErrorMessage(error)}`);
     return result;
   }
 
@@ -214,9 +215,7 @@ function parseQuestionCodeBlocks(body: string, errors: string[]): MaterialQuesti
     try {
       rawQuestion = parseYaml(yamlText);
     } catch (error) {
-      errors.push(
-        `question block ${blockIndex + 1}: invalid YAML: ${error instanceof Error ? error.message : String(error)}`
-      );
+      errors.push(`question block ${blockIndex + 1}: invalid YAML: ${getErrorMessage(error)}`);
       continue;
     }
     const parsed = questionInCodeBlockSchema.safeParse(rawQuestion);

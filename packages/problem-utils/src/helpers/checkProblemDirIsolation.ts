@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { getErrorMessage, isRecord } from '@willbooster/shared-lib';
 
 import { DecisionCode } from '../types/decisionCode.js';
 import { TEST_CASE_RESULT_PREFIX, testCaseResultSchema } from '../types/testCaseResult.js';
@@ -59,7 +60,7 @@ export async function checkProblemDirIsolation(
       return { passed: true };
     }
     const execArgv = process.execArgv.filter(isIsolationExecArg);
-    const paramsJson = JSON.stringify(isJudgeParamsObject(params) ? params : {});
+    const paramsJson = JSON.stringify(isRecord(params) ? params : {});
     const result = await runHarnessProcess([...execArgv, scriptPath, copiedCwd, paramsJson], {
       cwd: copiedProblemDir,
       env: process.env,
@@ -99,7 +100,7 @@ export async function checkProblemDirIsolation(
     printDebugBanner([
       '[DEBUG MODE] isolated problem directory check failed due to an unexpected error',
       '',
-      error instanceof Error ? error.message : String(error),
+      getErrorMessage(error),
     ]);
     return { passed: false };
   } finally {
@@ -142,10 +143,6 @@ function describeFailure(
 
 function isIsolationExecArg(arg: string): boolean {
   return !arg.startsWith('--inspect') && !arg.startsWith('--watch') && !arg.startsWith('--hot');
-}
-
-function isJudgeParamsObject(params: unknown): params is object {
-  return params !== undefined && params !== null && typeof params === 'object' && !Array.isArray(params);
 }
 
 function getInvokedScriptPath(problemDir: string): string {

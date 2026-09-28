@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { getErrorMessage } from '@willbooster/shared-lib';
 
 import { bedrock } from '@ai-sdk/amazon-bedrock';
 import { google } from '@ai-sdk/google';
@@ -114,7 +115,7 @@ export async function llmJudgePreset(problemDir: string, options: LlmJudgePreset
         testCaseId: testCase.id,
         decisionCode: DecisionCode.RUNTIME_ERROR,
         stdin: testCase.input,
-        stderr: error instanceof Error ? error.message : String(error),
+        stderr: getErrorMessage(error),
         timeSeconds: (stopTimeMilliseconds - startTimeMilliseconds) / 1000,
       });
 
