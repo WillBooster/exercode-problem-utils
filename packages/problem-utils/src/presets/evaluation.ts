@@ -330,7 +330,7 @@ function clip(value: string): string {
   // Control characters and backticks would break the markdown list item and inline code the value is echoed in.
   const printable = value.replaceAll(/[\p{Cc}]/gu, ' ').replaceAll('`', "'");
   if (printable.trim() === '') return '（空）';
-  return truncate(printable, MAX_ECHOED_CELL_LENGTH);
+  return truncate(printable, MAX_ECHOED_CELL_LENGTH + '…'.length);
 }
 
 function matchesExpectedResult(resolvedCwd: ResolvedCwd, result: Pick<TestCaseResult, 'decisionCode'>): boolean {

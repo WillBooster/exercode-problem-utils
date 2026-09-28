@@ -274,5 +274,5 @@ async function fileExists(filePath: string): Promise<boolean> {
 }
 
 function truncateFailureDetail(text: string): string {
-  return truncate(text, MAX_FAILURE_DETAIL_LENGTH, '...');
+  return truncate(text, MAX_FAILURE_DETAIL_LENGTH + '...'.length, '...');
 }
