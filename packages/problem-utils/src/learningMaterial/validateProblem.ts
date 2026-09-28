@@ -1,5 +1,6 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { basename, join, relative, resolve } from 'node:path';
+import { getErrorMessage } from '@willbooster/shared-lib';
 
 import { MAX_COMPARED_FILE_BYTES } from '../helpers/compareExpectedOutputFiles.js';
 import { findDefaultStdioHarnessFiles, type HarnessFileName } from '../helpers/defaultStdioHarness.js';
@@ -223,7 +224,7 @@ async function parseProblemFrontmatter(
     // exercode rejects problem bodies with more than one standalone chat delimiter, like materials.
     reportExcessChatMarkers(body, errors);
   } catch (error) {
-    errors.push(`problem.md: invalid YAML frontmatter: ${error instanceof Error ? error.message : String(error)}`);
+    errors.push(`problem.md: invalid YAML frontmatter: ${getErrorMessage(error)}`);
     return undefined;
   }
   const parsed = problemFrontmatterSchema.safeParse(attributes);

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { raceWithTimeout } from '@willbooster/shared-lib';
 import type { TestCaseResult } from '@exercode/problem-utils';
 import {
   launch,
@@ -45,23 +46,15 @@ export async function capturePngScreenshot(page: Page): Promise<Buffer> {
   const timeout = page.getDefaultTimeout();
   // A native screenshot holds a context-wide mutex even after a timeout, blocking other pages.
   const session = await page.createCDPSession();
-  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const screenshot = captureFullPagePng(page, session);
-    const result = await (timeout === 0
-      ? screenshot
-      : Promise.race([
-          screenshot,
-          new Promise<never>((_resolve, reject) => {
-            timer = setTimeout(
-              () => reject(new TimeoutError(`Screenshot capture timed out after ${timeout} ms`)),
-              timeout
-            );
-          }),
-        ]));
-    return Buffer.from(result.data, 'base64');
+    const result =
+      timeout === 0
+        ? { timedOut: false as const, value: await screenshot }
+        : await raceWithTimeout(screenshot, timeout);
+    if (result.timedOut) throw new TimeoutError(`Screenshot capture timed out after ${timeout} ms`);
+    return Buffer.from(result.value.data, 'base64');
   } finally {
-    clearTimeout(timer);
     await session.detach().catch(() => {
       // Closing the page also detaches this session; preserve the capture outcome.
     });

@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { getErrorMessage, hasErrorCode } from '@willbooster/shared-lib';
 import { DecisionCode, parseArgs, printTestCaseResult, type TestCaseResult } from '../index.js';
 export interface SpringBootJudgePresetOptions {
   problemDirectoryPath: string;
@@ -33,7 +34,7 @@ export async function springBootJudgePreset(options: SpringBootJudgePresetOption
     try {
       await options.evaluate();
     } catch (error) {
-      console.error(error instanceof Error ? error.message : String(error));
+      console.error(getErrorMessage(error));
       process.exitCode = 1;
     }
     return;
@@ -69,7 +70,7 @@ export async function springBootJudgePreset(options: SpringBootJudgePresetOption
     printTestCaseResult({
       testCaseId,
       decisionCode: DecisionCode.JUDGE_NOT_AVAILABLE,
-      stderr: error instanceof Error ? error.message : String(error),
+      stderr: getErrorMessage(error),
     });
   } finally {
     await stopSpringBootApplication(springBootProcess);
@@ -133,7 +134,7 @@ function buildWithMaven(buildDir: string): JudgeResult | undefined {
   const stdout = truncateOutput(result.stdout ?? '');
   const stderr = truncateOutput(result.stderr ?? '');
 
-  if (isTimeoutError(result.error)) {
+  if (hasErrorCode(result.error, 'ETIMEDOUT')) {
     return { decisionCode: DecisionCode.BUILD_TIME_LIMIT_EXCEEDED, stderr, stdout, timeSeconds };
   }
   if ((result.status ?? 0) === 0) {
@@ -251,7 +252,7 @@ function runJudgeScript(buildDir: string, problemDirectoryPath: string): JudgeRe
   const stderr = truncateOutput(result.stderr ?? '');
   const outputFiles = readOutputFiles(path.join(buildDir, '__SCREENSHOTS.json'));
 
-  if (isTimeoutError(result.error)) {
+  if (hasErrorCode(result.error, 'ETIMEDOUT')) {
     return { decisionCode: DecisionCode.TIME_LIMIT_EXCEEDED, stderr, stdout, timeSeconds, outputFiles };
   }
   if ((result.status ?? 0) !== 0) {
@@ -273,10 +274,6 @@ function runJudgeScript(buildDir: string, problemDirectoryPath: string): JudgeRe
     timeSeconds,
     outputFiles,
   };
-}
-
-function isTimeoutError(error: Error | undefined): boolean {
-  return !!error && 'code' in error && error.code === 'ETIMEDOUT';
 }
 
 export function buildSpringBootUrl(urlPath: string): string {

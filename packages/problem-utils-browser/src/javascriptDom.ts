@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { getErrorMessage } from '@willbooster/shared-lib';
 
 import { DecisionCode, parseArgs, printTestCaseResult } from '@exercode/problem-utils';
 import { createBrowserPage, evaluateBrowserProgram, launchBrowser } from './browser.js';
@@ -144,7 +145,7 @@ await window.verifyDom?.();
         printTestCaseResult({
           testCaseId,
           decisionCode: DecisionCode.RUNTIME_ERROR,
-          stderr: error instanceof Error ? error.message : String(error),
+          stderr: getErrorMessage(error),
         });
         await page.close();
         break;

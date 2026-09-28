@@ -1,4 +1,5 @@
 import { stripVTControlCharacters } from 'node:util';
+import { getErrorMessage } from '@willbooster/shared-lib';
 import {
   DecisionCode,
   parseArgs,
@@ -104,7 +105,7 @@ async function runBrowserJudge(options: BrowserJudgePresetOptions): Promise<void
         try {
           result.outputFiles = [...(result.outputFiles ?? []), await captureScreenshot(page)];
         } catch (error) {
-          const message = `Screenshot capture failed: ${error instanceof Error ? error.message : String(error)}`;
+          const message = `Screenshot capture failed: ${getErrorMessage(error)}`;
           result.stderr = result.stderr ? `${result.stderr}\n${message}` : message;
         }
       }

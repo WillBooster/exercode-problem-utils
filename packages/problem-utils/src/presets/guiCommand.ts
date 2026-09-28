@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { setTimeout as wait } from 'node:timers/promises';
+import { getErrorMessage } from '@willbooster/shared-lib';
 
 import { z } from 'zod';
 
@@ -205,7 +206,7 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
       printTestCaseResult({
         testCaseId: prebuildTestCaseId,
         decisionCode: DecisionCode.BUILD_ERROR,
-        stderr: errorToMessage(error),
+        stderr: getErrorMessage(error),
       });
       return;
     }
@@ -236,7 +237,7 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
       printTestCaseResult({
         testCaseId: prebuildTestCaseId,
         decisionCode: DecisionCode.BUILD_ERROR,
-        stderr: errorToMessage(error),
+        stderr: getErrorMessage(error),
       });
       return;
     }
@@ -312,7 +313,7 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
           testCaseId: testCase.id,
           decisionCode: DecisionCode.RUNTIME_ERROR,
           stdin,
-          stderr: errorToMessage(error),
+          stderr: getErrorMessage(error),
         });
         await cleanWorkingDirectory(args.cwd, cwdSnapshot);
         return;
@@ -347,7 +348,7 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
         } catch (error) {
           judgeResult = {
             decisionCode: DecisionCode.RUNTIME_ERROR,
-            stderr: errorToMessage(error),
+            stderr: getErrorMessage(error),
           };
         }
       }
@@ -376,7 +377,7 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
       testCaseId: currentTestCaseId,
       decisionCode: DecisionCode.RUNTIME_ERROR,
       stdin: currentStdin,
-      stderr: errorToMessage(error),
+      stderr: getErrorMessage(error),
     });
     await cleanWorkingDirectory(args.cwd, cwdSnapshot);
   } finally {
@@ -753,8 +754,4 @@ async function pathExists(filePath: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-function errorToMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

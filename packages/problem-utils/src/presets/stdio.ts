@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { getErrorMessage } from '@willbooster/shared-lib';
 
 import { z } from 'zod';
 
@@ -121,7 +122,7 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
       printTestCaseResult({
         testCaseId: testCases[0]?.id ?? 'prebuild',
         decisionCode: DecisionCode.BUILD_ERROR,
-        stderr: error instanceof Error ? error.message : String(error),
+        stderr: getErrorMessage(error),
       });
       return;
     }
@@ -225,7 +226,7 @@ export async function stdioJudgePreset(problemDir: string): Promise<void> {
       } catch (error) {
         // An authoring error (e.g. an oversized expected file) is reported per case, like the command preset does.
         decisionCode = DecisionCode.RUNTIME_ERROR;
-        judgementError = error instanceof Error ? error.message : String(error);
+        judgementError = getErrorMessage(error);
       }
     }
 
@@ -347,7 +348,7 @@ async function debugInWorkingDirectory(problemDir: string, cwd: string, params: 
       printTestCaseResult({
         testCaseId: 'prebuild',
         decisionCode: DecisionCode.BUILD_ERROR,
-        stderr: error instanceof Error ? error.message : String(error),
+        stderr: getErrorMessage(error),
       });
       return;
     }

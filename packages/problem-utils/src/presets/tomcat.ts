@@ -11,6 +11,7 @@ import http from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { getErrorMessage } from '@willbooster/shared-lib';
 import { DecisionCode, parseArgs, printTestCaseResult, type TestCaseResult } from '../index.js';
 
 export interface TomcatJudgePresetOptions {
@@ -39,7 +40,7 @@ export async function tomcatJudgePreset(options: TomcatJudgePresetOptions): Prom
     try {
       await options.evaluate();
     } catch (error) {
-      console.error(error instanceof Error ? error.message : String(error));
+      console.error(getErrorMessage(error));
       process.exitCode = 1;
     }
     return;
@@ -81,7 +82,7 @@ export async function tomcatJudgePreset(options: TomcatJudgePresetOptions): Prom
     printTestCaseResult({
       testCaseId,
       decisionCode: DecisionCode.JUDGE_NOT_AVAILABLE,
-      stderr: error instanceof Error ? error.message : String(error),
+      stderr: getErrorMessage(error),
     });
   } finally {
     try {

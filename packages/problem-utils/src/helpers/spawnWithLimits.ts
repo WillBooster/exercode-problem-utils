@@ -2,6 +2,7 @@ import childProcess from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { hasErrorCode } from '@willbooster/shared-lib';
 
 export interface SpawnWithLimitsResult {
   stdout: string;
@@ -252,7 +253,7 @@ function killSubprocessGroup(subprocess: childProcess.ChildProcess, signal: Node
     }
     process.kill(-subprocess.pid, signal);
   } catch (error) {
-    if (!isErrorWithCode(error, 'ESRCH') && !isErrorWithCode(error, 'EPERM')) throw error;
+    if (!hasErrorCode(error, 'ESRCH') && !hasErrorCode(error, 'EPERM')) throw error;
   }
 }
 
@@ -291,10 +292,6 @@ function parseTimeOutput(
 // GNU time formats its seconds with the locale's decimal separator.
 function parseSeconds(text: string): number {
   return Number(text.replace(',', '.'));
-}
-
-function isErrorWithCode(error: unknown, code: string): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && (error as { code: unknown }).code === code;
 }
 
 function resolveTimeCommand(): readonly [string, ...string[]] | undefined {

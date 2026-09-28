@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { hasErrorCode, isRecord } from '@willbooster/shared-lib';
 
 import { spawnWithLimits, type SpawnWithLimitsResult } from './spawnWithLimits.js';
 import { forciblyRemoveDirectory } from './temporaryProblemDirCopy.js';
@@ -297,9 +298,7 @@ async function pathExists(filePath: string): Promise<boolean> {
     await fs.access(filePath);
     return true;
   } catch (error) {
-    const code =
-      typeof error === 'object' && error !== null && 'code' in error ? (error as { code: unknown }).code : undefined;
-    if (code !== 'ENOENT') throw error;
+    if (!hasErrorCode(error, 'ENOENT')) throw error;
     return false;
   }
 }
@@ -307,14 +306,10 @@ async function pathExists(filePath: string): Promise<boolean> {
 async function readJson(filePath: string): Promise<Record<string, unknown>> {
   try {
     const parsed = JSON.parse(await fs.readFile(filePath, 'utf8')) as unknown;
-    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : {};
+    return isRecord(parsed) ? parsed : {};
   } catch (error) {
     if (error instanceof SyntaxError) return {};
-    const code =
-      typeof error === 'object' && error !== null && 'code' in error ? (error as { code: unknown }).code : undefined;
-    if (code === 'ENOENT') return {};
+    if (hasErrorCode(error, 'ENOENT')) return {};
     throw error;
   }
 }
@@ -338,8 +333,6 @@ async function copyPathIfExists(sourcePath: string, destinationPath: string): Pr
     await fs.mkdir(path.dirname(destinationPath), { recursive: true });
     await fs.cp(sourcePath, destinationPath, { force: true, recursive: true });
   } catch (error) {
-    const code =
-      typeof error === 'object' && error !== null && 'code' in error ? (error as { code: unknown }).code : undefined;
-    if (code !== 'ENOENT') throw error;
+    if (!hasErrorCode(error, 'ENOENT')) throw error;
   }
 }

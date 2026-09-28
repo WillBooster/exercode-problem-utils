@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { forEachConcurrently, getErrorMessage } from '@willbooster/shared-lib';
 
 import { findDefaultStdioHarnessFiles } from '../helpers/defaultStdioHarness.js';
 import { findFailingModelAnswerDirs, findModelAnswerDirs } from '../helpers/findModelAnswerDirs.js';
@@ -85,7 +86,7 @@ export async function checkAllProblems(args: readonly string[]): Promise<number>
           frontMatter = await readProblemMarkdownFrontMatter(problemDir);
         } catch (error) {
           failures.push(
-            `${toRelative(problemDir)}: failed to read the problem markdown front matter: ${error instanceof Error ? error.message : String(error)}`
+            `${toRelative(problemDir)}: failed to read the problem markdown front matter: ${getErrorMessage(error)}`
           );
           continue;
         }
@@ -106,24 +107,17 @@ export async function checkAllProblems(args: readonly string[]): Promise<number>
 
   const cliEntryPath = path.resolve(process.argv[1] ?? '');
   let passedCount = 0;
-  let nextRunIndex = 0;
-  await Promise.all(
-    Array.from({ length: Math.max(1, Math.min(options.concurrency, runs.length)) }, async () => {
-      while (nextRunIndex < runs.length) {
-        const run = runs[nextRunIndex++];
-        if (!run) return;
-        const label = `${toRelative(run.problemDir)} ${path.relative(run.problemDir, run.answerDir).replaceAll(path.sep, '/')}`;
-        const failureDetail = await executeCheckRun(run, cliEntryPath);
-        if (failureDetail === undefined) {
-          passedCount++;
-          console.info(`✓ ${label}`);
-        } else {
-          failures.push(`${label}: ${failureDetail}`);
-          console.error(`✗ ${label}: ${failureDetail}`);
-        }
-      }
-    })
-  );
+  await forEachConcurrently(runs, options.concurrency, async (run) => {
+    const label = `${toRelative(run.problemDir)} ${path.relative(run.problemDir, run.answerDir).replaceAll(path.sep, '/')}`;
+    const failureDetail = await executeCheckRun(run, cliEntryPath);
+    if (failureDetail === undefined) {
+      passedCount++;
+      console.info(`✓ ${label}`);
+    } else {
+      failures.push(`${label}: ${failureDetail}`);
+      console.error(`✗ ${label}: ${failureDetail}`);
+    }
+  });
 
   console.info(
     `\n${passedCount} passed, ${failures.length} failed (${runs.length} runs, ${problemDirs.length} problems)`
@@ -142,9 +136,7 @@ async function executeCheckRun(run: CheckRun, cliEntryPath: string): Promise<str
   try {
     ({ tempRoot, copiedProblemDir } = await copyProblemDirToTemporaryRoot(run.problemDir));
   } catch (error) {
-    return truncate(
-      `failed to copy the problem directory to a temporary location: ${error instanceof Error ? error.message : String(error)}`
-    );
+    return truncate(`failed to copy the problem directory to a temporary location: ${getErrorMessage(error)}`);
   }
 
   let harnessFailureDetail;
@@ -162,9 +154,7 @@ async function executeCheckRun(run: CheckRun, cliEntryPath: string): Promise<str
     );
     harnessFailureDetail = summarizeHarnessFailure(run, result);
   } catch (error) {
-    harnessFailureDetail = truncate(
-      `harness execution failed: ${error instanceof Error ? error.message : String(error)}`
-    );
+    harnessFailureDetail = truncate(`harness execution failed: ${getErrorMessage(error)}`);
   } finally {
     removedTempRoot = await forciblyRemoveDirectory(tempRoot);
   }

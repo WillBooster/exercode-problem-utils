@@ -1,5 +1,6 @@
 import { lstat, readdir, readFile, realpath } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+import { getErrorMessage } from '@willbooster/shared-lib';
 import { parse as parseYaml } from 'yaml';
 import {
   collectProblemDefinitions,
@@ -168,7 +169,7 @@ async function parseCourseFile(
   try {
     rawContent = parseYaml(await readFile(courseFilePath, 'utf8'));
   } catch (error) {
-    errors.push(`${courseFileName}: invalid YAML: ${error instanceof Error ? error.message : String(error)}`);
+    errors.push(`${courseFileName}: invalid YAML: ${getErrorMessage(error)}`);
     return undefined;
   }
   const parsed = courseFileSchema.safeParse(rawContent);
