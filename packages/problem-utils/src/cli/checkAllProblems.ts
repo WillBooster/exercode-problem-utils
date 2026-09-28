@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { forEachConcurrently, getErrorMessage, parsePositiveInteger, truncate } from '@willbooster/shared-lib';
+import { forEachConcurrently, getErrorMessage, truncate } from '@willbooster/shared-lib';
 
 import { findDefaultStdioHarnessFiles } from '../helpers/defaultStdioHarness.js';
 import { findFailingModelAnswerDirs, findModelAnswerDirs } from '../helpers/findModelAnswerDirs.js';
@@ -222,9 +222,10 @@ function parseCheckArgs(args: readonly string[]): CheckOptions {
       const value = args[++index];
       if (value === undefined) throw new Error(`${arg} requires a value`);
       if (arg === '--concurrency') {
-        const concurrency = parsePositiveInteger(value);
-        if (concurrency === undefined) throw new Error(`--concurrency requires a positive integer, but got ${value}`);
-        options.concurrency = concurrency;
+        options.concurrency = Number(value);
+        if (!Number.isInteger(options.concurrency) || options.concurrency <= 0) {
+          throw new Error(`--concurrency requires a positive integer, but got ${value}`);
+        }
       } else if (arg === '--only') {
         options.only.push(value);
       } else {

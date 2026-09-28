@@ -47,7 +47,7 @@
   },
   "dependencies": {
     "@exercode/problem-utils": "workspace:*",
-    "@willbooster/shared-lib": "^10.18.0",
+    "@willbooster/shared-lib": "10.18.0",
     "highlight.js": "11.12.0",
     "html-encoding-sniffer": "6.0.0",
     "marked": "18.0.13",

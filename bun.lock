@@ -56,7 +56,7 @@
         "exercode-problem": "bin/exercode-problem.mjs",
       },
       "dependencies": {
-        "@willbooster/shared-lib": "^10.18.0",
+        "@willbooster/shared-lib": "10.18.0",
         "front-matter": "4.0.2",
         "yaml": "2.9.1",
         "zod": "4.6.5",
@@ -84,7 +84,7 @@
       },
       "dependencies": {
         "@exercode/problem-utils": "workspace:*",
-        "@willbooster/shared-lib": "^10.18.0",
+        "@willbooster/shared-lib": "10.18.0",
         "highlight.js": "11.12.0",
         "html-encoding-sniffer": "6.0.0",
         "marked": "18.0.13",
@@ -119,7 +119,7 @@
         "@ai-sdk/openai": "4.0.71",
         "@ai-sdk/xai": "5.0.4",
         "@exercode/problem-utils": "workspace:*",
-        "@willbooster/shared-lib": "^10.18.0",
+        "@willbooster/shared-lib": "10.18.0",
         "ai": "7.0.107",
         "zod": "4.6.5",
       },
