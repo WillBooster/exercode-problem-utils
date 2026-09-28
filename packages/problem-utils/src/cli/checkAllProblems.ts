@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { forEachConcurrently, getErrorMessage, truncate } from '@willbooster/shared-lib';
+import { forEachConcurrently, getErrorMessage } from '@willbooster/shared-lib';
 
 import { findDefaultStdioHarnessFiles } from '../helpers/defaultStdioHarness.js';
 import { findFailingModelAnswerDirs, findModelAnswerDirs } from '../helpers/findModelAnswerDirs.js';
@@ -136,9 +136,7 @@ async function executeCheckRun(run: CheckRun, cliEntryPath: string): Promise<str
   try {
     ({ tempRoot, copiedProblemDir } = await copyProblemDirToTemporaryRoot(run.problemDir));
   } catch (error) {
-    return truncateFailureDetail(
-      `failed to copy the problem directory to a temporary location: ${getErrorMessage(error)}`
-    );
+    return truncate(`failed to copy the problem directory to a temporary location: ${getErrorMessage(error)}`);
   }
 
   let harnessFailureDetail;
@@ -156,7 +154,7 @@ async function executeCheckRun(run: CheckRun, cliEntryPath: string): Promise<str
     );
     harnessFailureDetail = summarizeHarnessFailure(run, result);
   } catch (error) {
-    harnessFailureDetail = truncateFailureDetail(`harness execution failed: ${getErrorMessage(error)}`);
+    harnessFailureDetail = truncate(`harness execution failed: ${getErrorMessage(error)}`);
   } finally {
     removedTempRoot = await forciblyRemoveDirectory(tempRoot);
   }
@@ -164,17 +162,15 @@ async function executeCheckRun(run: CheckRun, cliEntryPath: string): Promise<str
   const removalFailureDetail = `failed to remove the temporary copy at ${tempRoot} (judged code may have left permission-locked files)`;
   return harnessFailureDetail === undefined
     ? removalFailureDetail
-    : truncateFailureDetail(`${harnessFailureDetail}; ${removalFailureDetail}`);
+    : truncate(`${harnessFailureDetail}; ${removalFailureDetail}`);
 }
 
 /** Return why the harness run failed the check, or `undefined` when it passed. */
 function summarizeHarnessFailure(run: CheckRun, result: HarnessProcessResult): string | undefined {
   const { stdout, stderr } = result;
-  if (result.failureReason !== undefined) return truncateFailureDetail(result.failureReason);
+  if (result.failureReason !== undefined) return truncate(result.failureReason);
   if (result.exitCode !== 0) {
-    return truncateFailureDetail(
-      `harness exited with ${result.exitCode ?? 'a signal'}${stderr.trim() ? `: ${stderr.trim()}` : ''}`
-    );
+    return truncate(`harness exited with ${result.exitCode ?? 'a signal'}${stderr.trim() ? `: ${stderr.trim()}` : ''}`);
   }
 
   const resultLines = stdout.split(/\r?\n/).filter((line) => line.startsWith(TEST_CASE_RESULT_PREFIX));
@@ -186,7 +182,7 @@ function summarizeHarnessFailure(run: CheckRun, result: HarnessProcessResult): s
     } catch {
       parsedResult = undefined;
     }
-    if (!parsedResult?.success) return truncateFailureDetail(`malformed test case result line: ${line}`);
+    if (!parsedResult?.success) return truncate(`malformed test case result line: ${line}`);
     testCaseResults.push(parsedResult.data);
   }
   if (testCaseResults.length === 0) return 'no test case results were printed';
@@ -194,7 +190,7 @@ function summarizeHarnessFailure(run: CheckRun, result: HarnessProcessResult): s
   if (run.expectation === 'accepted') {
     const rejectedResult = testCaseResults.find((result) => result.decisionCode !== DecisionCode.ACCEPTED);
     if (rejectedResult) {
-      return truncateFailureDetail(
+      return truncate(
         `${decisionCodeNames.get(rejectedResult.decisionCode) ?? rejectedResult.decisionCode} on test case ${rejectedResult.testCaseId}${rejectedResult.stderr?.trim() ? `: ${rejectedResult.stderr.trim()}` : ''}`
       );
     }
@@ -273,6 +269,6 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-function truncateFailureDetail(text: string): string {
-  return truncate(text, MAX_FAILURE_DETAIL_LENGTH + '...'.length, '...');
+function truncate(text: string): string {
+  return text.length <= MAX_FAILURE_DETAIL_LENGTH ? text : `${text.slice(0, MAX_FAILURE_DETAIL_LENGTH)}...`;
 }

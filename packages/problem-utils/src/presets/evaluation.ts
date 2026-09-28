@@ -1,6 +1,5 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { truncate } from '@willbooster/shared-lib';
 
 import { judgeByStaticAnalysis } from '../helpers/judgeByStaticAnalysis.js';
 import { parseArgs } from '../helpers/parseArgs.js';
@@ -330,7 +329,7 @@ function clip(value: string): string {
   // Control characters and backticks would break the markdown list item and inline code the value is echoed in.
   const printable = value.replaceAll(/[\p{Cc}]/gu, ' ').replaceAll('`', "'");
   if (printable.trim() === '') return '（空）';
-  return truncate(printable, MAX_ECHOED_CELL_LENGTH + '…'.length);
+  return printable.length > MAX_ECHOED_CELL_LENGTH ? `${printable.slice(0, MAX_ECHOED_CELL_LENGTH)}…` : printable;
 }
 
 function matchesExpectedResult(resolvedCwd: ResolvedCwd, result: Pick<TestCaseResult, 'decisionCode'>): boolean {
