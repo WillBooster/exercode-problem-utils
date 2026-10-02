@@ -34,6 +34,8 @@ const XVFB_SHUTDOWN_WAIT_SECONDS = 0.1;
 const PROCESS_SHUTDOWN_WAIT_SECONDS = 0.2;
 const STOP_DETECTION_THRESHOLD = 5;
 const TIMEOUT_COMMAND_MARGIN_SECONDS = 1;
+// What `TIME_COMMAND` appends to stderr: the elapsed seconds and the peak memory in KiB.
+const TIME_OUTPUT_PATTERN = /(?:^|\n)(\d+\.\d+) (\d+)\s*$/;
 const TIME_COMMAND = [os.platform() === 'darwin' ? 'gtime' : '/usr/bin/time', '--format', '%e %M'] as const;
 
 const judgeParamsSchema = z.object({
@@ -568,7 +570,10 @@ async function spawnGuiProgram(context: {
     // The submission simply stopped reading its input; the exit handling below reports the result.
   });
   child.on('close', (code, signal) => {
-    if (code === 124 || Date.now() / 1000 - startTimeSeconds > context.timeLimitSeconds) {
+    // `timeout` kills the program only after the margin, so a program that ended by itself in between
+    // is told apart by the run time GNU time measured, not by when this callback happens to run.
+    const measuredSeconds = Number(TIME_OUTPUT_PATTERN.exec(stderr)?.[1]);
+    if (code === 124 || measuredSeconds > context.timeLimitSeconds) {
       stopReason = 'timeout';
       exitCode = 0;
       return;
@@ -710,7 +715,7 @@ function parseTimedStderr(
   startTimeSeconds: number,
   sampledMemoryBytes: number
 ): Pick<GuiCommandRunResult, 'stderr' | 'timeSeconds' | 'memoryBytes'> {
-  const match = /(?:^|\n)(\d+\.\d+) (\d+)\s*$/.exec(stderr);
+  const match = TIME_OUTPUT_PATTERN.exec(stderr);
   const normalizedStderr = match ? stderr.slice(0, match.index).trimEnd() : stderr.trimEnd();
   const parsedMemoryBytes = Number(match?.[2]) * 1024 || 0;
   return {
