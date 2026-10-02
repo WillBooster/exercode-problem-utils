@@ -596,6 +596,9 @@ async function spawnGuiProgram(context: {
 
     while (exitCode === undefined) {
       await wait(context.screenshotWaitSeconds * 1000);
+      // The program outlives the time limit by the margin of `timeout`; a capture taken in that
+      // margin is the last one of a timed-out run and never makes the run a stable one.
+      const isPastTimeLimit = Date.now() / 1000 - startTimeSeconds > context.timeLimitSeconds;
       sampledMemoryBytes = Math.max(sampledMemoryBytes, readProcessGroupMemoryBytes(child.pid));
       const capturedWindows = takeScreenshots(context.env.DISPLAY);
       const capturedAtMs = Date.now();
@@ -607,7 +610,7 @@ async function spawnGuiProgram(context: {
         .map(({ screenshot }) => screenshot)
         .toSorted((a, b) => a.data.length - b.data.length);
 
-      if (screenshots.length > 0) {
+      if (screenshots.length > 0 && !isPastTimeLimit) {
         const screenshotSignatures = screenshots.map((file) => file.data).toSorted();
         screenshotSignaturesHistory.unshift(screenshotSignatures);
         screenshotSignaturesHistory.length = Math.min(

@@ -36,7 +36,7 @@ interface ParsedPng {
 
 const PNG_SIGNATURE = Buffer.from('89504e470d0a1a0a', 'hex');
 const CHANNELS_BY_COLOR_TYPE: Record<number, number> = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 };
-const MAX_FRAME_DELAY_MS = 65_535;
+const MAX_UINT16 = 65_535;
 // A window is typically captured blank once before its first paint, which is not an animation.
 const MIN_RECORDED_FRAME_COUNT = 3;
 
@@ -148,8 +148,11 @@ export function encodeAnimatedPng(frames: readonly AnimationFrame[]): Buffer {
     frameControl.writeUInt32BE(frame.width, 4);
     frameControl.writeUInt32BE(frame.height, 8);
     // The x and y offsets at 12 and 16 stay 0.
-    frameControl.writeUInt16BE(Math.min(Math.max(Math.round(frame.delayMs), 1), MAX_FRAME_DELAY_MS), 20);
-    frameControl.writeUInt16BE(1000, 22);
+    // The delay is a fraction of two 16-bit integers: milliseconds, or seconds when those do not fit.
+    const delayUnitsPerSecond = frame.delayMs <= MAX_UINT16 ? 1000 : 1;
+    const delay = Math.round((frame.delayMs * delayUnitsPerSecond) / 1000);
+    frameControl.writeUInt16BE(Math.min(Math.max(delay, 1), MAX_UINT16), 20);
+    frameControl.writeUInt16BE(delayUnitsPerSecond, 22);
     // Every frame is cleared before the next one, so a larger frame does not stay visible around a smaller one.
     frameControl.writeUInt8(1, 24);
     chunks.push(createChunk('fcTL', frameControl));

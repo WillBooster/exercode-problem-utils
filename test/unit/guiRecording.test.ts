@@ -16,6 +16,8 @@ test('records a changing window as an animated PNG that shows each capture for a
   recorder.add('1', { path: 'Ball_1.png', data: createPng(4, 4, 0x20) }, 1300);
   recorder.add('1', { path: 'Ball_1.png', data: createPng(4, 4, 0x20) }, 1600);
   recorder.add('1', { path: 'Ball_1.png', data: createPng(4, 4, 0x30) }, 2000);
+  // A pause too long for a delay in milliseconds.
+  recorder.add('1', { path: 'Ball_1.png', data: createPng(4, 4, 0x40) }, 92_000);
 
   const recordings = recorder.build(300);
 
@@ -30,12 +32,14 @@ test('records a changing window as an animated PNG that shows each capture for a
     'fdAT',
     'fcTL',
     'fdAT',
+    'fcTL',
+    'fdAT',
     'IEND',
   ]);
-  expect(readFrameCountAndPlayCount(chunks)).toEqual([3, 0]);
-  expect(readFrameDelaysMs(chunks)).toEqual([300, 700, 300]);
+  expect(readFrameCountAndPlayCount(chunks)).toEqual([4, 0]);
+  expect(readFrameDelaysMs(chunks)).toEqual([300, 700, 90_000, 300]);
   // Frame data is numbered in display order together with the frame controls.
-  expect(readSequenceNumbers(chunks)).toEqual([0, 1, 2, 3, 4]);
+  expect(readSequenceNumbers(chunks)).toEqual([0, 1, 2, 3, 4, 5, 6]);
 });
 
 test('leaves out a window that only appeared and was painted', () => {
