@@ -10,15 +10,21 @@ export interface GuiRecordingFile {
 }
 
 interface CapturedFrame {
-  /** A PNG image in base64. */
-  data: string;
+  png: Buffer;
   capturedAtMs: number;
 }
 
 interface WindowCaptures {
   path: string;
+  /** The captures kept for the recording; none once the window turned out too large to record. */
   frames: CapturedFrame[];
+  /** The last capture in base64, kept or not, to tell whether the window changed. */
+  lastData: string;
+  changeCount: number;
+  /** Every how many changes a capture is kept; doubled whenever half of the kept frames are dropped. */
+  keptChangeInterval: number;
   lastSeenAtMs: number;
+  isTooLarge: boolean;
 }
 
 interface AnimationFrame {
@@ -38,70 +44,89 @@ const PNG_SIGNATURE = Buffer.from('89504e470d0a1a0a', 'hex');
 const CHANNELS_BY_COLOR_TYPE: Record<number, number> = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 };
 const MAX_UINT16 = 65_535;
 // A window is typically captured blank once before its first paint, which is not an animation.
-const MIN_RECORDED_FRAME_COUNT = 3;
+const MIN_RECORDED_CHANGE_COUNT = 3;
 
 /**
  * Collects the screenshots of each window over a run and turns the windows that kept changing into
- * animated PNGs, which browsers play wherever they show a PNG.
+ * animated PNGs, which browsers play wherever they show a PNG. The captures it keeps are bounded
+ * like the recordings, however long the run lasts and whatever the windows show.
  */
 export class GuiRecorder {
   readonly #windowIdToCaptures = new Map<string, WindowCaptures>();
 
   add(windowId: string, screenshot: { path: string; data: string }, capturedAtMs: number): void {
-    const captures = this.#windowIdToCaptures.get(windowId) ?? { path: '', frames: [], lastSeenAtMs: 0 };
+    const captures = this.#windowIdToCaptures.get(windowId) ?? {
+      path: '',
+      frames: [],
+      lastData: '',
+      changeCount: 0,
+      keptChangeInterval: 1,
+      lastSeenAtMs: 0,
+      isTooLarge: false,
+    };
     this.#windowIdToCaptures.set(windowId, captures);
     captures.path = screenshot.path.replace(/\.png$/, '_recording.png');
     captures.lastSeenAtMs = capturedAtMs;
     // An unchanged window only extends how long its last frame is shown.
-    if (captures.frames.at(-1)?.data !== screenshot.data) {
-      captures.frames.push({ data: screenshot.data, capturedAtMs });
-    }
+    if (captures.lastData === screenshot.data) return;
+
+    captures.lastData = screenshot.data;
+    const changeIndex = captures.changeCount++;
+    if (captures.isTooLarge || changeIndex % captures.keptChangeInterval !== 0) return;
+
+    captures.frames.push({ png: Buffer.from(screenshot.data, 'base64'), capturedAtMs });
+    this.#shrinkToFit(({ frames }) => frames.reduce((sum, frame) => sum + frame.png.length, 0));
   }
 
   /** @param frameIntervalMs How long the last capture of a window is shown. */
   build(frameIntervalMs: number): GuiRecordingFile[] {
-    const animatedCaptures = [...this.#windowIdToCaptures.values()].filter(
-      (captures) => captures.frames.length >= MIN_RECORDED_FRAME_COUNT
-    );
-    const recordings = animatedCaptures.map(({ path, frames: capturedFrames, lastSeenAtMs }) => {
-      const frames: AnimationFrame[] = capturedFrames.map((frame, index) => ({
-        png: Buffer.from(frame.data, 'base64'),
-        delayMs: (capturedFrames[index + 1]?.capturedAtMs ?? lastSeenAtMs + frameIntervalMs) - frame.capturedAtMs,
-      }));
-      return { path, frames, animatedPng: encodeAnimatedPng(frames) };
-    });
+    const framesToAnimatedPng = new Map<CapturedFrame[], Buffer>();
+    const encode = ({ frames, lastSeenAtMs }: WindowCaptures): Buffer => {
+      const animatedPng =
+        framesToAnimatedPng.get(frames) ??
+        encodeAnimatedPng(
+          frames.map((frame, index) => ({
+            png: frame.png,
+            delayMs: (frames[index + 1]?.capturedAtMs ?? lastSeenAtMs + frameIntervalMs) - frame.capturedAtMs,
+          }))
+        );
+      framesToAnimatedPng.set(frames, animatedPng);
+      return animatedPng;
+    };
+    const isRecorded = (captures: WindowCaptures): boolean =>
+      captures.changeCount >= MIN_RECORDED_CHANGE_COUNT && captures.frames.length > 0;
 
-    // Shrink the largest recording that can still lose frames until all of them fit together; one
-    // that does not fit even with two frames is left out.
-    while (recordings.reduce((sum, recording) => sum + recording.animatedPng.length, 0) > MAX_GUI_RECORDING_BYTES) {
-      const bySizeDescending = recordings.toSorted((a, b) => b.animatedPng.length - a.animatedPng.length);
-      const shrinkable = bySizeDescending.find((recording) => recording.frames.length > 2);
-      if (shrinkable) {
-        shrinkable.frames = dropEveryOtherFrame(shrinkable.frames);
-        shrinkable.animatedPng = encodeAnimatedPng(shrinkable.frames);
-      } else {
-        recordings.splice(recordings.indexOf(bySizeDescending[0] as (typeof recordings)[number]), 1);
-      }
-    }
-    return recordings.map(({ path, animatedPng }) => ({
-      path,
-      data: animatedPng.toString('base64'),
+    // The chunks an animated PNG adds per frame can exceed what the frames alone were bounded to.
+    this.#shrinkToFit((captures) => (isRecorded(captures) ? encode(captures).length : 0));
+    return [...this.#windowIdToCaptures.values()].filter(isRecorded).map((captures) => ({
+      path: captures.path,
+      data: encode(captures).toString('base64'),
       encoding: 'base64',
     }));
   }
-}
 
-function dropEveryOtherFrame(frames: readonly AnimationFrame[]): AnimationFrame[] {
-  const keptFrames: AnimationFrame[] = [];
-  for (const [index, frame] of frames.entries()) {
-    const keptFrame = keptFrames.at(-1);
-    if (index % 2 === 0 || !keptFrame) {
-      keptFrames.push({ ...frame });
-    } else {
-      keptFrame.delayMs += frame.delayMs;
+  /**
+   * Halves the frames of the largest window that still has more than two until all windows together
+   * fit `MAX_GUI_RECORDING_BYTES`; a window that does not fit even with two frames is not recorded.
+   */
+  #shrinkToFit(measure: (captures: WindowCaptures) => number): void {
+    const allCaptures = [...this.#windowIdToCaptures.values()];
+    for (;;) {
+      const sizes = new Map(allCaptures.map((captures) => [captures, measure(captures)]));
+      if ([...sizes.values()].reduce((sum, size) => sum + size, 0) <= MAX_GUI_RECORDING_BYTES) return;
+
+      const bySizeDescending = allCaptures.toSorted((a, b) => (sizes.get(b) ?? 0) - (sizes.get(a) ?? 0));
+      const shrinkable = bySizeDescending.find((captures) => captures.frames.length > 2);
+      if (shrinkable) {
+        shrinkable.frames = shrinkable.frames.filter((_, index) => index % 2 === 0);
+        shrinkable.keptChangeInterval *= 2;
+      } else {
+        const [largest] = bySizeDescending as [WindowCaptures, ...WindowCaptures[]];
+        largest.frames = [];
+        largest.isTooLarge = true;
+      }
     }
   }
-  return keptFrames;
 }
 
 /**
