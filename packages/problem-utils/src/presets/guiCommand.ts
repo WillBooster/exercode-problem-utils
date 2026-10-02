@@ -33,9 +33,6 @@ const XVFB_STARTUP_WAIT_SECONDS = 0.3;
 const XVFB_SHUTDOWN_WAIT_SECONDS = 0.1;
 const PROCESS_SHUTDOWN_WAIT_SECONDS = 0.2;
 const STOP_DETECTION_THRESHOLD = 5;
-const TIMEOUT_COMMAND_MARGIN_SECONDS = 1;
-// What `TIME_COMMAND` appends to stderr: the elapsed seconds and the peak memory in KiB.
-const TIME_OUTPUT_PATTERN = /(?:^|\n)(\d+\.\d+) (\d+)\s*$/;
 const TIME_COMMAND = [os.platform() === 'darwin' ? 'gtime' : '/usr/bin/time', '--format', '%e %M'] as const;
 
 const judgeParamsSchema = z.object({
@@ -528,13 +525,9 @@ async function spawnGuiProgram(context: {
   stopDetectionThreshold: number;
   recordsAnimation: boolean;
 }): Promise<GuiCommandRunResult> {
-  // A recorded run that times out reaches `test`, so its last capture must show the program's
-  // windows: the capture loop below then stops it at the time limit, and `timeout` only backs the
-  // loop up after a margin instead of killing the program while it is being captured.
-  const timeoutMarginSeconds = context.recordsAnimation ? TIMEOUT_COMMAND_MARGIN_SECONDS : 0;
   const child = childProcess.spawn(
     'timeout',
-    [(context.timeLimitSeconds + timeoutMarginSeconds).toFixed(3), ...TIME_COMMAND, ...context.command],
+    [context.timeLimitSeconds.toFixed(3), ...TIME_COMMAND, ...context.command],
     {
       cwd: context.cwd,
       env: context.env,
@@ -572,11 +565,7 @@ async function spawnGuiProgram(context: {
     // The submission simply stopped reading its input; the exit handling below reports the result.
   });
   child.on('close', (code, signal) => {
-    // A program that ended by itself within the margin is told apart by the run time GNU time
-    // measured, not by when this callback happens to run.
-    const exceededTimeLimit =
-      timeoutMarginSeconds > 0 && Number(TIME_OUTPUT_PATTERN.exec(stderr)?.[1]) > context.timeLimitSeconds;
-    if (code === 124 || exceededTimeLimit) {
+    if (code === 124) {
       stopReason = 'timeout';
       exitCode = 0;
       return;
@@ -597,11 +586,24 @@ async function spawnGuiProgram(context: {
     if (context.stdin) child.stdin.write(context.stdin);
     child.stdin.end();
 
+    let captureSeconds = 0;
     while (exitCode === undefined) {
+      // A recorded run that times out reaches `test`, so its last capture must show the program's
+      // windows: stop it before a capture that `timeout` would kill the program during.
+      const nextCaptureEndSeconds =
+        Date.now() / 1000 - startTimeSeconds + context.screenshotWaitSeconds + captureSeconds;
+      if (recorder && nextCaptureEndSeconds >= context.timeLimitSeconds) {
+        stopReason = 'timeout';
+        exitCode = 0;
+        break;
+      }
+
       await wait(context.screenshotWaitSeconds * 1000);
       sampledMemoryBytes = Math.max(sampledMemoryBytes, readProcessGroupMemoryBytes(child.pid));
+      const captureStartMs = Date.now();
       const capturedWindows = takeScreenshots(context.env.DISPLAY);
       const capturedAtMs = Date.now();
+      captureSeconds = (capturedAtMs - captureStartMs) / 1000;
       for (const { windowId, isSinglePixel, screenshot } of capturedWindows) {
         // Java creates an unmapped 1x1 window per program, of which `maim` captures the whole screen instead.
         if (!isSinglePixel) recorder?.add(windowId, screenshot, capturedAtMs);
@@ -610,11 +612,7 @@ async function spawnGuiProgram(context: {
         .map(({ screenshot }) => screenshot)
         .toSorted((a, b) => a.data.length - b.data.length);
 
-      // A recorded run is still alive here after the time limit (see `timeoutMarginSeconds`), so a
-      // capture that ends after the limit must not make it a stable run instead of a timed-out one.
-      const isRecordedRunPastTimeLimit =
-        recorder !== undefined && Date.now() / 1000 - startTimeSeconds > context.timeLimitSeconds;
-      if (screenshots.length > 0 && !isRecordedRunPastTimeLimit) {
+      if (screenshots.length > 0) {
         const screenshotSignatures = screenshots.map((file) => file.data).toSorted();
         screenshotSignaturesHistory.unshift(screenshotSignatures);
         screenshotSignaturesHistory.length = Math.min(
@@ -722,7 +720,7 @@ function parseTimedStderr(
   startTimeSeconds: number,
   sampledMemoryBytes: number
 ): Pick<GuiCommandRunResult, 'stderr' | 'timeSeconds' | 'memoryBytes'> {
-  const match = TIME_OUTPUT_PATTERN.exec(stderr);
+  const match = /(?:^|\n)(\d+\.\d+) (\d+)\s*$/.exec(stderr);
   const normalizedStderr = match ? stderr.slice(0, match.index).trimEnd() : stderr.trimEnd();
   const parsedMemoryBytes = Number(match?.[2]) * 1024 || 0;
   return {
