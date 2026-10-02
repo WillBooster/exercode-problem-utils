@@ -11,6 +11,8 @@ import { cleanWorkingDirectory, snapshotWorkingDirectory } from '../helpers/clea
 import { copyTestCaseFileInput } from '../helpers/copyTestCaseFileInput.js';
 import { findEntryPointFile } from '../helpers/findEntryPointFile.js';
 import { findLanguageDefinitionByPath } from '../helpers/findLanguageDefinitionByPath.js';
+import { GuiRecorder } from '../helpers/guiRecording.js';
+import type { GuiRecordingFile } from '../helpers/guiRecording.js';
 import { judgeByStaticAnalysis } from '../helpers/judgeByStaticAnalysis.js';
 import { parseArgs } from '../helpers/parseArgs.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
@@ -31,6 +33,7 @@ const XVFB_STARTUP_WAIT_SECONDS = 0.3;
 const XVFB_SHUTDOWN_WAIT_SECONDS = 0.1;
 const PROCESS_SHUTDOWN_WAIT_SECONDS = 0.2;
 const STOP_DETECTION_THRESHOLD = 5;
+const TIMEOUT_COMMAND_MARGIN_SECONDS = 1;
 const TIME_COMMAND = [os.platform() === 'darwin' ? 'gtime' : '/usr/bin/time', '--format', '%e %M'] as const;
 
 const judgeParamsSchema = z.object({
@@ -60,6 +63,8 @@ export interface GuiScreenshotFile {
   encoding: 'base64';
 }
 
+export type { GuiRecordingFile } from '../helpers/guiRecording.js';
+
 export interface GuiCommandRunResult {
   stdin: string;
   stdout: string;
@@ -68,7 +73,18 @@ export interface GuiCommandRunResult {
   timeSeconds: number;
   memoryBytes: number;
   screenshots: GuiScreenshotFile[];
+  /**
+   * With `recordsAnimation`, an animated PNG (`<window name>_<window id>_recording.png`) of each
+   * window that kept changing during the run; a window that only appeared and was painted has none.
+   */
+  recordings?: GuiRecordingFile[];
   stopReason: 'process_exit' | 'stable_screenshot' | 'timeout';
+}
+
+interface CapturedWindow {
+  windowId: string;
+  isSinglePixel: boolean;
+  screenshot: GuiScreenshotFile;
 }
 
 interface GuiJudgeContext {
@@ -86,6 +102,12 @@ export interface GuiCommandJudgePresetOptions<TTestCase extends BaseGuiTestCase 
   runTimeoutSeconds?: number;
   screenshotWaitSeconds?: number;
   stopDetectionThreshold?: number;
+  /**
+   * Records the windows into `runResult.recordings` for a grader to watch. The time limit then ends
+   * the recording instead of failing the run: a run stopped by it reaches `test` with
+   * `stopReason: 'timeout'` rather than being reported as `TIME_LIMIT_EXCEEDED`.
+   */
+  recordsAnimation?: boolean;
   readTestCases?: (problemDir: string) => Promise<readonly TTestCase[]>;
   prepare?: (context: {
     cwd: string;
@@ -109,10 +131,11 @@ export interface GuiCommandJudgePresetOptions<TTestCase extends BaseGuiTestCase 
     timeLimitSeconds: number;
     screenshotWaitSeconds: number;
     stopDetectionThreshold: number;
+    recordsAnimation: boolean;
   }) => Promise<GuiCommandRunResult> | GuiCommandRunResult;
   test: (context: {
     testCase: TTestCase;
-    runResult: GuiCommandRunResult;
+    runResult: Required<GuiCommandRunResult>;
     outputFiles: NonNullable<TestCaseResult['outputFiles']>;
     /** The submission's working directory, e.g. for `compareExpectedOutputFiles(cwd, testCase.fileOutputPath)`. */
     cwd: string;
@@ -123,7 +146,8 @@ export interface GuiCommandJudgePresetOptions<TTestCase extends BaseGuiTestCase 
 /**
  * A preset function for judging GUI programs by collecting screenshots while the program runs.
  *
- * Keep problem-specific logic in `prepare`, `command`, and `test`.
+ * Keep problem-specific logic in `prepare`, `command`, and `test`. Set `recordsAnimation` to also
+ * hand `test` an animated PNG of each window that kept changing, e.g. to attach to `outputFiles`.
  *
  * @example
  * Create `judge.ts`:
@@ -286,28 +310,22 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
         (await options.command?.({ testCase, cwd: args.cwd, env: runEnv, mainFilePath: resolvedMainFilePath })) ??
         languageDefinition.command(resolvedMainFilePath);
 
-      let runResult: GuiCommandRunResult;
+      let runResult: Required<GuiCommandRunResult>;
       try {
-        runResult = options.runCommand
-          ? await options.runCommand({
-              testCase,
-              command,
-              stdin,
-              cwd: submissionDir,
-              env: runEnv,
-              timeLimitSeconds,
-              screenshotWaitSeconds: options.screenshotWaitSeconds ?? SCREENSHOT_WAIT_SECONDS,
-              stopDetectionThreshold: options.stopDetectionThreshold ?? STOP_DETECTION_THRESHOLD,
-            })
-          : await spawnGuiProgram({
-              command,
-              stdin,
-              cwd: args.cwd,
-              env: runEnv,
-              timeLimitSeconds,
-              screenshotWaitSeconds: options.screenshotWaitSeconds ?? SCREENSHOT_WAIT_SECONDS,
-              stopDetectionThreshold: options.stopDetectionThreshold ?? STOP_DETECTION_THRESHOLD,
-            });
+        const runContext = {
+          command,
+          stdin,
+          cwd: submissionDir,
+          env: runEnv,
+          timeLimitSeconds,
+          screenshotWaitSeconds: options.screenshotWaitSeconds ?? SCREENSHOT_WAIT_SECONDS,
+          stopDetectionThreshold: options.stopDetectionThreshold ?? STOP_DETECTION_THRESHOLD,
+          recordsAnimation: options.recordsAnimation ?? false,
+        };
+        const result = options.runCommand
+          ? await options.runCommand({ testCase, ...runContext })
+          : await spawnGuiProgram(runContext);
+        runResult = { ...result, recordings: result.recordings ?? [] };
       } catch (error) {
         printTestCaseResult({
           testCaseId: testCase.id,
@@ -327,7 +345,12 @@ export async function guiCommandJudgePreset<TTestCase extends BaseGuiTestCase = 
           requiredOutputFilePaths: problemMarkdownFrontMatter.requiredOutputFilePaths,
         },
       };
-      const baseJudgeResult = evaluateGuiRunResult({ runResult, outputFiles, context: judgeContext });
+      const baseJudgeResult = evaluateGuiRunResult({
+        runResult,
+        outputFiles,
+        context: judgeContext,
+        acceptsTimeout: options.recordsAnimation ?? false,
+      });
       let judgeResult = baseJudgeResult;
       if (baseJudgeResult.decisionCode === DecisionCode.ACCEPTED) {
         try {
@@ -452,8 +475,9 @@ function evaluateGuiRunResult(context: {
   runResult: GuiCommandRunResult;
   outputFiles: NonNullable<TestCaseResult['outputFiles']>;
   context: GuiJudgeContext;
+  acceptsTimeout: boolean;
 }): Partial<GuiJudgeCaseResult> {
-  if (context.runResult.stopReason === 'timeout') {
+  if (context.runResult.stopReason === 'timeout' && !context.acceptsTimeout) {
     return {
       decisionCode: DecisionCode.TIME_LIMIT_EXCEEDED,
       stderr: context.runResult.stderr,
@@ -500,10 +524,13 @@ async function spawnGuiProgram(context: {
   timeLimitSeconds: number;
   screenshotWaitSeconds: number;
   stopDetectionThreshold: number;
+  recordsAnimation: boolean;
 }): Promise<GuiCommandRunResult> {
+  // The capture loop below enforces the time limit while the program still shows its windows, so the
+  // last capture of a timed-out run is not taken after `timeout` killed it; `timeout` only backs it up.
   const child = childProcess.spawn(
     'timeout',
-    [context.timeLimitSeconds.toFixed(3), ...TIME_COMMAND, ...context.command],
+    [(context.timeLimitSeconds + TIMEOUT_COMMAND_MARGIN_SECONDS).toFixed(3), ...TIME_COMMAND, ...context.command],
     {
       cwd: context.cwd,
       env: context.env,
@@ -522,6 +549,7 @@ async function spawnGuiProgram(context: {
   let stopReason: GuiCommandRunResult['stopReason'] = 'process_exit';
   const screenshotSignaturesHistory: string[][] = [];
   let screenshots: GuiScreenshotFile[] = [];
+  const recorder = context.recordsAnimation ? new GuiRecorder() : undefined;
   const startTimeSeconds = Date.now() / 1000;
   let sampledMemoryBytes = 0;
   child.stdout.on('data', (chunk: string) => {
@@ -540,7 +568,7 @@ async function spawnGuiProgram(context: {
     // The submission simply stopped reading its input; the exit handling below reports the result.
   });
   child.on('close', (code, signal) => {
-    if (code === 124) {
+    if (code === 124 || Date.now() / 1000 - startTimeSeconds > context.timeLimitSeconds) {
       stopReason = 'timeout';
       exitCode = 0;
       return;
@@ -564,8 +592,15 @@ async function spawnGuiProgram(context: {
     while (exitCode === undefined) {
       await wait(context.screenshotWaitSeconds * 1000);
       sampledMemoryBytes = Math.max(sampledMemoryBytes, readProcessGroupMemoryBytes(child.pid));
-      const currentScreenshots = takeScreenshots(context.env.DISPLAY);
-      screenshots = currentScreenshots.toSorted((a, b) => a.data.length - b.data.length);
+      const capturedWindows = takeScreenshots(context.env.DISPLAY);
+      const capturedAtMs = Date.now();
+      for (const { windowId, isSinglePixel, screenshot } of capturedWindows) {
+        // Java creates an unmapped 1x1 window per program, of which `maim` captures the whole screen instead.
+        if (!isSinglePixel) recorder?.add(windowId, screenshot, capturedAtMs);
+      }
+      screenshots = capturedWindows
+        .map(({ screenshot }) => screenshot)
+        .toSorted((a, b) => a.data.length - b.data.length);
 
       if (screenshots.length > 0) {
         const screenshotSignatures = screenshots.map((file) => file.data).toSorted();
@@ -617,19 +652,20 @@ async function spawnGuiProgram(context: {
     timeSeconds,
     memoryBytes,
     screenshots,
+    recordings: recorder?.build(context.screenshotWaitSeconds * 1000) ?? [],
     stopReason,
   };
 }
 
-function takeScreenshots(display: string | undefined): GuiScreenshotFile[] {
+function takeScreenshots(display: string | undefined): CapturedWindow[] {
   // Node omits environment entries whose value is undefined, so a missing display is simply not set.
   const env = { ...process.env, DISPLAY: display ?? process.env.DISPLAY };
   const xwininfo = childProcess.spawnSync('xwininfo', ['-root', '-tree'], { encoding: 'utf8', env });
   if (xwininfo.error) throw xwininfo.error;
   if (xwininfo.status !== 0 || !xwininfo.stdout) return [];
 
-  const screenshots: GuiScreenshotFile[] = [];
-  for (const windowId of extractTopLevelWindowIds(xwininfo.stdout)) {
+  const capturedWindows: CapturedWindow[] = [];
+  for (const { windowId, isSinglePixel } of extractTopLevelWindows(xwininfo.stdout)) {
     const screenshot = childProcess.spawnSync('maim', ['-i', windowId], { env });
     if (screenshot.error) throw screenshot.error;
     if (screenshot.status !== 0 || screenshot.stdout.length === 0) continue;
@@ -638,27 +674,35 @@ function takeScreenshots(display: string | undefined): GuiScreenshotFile[] {
     if (windowNameResult.error) throw windowNameResult.error;
     const windowName = windowNameResult.stdout.trim().replaceAll(/[\s/]/g, '_');
 
-    screenshots.push({
-      path: `${windowName || 'window'}_${windowId}.png`,
-      data: screenshot.stdout.toString('base64'),
-      encoding: 'base64',
+    capturedWindows.push({
+      windowId,
+      isSinglePixel,
+      screenshot: {
+        path: `${windowName || 'window'}_${windowId}.png`,
+        data: screenshot.stdout.toString('base64'),
+        encoding: 'base64',
+      },
     });
   }
 
-  return screenshots;
+  return capturedWindows;
 }
 
-function extractTopLevelWindowIds(stdout: string): string[] {
-  const windowIds: string[] = [];
+function extractTopLevelWindows(stdout: string): Pick<CapturedWindow, 'windowId' | 'isSinglePixel'>[] {
+  const windows: Pick<CapturedWindow, 'windowId' | 'isSinglePixel'>[] = [];
   const lines = stdout.split('\n');
   for (const line of lines) {
     if (line.includes('Root window id:') || line.includes('Parent window id:') || line.includes('()')) continue;
 
     const match = /^\s{5}(0x[\da-f]+) /.exec(line);
     if (!match?.[1]) continue;
-    windowIds.push(Number.parseInt(match[1], 16).toString());
+    windows.push({
+      windowId: Number.parseInt(match[1], 16).toString(),
+      // A line ends with the geometry, e.g. `400x240+0+0  +0+0`.
+      isSinglePixel: / 1x1[+-]\d+[+-]\d+ {2}[+-]\d+[+-]\d+\s*$/.test(line),
+    });
   }
-  return windowIds;
+  return windows;
 }
 
 function parseTimedStderr(

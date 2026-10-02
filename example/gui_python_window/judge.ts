@@ -3,10 +3,12 @@ import { guiCommandJudgePreset } from '@exercode/problem-utils/presets/guiComman
 import type { GuiCommandRunResult } from '@exercode/problem-utils/presets/guiCommand';
 
 const mockScreenshotPath = process.env.MOCK_GUI_SCREENSHOT_PATH;
+const mockRecordingPath = process.env.MOCK_GUI_RECORDING_PATH;
 
 await guiCommandJudgePreset(import.meta.dirname, {
   mainFilePath: 'main.py',
   runTimeoutSeconds: 5,
+  recordsAnimation: true,
   readTestCases: () => Promise.resolve([{ id: 'default' }]),
   command: () => ['python3', 'main.py'],
   ...(mockScreenshotPath
@@ -20,12 +22,19 @@ await guiCommandJudgePreset(import.meta.dirname, {
             timeSeconds: 0.1,
             memoryBytes: 0,
             screenshots: [{ path: mockScreenshotPath, data: 'mock-image', encoding: 'base64' }],
-            stopReason: 'stable_screenshot',
+            // A window that keeps animating is recorded until the time limit stops the run.
+            ...(mockRecordingPath
+              ? {
+                  recordings: [{ path: mockRecordingPath, data: 'mock-animation', encoding: 'base64' }],
+                  stopReason: 'timeout',
+                }
+              : { stopReason: 'stable_screenshot' }),
           }) satisfies GuiCommandRunResult,
       }
     : {}),
   test: ({ runResult }) => {
-    if (runResult.stopReason === 'timeout') {
+    // A window that is still animating at the time limit is fine; a program that shows nothing is not.
+    if (runResult.stopReason === 'timeout' && runResult.recordings.length === 0) {
       return {
         decisionCode: DecisionCode.TIME_LIMIT_EXCEEDED,
         feedbackMarkdown: 'GUI プログラムの実行が時間内に終了しませんでした。',
@@ -55,6 +64,6 @@ await guiCommandJudgePreset(import.meta.dirname, {
       };
     }
 
-    return { decisionCode: DecisionCode.ACCEPTED };
+    return { decisionCode: DecisionCode.ACCEPTED, outputFiles: [...runResult.screenshots, ...runResult.recordings] };
   },
 });

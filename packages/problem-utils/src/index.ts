@@ -18,4 +18,5 @@ export * from './learningMaterial/validationResult.js';
 export * from './types/decisionCode.js';
 export * from './types/problem.js';
 export * from './types/testCaseResult.js';
+export { MAX_GUI_RECORDING_BYTES } from './helpers/guiRecording.js';
 export { parseFrontmatter } from './learningMaterial/frontmatter.js';

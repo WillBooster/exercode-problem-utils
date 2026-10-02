@@ -154,6 +154,7 @@ const acceptedTestCaseResultsForGuiPythonWindow = [
     exitStatus: 0,
     timeSeconds: expect.any(Number),
     memoryBytes: expect.any(Number),
+    outputFiles: [{ path: 'Hello_Window_1.png', data: 'mock-image', encoding: 'base64' }],
   },
 ] as const satisfies readonly TestCaseResult[];
 
@@ -640,6 +641,27 @@ test.each<
     {},
     { DISPLAY: ':99', MOCK_GUI_SCREENSHOT_PATH: 'Hello_Window_1.png' },
     acceptedTestCaseResultsForGuiPythonWindow,
+  ],
+  // A run that is still animating at the time limit reaches `test` together with its recording.
+  [
+    'example/gui_python_window',
+    'judge.ts',
+    'model_answers/default',
+    {},
+    {
+      DISPLAY: ':99',
+      MOCK_GUI_SCREENSHOT_PATH: 'Hello_Window_1.png',
+      MOCK_GUI_RECORDING_PATH: 'Hello_Window_1_recording.png',
+    },
+    [
+      {
+        ...acceptedTestCaseResultsForGuiPythonWindow[0],
+        outputFiles: [
+          ...acceptedTestCaseResultsForGuiPythonWindow[0].outputFiles,
+          { path: 'Hello_Window_1_recording.png', data: 'mock-animation', encoding: 'base64' },
+        ],
+      },
+    ],
   ],
 ])(
   '%s %s %s %j',

@@ -146,6 +146,37 @@ responsibility. `requirePageElement(page, selector)` immediately returns a nativ
 Puppeteer element handle or reports the missing selector in Japanese; callers use
 the handle's native actions for course-specific interactions.
 
+## GUI programs
+
+`guiCommandJudgePreset` from `@exercode/problem-utils/presets/guiCommand` runs a program on Xvfb,
+captures every top-level window every `screenshotWaitSeconds` (0.3 by default), and stops the
+program once `stopDetectionThreshold` (5 by default) consecutive captures are identical. The
+problem's `test` receives the last capture of each window as PNG files in `runResult.screenshots`.
+The host must provide `Xvfb`, `maim`, `xdotool`, and `xwininfo`.
+
+Set `recordsAnimation: true` for programs a grader has to watch moving, such as animations:
+
+```ts
+await guiCommandJudgePreset(import.meta.dirname, {
+  recordsAnimation: true,
+  test: ({ runResult }) => ({
+    decisionCode: DecisionCode.ACCEPTED,
+    outputFiles: [...runResult.screenshots, ...runResult.recordings],
+  }),
+});
+```
+
+- `runResult.recordings` holds an animated PNG (`<window name>_<window id>_recording.png`) of each
+  window that kept changing during the run, assembled from the captures above and looping forever.
+  Browsers play it wherever they show a PNG, so Exercode displays it like a screenshot. A window that
+  only appeared and was painted has no recording, only its screenshot.
+- A run that is still changing at the time limit reaches `test` with `stopReason: 'timeout'` instead of
+  being reported as `TIME_LIMIT_EXCEEDED`, so `test` decides the verdict (e.g. a time limit exceeded
+  when nothing was captured). Without `recordsAnimation`, such a run never reaches `test`.
+- The recordings of one run take at most `MAX_GUI_RECORDING_BYTES` (2 MiB) in total: a larger one
+  loses every other frame until it fits. A lower `screenshotWaitSeconds` records more smoothly; raise
+  `stopDetectionThreshold` with it, and for programs that pause longer than the two multiplied.
+
 ## PDF export
 
 ```typescript
