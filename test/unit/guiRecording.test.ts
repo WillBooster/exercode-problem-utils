@@ -90,6 +90,21 @@ test('shrinks only the recording that takes the most space', () => {
   expect(recordings.map((recording) => readFrameCountAndPlayCount(readChunks(recording.data))[0])).toEqual([3, 12]);
 });
 
+test('records an animation next to static windows that would fill the size limit by themselves', () => {
+  const recorder = new GuiRecorder();
+  for (const windowId of ['1', '2', '3', '4', '5']) {
+    recorder.add(windowId, { path: `Still_${windowId}.png`, data: createPng(700, 250, undefined) }, 1000);
+  }
+  for (let index = 0; index < 4; index++) {
+    recorder.add('6', { path: 'Ball_6.png', data: createPng(4, 4, index) }, 1000 + index * 300);
+  }
+
+  const recordings = recorder.build(300);
+
+  expect(recordings.map((recording) => recording.path)).toEqual(['Ball_6_recording.png']);
+  expect(readFrameCountAndPlayCount(readChunks(recordings[0]?.data ?? ''))[0]).toBe(4);
+});
+
 test('drops frames until the recordings of a run fit the size limit', () => {
   const recorder = new GuiRecorder();
   const frameCount = 12;

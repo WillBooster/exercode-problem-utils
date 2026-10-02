@@ -95,8 +95,7 @@ export class GuiRecorder {
       framesToAnimatedPng.set(frames, animatedPng);
       return animatedPng;
     };
-    const isRecorded = (captures: WindowCaptures): boolean =>
-      captures.changeCount >= MIN_RECORDED_CHANGE_COUNT && captures.frames.length > 0;
+    const isRecorded = (captures: WindowCaptures): boolean => isAnimated(captures) && captures.frames.length > 1;
 
     // The chunks an animated PNG adds per frame can exceed what the frames alone were bounded to.
     this.#shrinkToFit((captures) => (isRecorded(captures) ? encode(captures).length : 0));
@@ -108,8 +107,10 @@ export class GuiRecorder {
   }
 
   /**
-   * Halves the frames of the largest window that still has more than two until all windows together
-   * fit `MAX_GUI_RECORDING_BYTES`; a window that does not fit even with two frames is not recorded.
+   * Frees space until all windows together fit `MAX_GUI_RECORDING_BYTES`, giving up what matters
+   * least first: the early captures of a window that is not animated (yet), then every other frame
+   * of the largest animated window, and only when no window has more than two frames a whole window,
+   * which is then not recorded.
    */
   #shrinkToFit(measure: (captures: WindowCaptures) => number): void {
     const allCaptures = [...this.#windowIdToCaptures.values()];
@@ -117,9 +118,17 @@ export class GuiRecorder {
       const sizes = new Map(allCaptures.map((captures) => [captures, measure(captures)]));
       if ([...sizes.values()].reduce((sum, size) => sum + size, 0) <= MAX_GUI_RECORDING_BYTES) return;
 
-      const bySizeDescending = allCaptures.toSorted((a, b) => (sizes.get(b) ?? 0) - (sizes.get(a) ?? 0));
+      const bySizeDescending = allCaptures
+        .filter((captures) => captures.frames.length > 0)
+        .toSorted((a, b) => (sizes.get(b) ?? 0) - (sizes.get(a) ?? 0));
+      // The fewer changes a window showed, the less likely it is the start of an animation.
+      const [notAnimated] = bySizeDescending
+        .filter((captures) => !isAnimated(captures))
+        .toSorted((a, b) => a.changeCount - b.changeCount);
       const shrinkable = bySizeDescending.find((captures) => captures.frames.length > 2);
-      if (shrinkable) {
+      if (notAnimated) {
+        notAnimated.frames = [];
+      } else if (shrinkable) {
         shrinkable.frames = shrinkable.frames.filter((_, index) => index % 2 === 0);
         shrinkable.keptChangeInterval *= 2;
       } else {
@@ -129,6 +138,10 @@ export class GuiRecorder {
       }
     }
   }
+}
+
+function isAnimated(captures: WindowCaptures): boolean {
+  return captures.changeCount >= MIN_RECORDED_CHANGE_COUNT;
 }
 
 /**
