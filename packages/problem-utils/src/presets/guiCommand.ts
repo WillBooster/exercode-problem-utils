@@ -528,11 +528,13 @@ async function spawnGuiProgram(context: {
   stopDetectionThreshold: number;
   recordsAnimation: boolean;
 }): Promise<GuiCommandRunResult> {
-  // The capture loop below enforces the time limit while the program still shows its windows, so the
-  // last capture of a timed-out run is not taken after `timeout` killed it; `timeout` only backs it up.
+  // A recorded run that times out reaches `test`, so its last capture must show the program's
+  // windows: the capture loop below then stops it at the time limit, and `timeout` only backs the
+  // loop up after a margin instead of killing the program while it is being captured.
+  const timeoutMarginSeconds = context.recordsAnimation ? TIMEOUT_COMMAND_MARGIN_SECONDS : 0;
   const child = childProcess.spawn(
     'timeout',
-    [(context.timeLimitSeconds + TIMEOUT_COMMAND_MARGIN_SECONDS).toFixed(3), ...TIME_COMMAND, ...context.command],
+    [(context.timeLimitSeconds + timeoutMarginSeconds).toFixed(3), ...TIME_COMMAND, ...context.command],
     {
       cwd: context.cwd,
       env: context.env,
@@ -570,10 +572,11 @@ async function spawnGuiProgram(context: {
     // The submission simply stopped reading its input; the exit handling below reports the result.
   });
   child.on('close', (code, signal) => {
-    // `timeout` kills the program only after the margin, so a program that ended by itself in between
-    // is told apart by the run time GNU time measured, not by when this callback happens to run.
-    const measuredSeconds = Number(TIME_OUTPUT_PATTERN.exec(stderr)?.[1]);
-    if (code === 124 || measuredSeconds > context.timeLimitSeconds) {
+    // A program that ended by itself within the margin is told apart by the run time GNU time
+    // measured, not by when this callback happens to run.
+    const exceededTimeLimit =
+      timeoutMarginSeconds > 0 && Number(TIME_OUTPUT_PATTERN.exec(stderr)?.[1]) > context.timeLimitSeconds;
+    if (code === 124 || exceededTimeLimit) {
       stopReason = 'timeout';
       exitCode = 0;
       return;
@@ -596,9 +599,6 @@ async function spawnGuiProgram(context: {
 
     while (exitCode === undefined) {
       await wait(context.screenshotWaitSeconds * 1000);
-      // The program outlives the time limit by the margin of `timeout`; a capture taken in that
-      // margin is the last one of a timed-out run and never makes the run a stable one.
-      const isPastTimeLimit = Date.now() / 1000 - startTimeSeconds > context.timeLimitSeconds;
       sampledMemoryBytes = Math.max(sampledMemoryBytes, readProcessGroupMemoryBytes(child.pid));
       const capturedWindows = takeScreenshots(context.env.DISPLAY);
       const capturedAtMs = Date.now();
@@ -610,7 +610,7 @@ async function spawnGuiProgram(context: {
         .map(({ screenshot }) => screenshot)
         .toSorted((a, b) => a.data.length - b.data.length);
 
-      if (screenshots.length > 0 && !isPastTimeLimit) {
+      if (screenshots.length > 0) {
         const screenshotSignatures = screenshots.map((file) => file.data).toSorted();
         screenshotSignaturesHistory.unshift(screenshotSignatures);
         screenshotSignaturesHistory.length = Math.min(
