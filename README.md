@@ -158,6 +158,9 @@ The host must provide `Xvfb`, `maim`, `xdotool`, and `xwininfo`.
 Set `recordsAnimation: true` for programs a grader has to watch moving, such as animations:
 
 ```ts
+import { DecisionCode } from '@exercode/problem-utils';
+import { guiCommandJudgePreset } from '@exercode/problem-utils/presets/guiCommand';
+
 await guiCommandJudgePreset(import.meta.dirname, {
   recordsAnimation: true,
   test: ({ runResult }) => ({

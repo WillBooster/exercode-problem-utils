@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import zlib from 'node:zlib';
 
 /** Bounds the recordings of one GUI run in total, so a judge server can budget for them. */
@@ -18,8 +19,8 @@ interface WindowCaptures {
   path: string;
   /** The captures kept for the recording; none once the window turned out too large to record. */
   frames: CapturedFrame[];
-  /** The last capture in base64, kept or not, to tell whether the window changed. */
-  lastData: string;
+  /** A digest of the last capture, kept or not, to tell whether the window changed. */
+  lastDigest: string;
   changeCount: number;
   /** Every how many changes a capture is kept; doubled whenever half of the kept frames are dropped. */
   keptChangeInterval: number;
@@ -58,7 +59,7 @@ export class GuiRecorder {
     const captures = this.#windowIdToCaptures.get(windowId) ?? {
       path: '',
       frames: [],
-      lastData: '',
+      lastDigest: '',
       changeCount: 0,
       keptChangeInterval: 1,
       lastSeenAtMs: 0,
@@ -68,9 +69,10 @@ export class GuiRecorder {
     captures.path = screenshot.path.replace(/\.png$/, '_recording.png');
     captures.lastSeenAtMs = capturedAtMs;
     // An unchanged window only extends how long its last frame is shown.
-    if (captures.lastData === screenshot.data) return;
+    const digest = crypto.createHash('sha256').update(screenshot.data).digest('base64');
+    if (captures.lastDigest === digest) return;
 
-    captures.lastData = screenshot.data;
+    captures.lastDigest = digest;
     const changeIndex = captures.changeCount++;
     if (captures.isTooLarge || changeIndex % captures.keptChangeInterval !== 0) return;
 
