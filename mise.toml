@@ -5,5 +5,8 @@ java = "temurin-25.0.4+101.0.LTS"
 kotlin = "2.4.20"
 node = "24.21.0"
 
+[tasks.check-authoring]
+run = "bun oxlint --type-aware --type-check test example *.config.ts"
+
 [tasks.typecheck]
-run = "bun wb typecheck && bun oxlint --type-aware --type-check test example *.config.ts"
+run = "bun wb typecheck && mise run check-authoring"

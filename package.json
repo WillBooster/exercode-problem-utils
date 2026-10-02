@@ -27,7 +27,7 @@
     "test/ci-setup": "bun run build && bun exercode-browser browsers install chrome-headless-shell",
     "typecheck": "mise run typecheck",
     "verify": "bun wb verify",
-    "verify-full": "bun run typecheck && bun wb verify --full"
+    "verify-full": "mise run check-authoring && bun wb verify --full"
   },
   "prettier": "@willbooster/prettier-config",
   "devDependencies": {
