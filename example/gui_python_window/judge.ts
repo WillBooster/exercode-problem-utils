@@ -34,7 +34,7 @@ await guiCommandJudgePreset(import.meta.dirname, {
     : {}),
   test: ({ runResult }) => {
     // A window that is still animating at the time limit is fine; a program that shows nothing is not.
-    if (runResult.stopReason === 'timeout' && runResult.recordings.length === 0) {
+    if (runResult.stopReason === 'timeout' && runResult.screenshots.length === 0) {
       return {
         decisionCode: DecisionCode.TIME_LIMIT_EXCEEDED,
         feedbackMarkdown: 'GUI プログラムの実行が時間内に終了しませんでした。',

@@ -74,6 +74,18 @@ test('keeps a window that changes its size on a canvas fitting every frame', () 
   expect(zlib.inflateSync(chunks[2]?.data ?? Buffer.alloc(0))).toHaveLength(6 * (1 + 8 * 3));
 });
 
+test('shrinks only the recording that takes the most space', () => {
+  const recorder = new GuiRecorder();
+  for (let index = 0; index < 12; index++) {
+    recorder.add('1', { path: 'Noise_1.png', data: createPng(700, 250, undefined) }, 1000 + index * 300);
+    recorder.add('2', { path: 'Ball_2.png', data: createPng(4, 4, index) }, 1000 + index * 300);
+  }
+
+  const recordings = recorder.build(300);
+
+  expect(recordings.map((recording) => readFrameCountAndPlayCount(readChunks(recording.data))[0])).toEqual([3, 12]);
+});
+
 test('drops frames until the recordings of a run fit the size limit', () => {
   const recorder = new GuiRecorder();
   const frameCount = 12;

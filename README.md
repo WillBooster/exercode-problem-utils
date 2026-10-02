@@ -173,9 +173,11 @@ await guiCommandJudgePreset(import.meta.dirname, {
 - A run that is still changing at the time limit reaches `test` with `stopReason: 'timeout'` instead of
   being reported as `TIME_LIMIT_EXCEEDED`, so `test` decides the verdict (e.g. a time limit exceeded
   when nothing was captured). Without `recordsAnimation`, such a run never reaches `test`.
-- The recordings of one run take at most `MAX_GUI_RECORDING_BYTES` (2 MiB) in total: a larger one
-  loses every other frame until it fits. A lower `screenshotWaitSeconds` records more smoothly; raise
-  `stopDetectionThreshold` with it, and for programs that pause longer than the two multiplied.
+- The recordings of one run take at most `MAX_GUI_RECORDING_BYTES` (2 MiB) in total: the largest one
+  loses every other frame until they fit, and one that does not fit even with two frames is left out, so
+  decide a timed-out run by `runResult.screenshots` rather than by the presence of a recording. A lower
+  `screenshotWaitSeconds` records more smoothly; raise `stopDetectionThreshold` with it, and for programs
+  that pause longer than the two multiplied.
 
 ## PDF export
 
