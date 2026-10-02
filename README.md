@@ -160,7 +160,11 @@ Set `recordsAnimation: true` for programs a grader has to watch moving, such as 
 await guiCommandJudgePreset(import.meta.dirname, {
   recordsAnimation: true,
   test: ({ runResult }) => ({
-    decisionCode: DecisionCode.ACCEPTED,
+    // A program that is still animating at the time limit is fine; one that shows nothing is not.
+    decisionCode:
+      runResult.stopReason === 'timeout' && runResult.screenshots.length === 0
+        ? DecisionCode.TIME_LIMIT_EXCEEDED
+        : DecisionCode.ACCEPTED,
     outputFiles: [...runResult.screenshots, ...runResult.recordings],
   }),
 });
