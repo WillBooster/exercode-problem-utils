@@ -148,8 +148,8 @@ export function encodeAnimatedPng(frames: readonly AnimationFrame[]): Buffer {
     frameControl.writeUInt32BE(frame.width, 4);
     frameControl.writeUInt32BE(frame.height, 8);
     // The x and y offsets at 12 and 16 stay 0.
-    // The delay is a fraction of two 16-bit integers: milliseconds, or seconds when those do not fit.
-    const delayUnitsPerSecond = frame.delayMs <= MAX_UINT16 ? 1000 : 1;
+    // The delay is a fraction of two 16-bit integers: milliseconds, or the finest unit a longer delay fits in.
+    const delayUnitsPerSecond = Math.max(1, Math.min(1000, Math.floor((MAX_UINT16 * 1000) / frame.delayMs)));
     const delay = Math.round((frame.delayMs * delayUnitsPerSecond) / 1000);
     frameControl.writeUInt16BE(Math.min(Math.max(delay, 1), MAX_UINT16), 20);
     frameControl.writeUInt16BE(delayUnitsPerSecond, 22);
