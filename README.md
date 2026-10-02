@@ -149,7 +149,8 @@ the handle's native actions for course-specific interactions.
 ## GUI programs
 
 `guiCommandJudgePreset` from `@exercode/problem-utils/presets/guiCommand` runs a program on Xvfb,
-captures every top-level window every `screenshotWaitSeconds` (0.3 by default), and stops the
+captures every top-level window, waits `screenshotWaitSeconds` (0.3 by default) before the next
+capture (so captures are that wait plus the time a capture takes apart), and stops the
 program once `stopDetectionThreshold` (5 by default) consecutive captures are identical. The
 problem's `test` receives the last capture of each window as PNG files in `runResult.screenshots`.
 The host must provide `Xvfb`, `maim`, `xdotool`, and `xwininfo`.

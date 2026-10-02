@@ -610,7 +610,11 @@ async function spawnGuiProgram(context: {
         .map(({ screenshot }) => screenshot)
         .toSorted((a, b) => a.data.length - b.data.length);
 
-      if (screenshots.length > 0) {
+      // A recorded run is still alive here after the time limit (see `timeoutMarginSeconds`), so a
+      // capture that ends after the limit must not make it a stable run instead of a timed-out one.
+      const isRecordedRunPastTimeLimit =
+        recorder !== undefined && Date.now() / 1000 - startTimeSeconds > context.timeLimitSeconds;
+      if (screenshots.length > 0 && !isRecordedRunPastTimeLimit) {
         const screenshotSignatures = screenshots.map((file) => file.data).toSorted();
         screenshotSignaturesHistory.unshift(screenshotSignatures);
         screenshotSignaturesHistory.length = Math.min(
