@@ -25,9 +25,9 @@
     "test": "bun run build && bun wb test",
     "test/ci": "bun wb test-on-ci",
     "test/ci-setup": "bun run build && bun exercode-browser browsers install chrome-headless-shell",
-    "typecheck": "mise run typecheck",
+    "typecheck": "bun wb typecheck",
     "verify": "bun wb verify",
-    "verify-full": "mise run check-authoring && bun wb verify --full"
+    "verify-full": "bun wb verify --full"
   },
   "prettier": "@willbooster/prettier-config",
   "devDependencies": {
@@ -44,7 +44,7 @@
     "@willbooster/oxfmt-config": "1.2.2",
     "@willbooster/oxlint-config": "1.4.8",
     "@willbooster/prettier-config": "10.4.0",
-    "@willbooster/wb": "22.8.0",
+    "@willbooster/wb": "22.17.0",
     "build-ts": "21.0.19",
     "conventional-changelog-conventionalcommits": "10.4.0",
     "lefthook": "2.1.14",
