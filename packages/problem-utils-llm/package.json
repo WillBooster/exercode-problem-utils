@@ -41,7 +41,7 @@
     "@ai-sdk/openai": "4.0.83",
     "@ai-sdk/xai": "5.0.14",
     "@exercode/problem-utils": "workspace:*",
-    "@willbooster/shared-lib": "10.19.1",
+    "@willbooster/shared-lib": "10.19.2",
     "ai": "7.0.127",
     "zod": "4.6.5"
   },
@@ -51,7 +51,7 @@
     "@willbooster/oxfmt-config": "1.2.2",
     "@willbooster/oxlint-config": "1.4.8",
     "@willbooster/wb": "22.23.1",
-    "build-ts": "21.0.20",
+    "build-ts": "21.0.21",
     "oxfmt": "0.68.0",
     "oxlint": "1.83.0",
     "oxlint-tsgolint": "7.0.2002",
