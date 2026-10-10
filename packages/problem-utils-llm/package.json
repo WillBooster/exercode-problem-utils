@@ -36,13 +36,13 @@
     "verify-full": "bun wb verify --full"
   },
   "dependencies": {
-    "@ai-sdk/amazon-bedrock": "5.0.97",
-    "@ai-sdk/google": "4.0.82",
-    "@ai-sdk/openai": "4.0.78",
-    "@ai-sdk/xai": "5.0.10",
+    "@ai-sdk/amazon-bedrock": "5.0.105",
+    "@ai-sdk/google": "4.0.87",
+    "@ai-sdk/openai": "4.0.83",
+    "@ai-sdk/xai": "5.0.14",
     "@exercode/problem-utils": "workspace:*",
     "@willbooster/shared-lib": "10.19.1",
-    "ai": "7.0.116",
+    "ai": "7.0.127",
     "zod": "4.6.5"
   },
   "devDependencies": {

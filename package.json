@@ -47,7 +47,7 @@
     "@willbooster/wb": "22.18.0",
     "build-ts": "21.0.19",
     "conventional-changelog-conventionalcommits": "10.4.0",
-    "lefthook": "2.1.14",
+    "lefthook": "2.1.16",
     "oxfmt": "0.68.0",
     "oxlint": "1.83.0",
     "oxlint-tsgolint": "7.0.2002",
