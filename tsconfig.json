@@ -33,6 +33,7 @@
     "@tsconfig/node24/tsconfig.json"
   ],
   "include": [
+    "*.config.mts",
     "*.config.ts",
     "example/*.config.ts",
     "example/scripts/**/*",
