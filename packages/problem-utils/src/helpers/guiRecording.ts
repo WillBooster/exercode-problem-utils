@@ -95,8 +95,6 @@ export class GuiRecorder {
       framesToAnimatedPng.set(frames, animatedPng);
       return animatedPng;
     };
-    const isRecorded = (captures: WindowCaptures): boolean => isAnimated(captures) && captures.frames.length > 1;
-
     // The chunks an animated PNG adds per frame can exceed what the frames alone were bounded to.
     this.#shrinkToFit((captures) => (isRecorded(captures) ? encode(captures).length : 0));
     return [...this.#windowIdToCaptures.values()].filter(isRecorded).map((captures) => ({
@@ -138,6 +136,10 @@ export class GuiRecorder {
       }
     }
   }
+}
+
+function isRecorded(captures: WindowCaptures): boolean {
+  return isAnimated(captures) && captures.frames.length > 1;
 }
 
 function isAnimated(captures: WindowCaptures): boolean {
