@@ -6,12 +6,12 @@ timeLimitMs: 5000
 
 ## 問題文
 
-`main.py` を作成し、タイトルが `Hello Window` の GUI ウィンドウを1つ表示してください。
+`main.py` を作成し、タイトルが `Hello Window` のGUIウィンドウを1つ表示してください。
 
 ## 制約
 
-- Python 3 で実行されます。
-- Linux 上で GUI スクリーンショットを使って判定されます。
+- Python 3で実行されます。
+- Linux上でGUIスクリーンショットを使って判定されます。
 
 ## 入力
 

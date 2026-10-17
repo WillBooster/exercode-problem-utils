@@ -102,7 +102,7 @@ it with `stdioJudgePreset` and provides the debug feature with `stdioDebugPreset
 | `test_2.in`     | `1000000000 1000000000` (edge: maximum values) |
 | `test_2.out`    | `2000000000`                                   |
 
-The `example_*` cases match the 入力例/出力例 sections in `problem.md`. Every `.out` was produced by running the Python model answer (e.g. `python3 model_answers/python/main.py < test_cases/test_1.in > test_cases/test_1.out`) and verified against the Java model answer.
+The `example_*` cases match the入力例/出力例sections in `problem.md`. Every `.out` was produced by running the Python model answer (e.g. `python3 model_answers/python/main.py < test_cases/test_1.in > test_cases/test_1.out`) and verified against the Java model answer.
 
 ## model_answers/python/main.py
 
