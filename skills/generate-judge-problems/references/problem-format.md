@@ -84,7 +84,7 @@ YAML frontmatter followed by the markdown statement. The schema is strict: unkno
 
 ## Statement body
 
-Japanese, with these sections in order: `## 問題文`, `## 制約`, `## 入力`, `## 出力`, then `## 入力例1` / `## 出力例1`, `## 入力例2` / `## 出力例2`, ... matching the `example_*` test cases (for an input-only problem — see Test cases below — `## 出力` describes the judged output file, and each `## 出力例N` shows that file for the example input, e.g. an embedded image, instead of stdout). Separate section groups with `---` lines as in [example-problem.md](example-problem.md). Write math in `$...$` LaTeX. If the statement has no 入力例/出力例/サンプルケース heading, the server auto-appends the example cases from their `.in`/`.out`; an example case whose input and output live only in `.fin/` or `.fout/` is not appended, so write its 入力例/出力例 by hand with a heading per file.
+Japanese, with these sections in order: `## 問題文`, `## 制約`, `## 入力`, `## 出力`, then `## 入力例1` / `## 出力例1`, `## 入力例2` / `## 出力例2`, ... matching the `example_*` test cases (for an input-only problem — see Test cases below — `## 出力` describes the judged output file, and each `## 出力例N` shows that file for the example input, e.g. an embedded image, instead of stdout). Separate section groups with `---` lines as in [example-problem.md](example-problem.md). Write math in `$...$` LaTeX. If the statement has no入力例/出力例/サンプルケースheading, the server auto-appends the example cases from their `.in`/`.out`; an example case whose input and output live only in `.fin/` or `.fout/` is not appended, so write its入力例/出力例by hand with a heading per file.
 
 ## Test cases
 

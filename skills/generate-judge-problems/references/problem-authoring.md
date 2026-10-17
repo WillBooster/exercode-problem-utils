@@ -18,7 +18,7 @@ Problems are graded automatically against prepared test cases, so every problem 
 - 上級 (advanced): combine multiple learned concepts into a more complex program.
 - 超級 (expert): open-ended or practical challenges solved by applying learned knowledge independently.
 
-Problems at 中級 and above should be optional challenges: learners who skip them can still progress.
+Problems at中級and above should be optional challenges: learners who skip them can still progress.
 
 ## Statement writing rules
 
