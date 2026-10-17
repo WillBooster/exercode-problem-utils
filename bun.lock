@@ -25,7 +25,7 @@
         "oxfmt": "0.72.0",
         "oxlint": "1.87.0",
         "oxlint-tsgolint": "7.0.2003",
-        "prettier": "3.9.9",
+        "prettier": "3.9.10",
         "prettier-plugin-java": "2.11.0",
         "semantic-release": "25.0.9",
         "sort-package-json": "4.0.0",
@@ -44,7 +44,7 @@
       "devDependencies": {
         "@willbooster/prettier-config": "10.4.0",
         "@willbooster/wb": "22.24.0",
-        "prettier": "3.9.9",
+        "prettier": "3.9.10",
         "prettier-plugin-java": "2.11.0",
         "sort-package-json": "4.0.0",
       },
@@ -90,7 +90,7 @@
         "marked": "18.0.14",
         "marked-cjk-friendly": "0.1.2",
         "marked-gfm-heading-id": "4.1.4",
-        "prettier": "3.9.9",
+        "prettier": "3.9.10",
         "prettier-plugin-organize-attributes": "1.0.0",
         "puppeteer": "25.12.0",
         "zod": "4.6.5",
@@ -1341,7 +1341,7 @@
 
     "postcss": ["postcss@8.5.28", "", { "dependencies": { "nanoid": "^3.3.18", "picocolors": "^1.1.1", "source-map-js": "^1.2.1" } }, "sha512-RRuzqDtt5Y9h3quz5hWhK+TPnsmVs6WwSU6LkJMeY4HstUEDuYTG8UJSdawMRzmzAtV+KEoG8N3Qg2qLy5vM/A=="],
 
-    "prettier": ["prettier@3.9.9", "", { "bin": { "prettier": "bin/prettier.cjs" } }, "sha512-Z/CJHIkdujO/OtN7nXUii0Rf3VT5SRuhjBA82Xvu2XhBUgX3nhP67T0LHceBdQLex7OOFGTox+Q5Yg8Jk2Qivg=="],
+    "prettier": ["prettier@3.9.10", "", { "bin": { "prettier": "bin/prettier.cjs" } }, "sha512-skGHTH1Yb9QvaTC4hWnRTzEYtCpApF0UMBPz+t/0ZPzP8ihefo/btKd+QA7pUE0fEwA1SbS/NmhyEcstdXOIdA=="],
 
     "prettier-plugin-java": ["prettier-plugin-java@2.11.0", "", { "dependencies": { "web-tree-sitter": "0.27.0" }, "peerDependencies": { "prettier": "^3.0.0" } }, "sha512-pLwm2wHvVvW5eVVLf1cq2orY2ATaIj5ngN8hJ5ZdXYzUHzxrfaZkk2xmu8Mz/duBXAc2xT/cUH5+dK414HQSTw=="],
 
