@@ -60,12 +60,12 @@
     "@types/bun": "1.4.3",
     "@willbooster/oxfmt-config": "1.2.2",
     "@willbooster/oxlint-config": "1.4.8",
-    "@willbooster/wb": "22.26.2",
+    "@willbooster/wb": "22.26.3",
     "build-ts": "21.0.27",
     "oxfmt": "0.73.0",
     "oxlint": "1.88.0",
     "oxlint-tsgolint": "7.0.2004",
-    "sort-package-json": "4.0.0",
+    "sort-package-json": "4.1.0",
     "undici-types": "8.11.2"
   },
   "engines": {
