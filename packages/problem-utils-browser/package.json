@@ -64,7 +64,7 @@
     "@types/html-encoding-sniffer": "3.0.2",
     "@willbooster/oxfmt-config": "1.2.2",
     "@willbooster/oxlint-config": "1.4.8",
-    "@willbooster/wb": "22.26.3",
+    "@willbooster/wb": "22.27.0",
     "build-ts": "21.0.27",
     "oxfmt": "0.73.0",
     "oxlint": "1.88.0",
