@@ -26,7 +26,7 @@
   },
   "devDependencies": {
     "@willbooster/prettier-config": "10.4.0",
-    "@willbooster/wb": "22.26.3",
+    "@willbooster/wb": "22.27.0",
     "prettier": "3.9.10",
     "prettier-plugin-java": "2.11.0",
     "sort-package-json": "4.1.0"
