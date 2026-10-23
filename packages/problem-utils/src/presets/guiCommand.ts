@@ -3,8 +3,8 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { setTimeout as wait } from 'node:timers/promises';
-import { getErrorMessage } from '@willbooster/shared-lib';
 
+import { getErrorMessage } from '@willbooster/shared-lib';
 import { z } from 'zod';
 
 import { cleanWorkingDirectory, snapshotWorkingDirectory } from '../helpers/cleanWorkingDirectory.js';

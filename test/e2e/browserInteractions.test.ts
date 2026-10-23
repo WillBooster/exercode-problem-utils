@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { expect, test } from 'vitest';
+
 import {
   clickAndDetectCanceledSubmit,
   createBrowserPage,
@@ -8,6 +8,7 @@ import {
   requirePageElement,
   submitFormAndCaptureRequest,
 } from '@exercode/problem-utils-browser';
+import { expect, test } from 'vitest';
 
 test(
   'required course controls fail when absent and support native input and click actions',

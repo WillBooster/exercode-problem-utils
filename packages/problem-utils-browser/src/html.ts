@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import { MIMEType } from 'node:util';
-import { getErrorMessage } from '@willbooster/shared-lib';
 
 import {
   DecisionCode,
@@ -11,9 +10,10 @@ import {
   startLocalHttpServer,
   type TestCaseResult,
 } from '@exercode/problem-utils';
+import { getErrorMessage } from '@willbooster/shared-lib';
 import type { Page } from 'puppeteer';
 
-import { createBrowserPage, capturePngScreenshot, launchBrowser } from './browser.js';
+import { capturePngScreenshot, createBrowserPage, launchBrowser } from './browser.js';
 import { createTemporaryDirectory } from './temporaryDirectory.js';
 
 type JudgeCaseResult = Omit<TestCaseResult, 'testCaseId'>;

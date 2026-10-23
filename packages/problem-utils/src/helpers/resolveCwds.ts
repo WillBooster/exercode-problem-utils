@@ -2,9 +2,9 @@ import path from 'node:path';
 
 import {
   FAILING_MODEL_ANSWERS_DIRNAME,
-  MODEL_ANSWERS_DIRNAME,
   findFailingModelAnswerDirs,
   findModelAnswerDirs,
+  MODEL_ANSWERS_DIRNAME,
 } from './findModelAnswerDirs.js';
 import { printDebugBanner } from './printDebugBanner.js';
 

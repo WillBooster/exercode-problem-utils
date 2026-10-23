@@ -1,9 +1,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { createBrowserPage, captureScreenshot, launchBrowser } from './browser.js';
-import type { Page } from 'puppeteer';
+
 import type { TestCaseResult } from '@exercode/problem-utils';
 import { buildTomcatUrl } from '@exercode/problem-utils/presets/tomcat';
+import type { Page } from 'puppeteer';
+
+import { captureScreenshot, createBrowserPage, launchBrowser } from './browser.js';
 
 export async function captureTomcatScreenshots(pages: readonly [Page, ...Page[]]): Promise<void> {
   const outputFiles: NonNullable<TestCaseResult['outputFiles']> = [];

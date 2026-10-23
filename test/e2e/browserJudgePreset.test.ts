@@ -1,9 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 
-import { expect, test } from 'vitest';
-
 import { DecisionCode, TEST_CASE_RESULT_PREFIX, testCaseResultSchema } from '@exercode/problem-utils';
+import { expect, test } from 'vitest';
 
 test('a failure screenshot cannot discard a verdict after the check closes its page', { timeout: 30_000 }, () => {
   const result = spawnSync(

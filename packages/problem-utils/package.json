@@ -6,15 +6,25 @@
     "exercode",
     "judge"
   ],
+  "license": "Apache-2.0",
+  "author": "WillBooster Inc.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WillBooster/exercode-problem-utils.git",
     "directory": "packages/problem-utils"
   },
-  "license": "Apache-2.0",
-  "author": "WillBooster Inc.",
-  "sideEffects": false,
+  "bin": {
+    "exercode-problem": "bin/exercode-problem.mjs"
+  },
+  "files": [
+    "bin/",
+    "dist/"
+  ],
   "type": "module",
+  "sideEffects": false,
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -27,16 +37,10 @@
       "require": "./dist/presets/*.cjs"
     }
   },
-  "main": "dist/index.cjs",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "bin": {
-    "exercode-problem": "bin/exercode-problem.mjs"
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
-  "files": [
-    "bin/",
-    "dist/"
-  ],
   "scripts": {
     "build": "build-ts lib --input src/index.ts src/presets/*.ts src/cli/*.ts",
     "cleanup": "bun wb lint --fix --format",
@@ -48,7 +52,6 @@
     "verify": "bun wb verify",
     "verify-full": "bun wb verify --full"
   },
-  "prettier": "@willbooster/prettier-config",
   "dependencies": {
     "@willbooster/shared-lib": "10.20.0",
     "front-matter": "4.0.2",
@@ -58,21 +61,15 @@
   "devDependencies": {
     "@tsconfig/bun": "1.0.11",
     "@types/bun": "1.4.3",
-    "@willbooster/oxfmt-config": "1.2.2",
-    "@willbooster/oxlint-config": "1.4.8",
-    "@willbooster/wb": "22.27.0",
+    "@willbooster/oxlint-config": "1.4.9",
+    "@willbooster/wb": "22.29.1",
     "build-ts": "21.0.27",
-    "oxfmt": "0.73.0",
     "oxlint": "1.88.0",
     "oxlint-tsgolint": "7.0.2004",
-    "sort-package-json": "4.1.0",
     "undici-types": "8.11.2"
   },
+  "prettier": "@willbooster/prettier-config",
   "engines": {
     "node": ">=24"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
   }
 }

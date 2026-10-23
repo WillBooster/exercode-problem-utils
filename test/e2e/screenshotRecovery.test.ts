@@ -1,8 +1,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { expect, test } from 'vitest';
+
 import { testCaseResultSchema } from '@exercode/problem-utils';
 import { captureScreenshot, captureTomcatScreenshots, launchBrowser } from '@exercode/problem-utils-browser';
+import { expect, test } from 'vitest';
 
 test(
   'a blocked submission screenshot leaves model diagnostics and later pages usable',

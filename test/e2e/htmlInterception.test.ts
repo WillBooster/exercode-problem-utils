@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { expect, test } from 'vitest';
+
 import { captureHtmlScreenshotPair, launchBrowser } from '@exercode/problem-utils-browser';
+import { expect, test } from 'vitest';
 
 test('HTML screenshots preserve caller-owned asset interception', { timeout: 30_000 }, async () => {
   await using server = http.createServer((_request, response) => {

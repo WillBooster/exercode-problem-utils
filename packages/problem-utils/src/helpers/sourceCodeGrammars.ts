@@ -1,5 +1,5 @@
-import type { SourceCodeGrammar } from './removeCommentsInSourceCode.js';
 import { languageIdToDefinition } from '../types/language.js';
+import type { SourceCodeGrammar } from './removeCommentsInSourceCode.js';
 
 export const languageIdToSourceCodeGrammar = Object.fromEntries(
   Object.entries(languageIdToDefinition).flatMap(([languageId, languageDefinition]) =>

@@ -2,9 +2,8 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { expect, test } from 'vitest';
-
 import { DecisionCode, TEST_CASE_RESULT_PREFIX, testCaseResultSchema } from '@exercode/problem-utils';
+import { expect, test } from 'vitest';
 
 test(
   'the distributed DOM preset preserves setup bindings and exposes submitted functions to verification hooks',

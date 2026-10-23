@@ -1,13 +1,14 @@
 import fs from 'node:fs/promises';
-import { setTimeout as sleep } from 'node:timers/promises';
-import { createBrowserPage, evaluateBrowserProgram, launchBrowser } from './browser.js';
-import { startEmptyPageServer } from './emptyPageServer.js';
-import { consoleText } from './consoleText.js';
 import path from 'node:path';
-import { getErrorMessage, raceWithTimeout } from '@willbooster/shared-lib';
+import { setTimeout as sleep } from 'node:timers/promises';
 
 import { DecisionCode } from '@exercode/problem-utils';
 import { commandJudgePreset } from '@exercode/problem-utils/presets/command';
+import { getErrorMessage, raceWithTimeout } from '@willbooster/shared-lib';
+
+import { createBrowserPage, evaluateBrowserProgram, launchBrowser } from './browser.js';
+import { consoleText } from './consoleText.js';
+import { startEmptyPageServer } from './emptyPageServer.js';
 
 interface TestCase {
   id: string;

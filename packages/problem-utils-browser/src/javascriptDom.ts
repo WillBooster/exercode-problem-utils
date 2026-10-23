@@ -1,8 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { getErrorMessage } from '@willbooster/shared-lib';
 
 import { DecisionCode, parseArgs, printTestCaseResult } from '@exercode/problem-utils';
+import { getErrorMessage } from '@willbooster/shared-lib';
+
 import { createBrowserPage, evaluateBrowserProgram, launchBrowser } from './browser.js';
 import { startEmptyPageServer } from './emptyPageServer.js';
 

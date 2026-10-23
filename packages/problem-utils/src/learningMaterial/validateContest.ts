@@ -1,14 +1,16 @@
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
+
 import { getErrorMessage } from '@willbooster/shared-lib';
 import { parse as parseYaml } from 'yaml';
+
 import { collectProblemIdsFromDirectory, isFile, isRegularFile, reportDanglingProblemReferences } from './fsHelpers.js';
 import { CONTEST_MATERIAL_FILE_SUFFIX, contestFileSchema, LEARNING_MATERIAL_ID_REGEX } from './schemas.js';
 import {
   mergeSubmissionPeriods,
   reportForeignProblemCourseIds,
-  validateSubmissionPeriods,
   type SubmissionPeriods,
+  validateSubmissionPeriods,
 } from './validateMaterial.js';
 import { formatZodIssues, reportDuplicateIds, type ValidationResult } from './validationResult.js';
 
