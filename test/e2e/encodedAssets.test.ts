@@ -2,10 +2,9 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { expect, test } from 'vitest';
-
 import { startHttpServer } from '@exercode/problem-utils';
 import { markdownToPdf } from '@exercode/problem-utils-browser/pdf';
+import { expect, test } from 'vitest';
 
 test(
   'PDF export loads relative assets with Japanese names, spaces and literal percent signs',

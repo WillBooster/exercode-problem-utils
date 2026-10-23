@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+
 import { z } from 'zod';
+
 import type { TestCaseResult } from '../types/testCaseResult.js';
 
 type OutputFile = NonNullable<TestCaseResult['outputFiles']>[number];

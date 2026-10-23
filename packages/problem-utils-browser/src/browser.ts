@@ -1,18 +1,19 @@
 import { randomUUID } from 'node:crypto';
-import { raceWithTimeout } from '@willbooster/shared-lib';
+
 import type { TestCaseResult } from '@exercode/problem-utils';
+import { raceWithTimeout } from '@willbooster/shared-lib';
 import {
-  launch,
-  PuppeteerError,
-  TimeoutError,
   type Browser,
   type BrowserContext,
   type CDPSession,
   type ElementHandle,
   type HTTPRequest,
+  launch,
   type LaunchOptions,
   type Page,
   type Protocol,
+  PuppeteerError,
+  TimeoutError,
 } from 'puppeteer';
 
 const submitEventsKey = '@exercode/problem-utils-browser/submit-events';

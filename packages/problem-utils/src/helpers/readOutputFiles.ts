@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import type { TestCaseResult } from '../types/testCaseResult.js';
-
 import { encodeFileForTestCaseResult } from './printTestCaseResult.js';
 
 export async function readOutputFiles(

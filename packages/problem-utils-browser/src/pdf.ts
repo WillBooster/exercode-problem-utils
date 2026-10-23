@@ -1,11 +1,12 @@
 import { parseFrontmatter, startLocalHttpServer } from '@exercode/problem-utils';
-import type { Page } from 'puppeteer';
+import hljs from 'highlight.js';
 import { Marked } from 'marked';
 import { gfmHeadingId } from 'marked-gfm-heading-id';
-import hljs from 'highlight.js';
+import type { Page } from 'puppeteer';
 import { z } from 'zod';
+
 import { createBrowserPage, launchBrowser } from './browser.js';
-import { markdownStyles, highlightStyles } from './markdownStyles.js';
+import { highlightStyles, markdownStyles } from './markdownStyles.js';
 
 type PdfOptions = NonNullable<Parameters<Page['pdf']>[0]>;
 export interface MarkdownPdfOptions {

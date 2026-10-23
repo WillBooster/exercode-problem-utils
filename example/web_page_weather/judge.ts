@@ -1,6 +1,7 @@
+import assert from 'node:assert';
+
 import { DecisionCode } from '@exercode/problem-utils';
 import type { TestCaseResult } from '@exercode/problem-utils';
-import assert from 'node:assert';
 import { browserJudgePreset, type Page } from '@exercode/problem-utils-browser';
 
 const TEST_CASES: readonly [string, (page: Page) => Promise<Omit<TestCaseResult, 'testCaseId'>>][] = [

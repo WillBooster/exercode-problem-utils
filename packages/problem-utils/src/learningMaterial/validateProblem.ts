@@ -1,5 +1,6 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { basename, join, relative, resolve } from 'node:path';
+
 import { getErrorMessage } from '@willbooster/shared-lib';
 
 import { MAX_COMPARED_FILE_BYTES } from '../helpers/compareExpectedOutputFiles.js';
@@ -9,7 +10,6 @@ import { judgesTestCasesWithoutExpectations } from '../helpers/readProblemMarkdo
 import { removeCommentsInSourceCode } from '../helpers/removeCommentsInSourceCode.js';
 import { EXAMPLE_TEST_CASE_ID_PATTERN, MAX_STDOUT_LENGTH } from '../helpers/stdioJudgeRules.js';
 import { type CodeRule, normalizeCodeRule } from '../types/problem.js';
-
 import { parseFrontmatter } from './frontmatter.js';
 import {
   isDirectory,
@@ -22,8 +22,8 @@ import {
 import {
   availableLanguageIds,
   LEARNING_MATERIAL_ID_REGEX,
-  problemFrontmatterSchema,
   type ProblemFrontmatter,
+  problemFrontmatterSchema,
 } from './schemas.js';
 import { reportExcessChatMarkers } from './validateMaterial.js';
 import { formatZodIssues, type ValidationResult } from './validationResult.js';

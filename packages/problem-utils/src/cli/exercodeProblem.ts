@@ -1,6 +1,6 @@
 import { checkAllProblems } from './checkAllProblems.js';
 import { runSingleHarness } from './runSingleHarness.js';
-import { VALIDATE_SUBCOMMANDS, type ValidateSubcommand, validateLearningMaterial } from './validateLearningMaterial.js';
+import { VALIDATE_SUBCOMMANDS, validateLearningMaterial, type ValidateSubcommand } from './validateLearningMaterial.js';
 
 const usage = `Usage: exercode-problem [rootDir] [--only <substring>]... [--skip <substring>]... [--concurrency <n>]
        exercode-problem judge <answerDir> [paramsJson]

@@ -1,6 +1,8 @@
-import { afterEach, describe, expect, test } from 'vitest';
 import { appendFile, cp, mkdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+
+import { afterEach, describe, expect, test } from 'vitest';
+
 import { validateCourseDirectory } from '../../packages/problem-utils/src/learningMaterial/validateCourse.js';
 import { validateMaterialFile } from '../../packages/problem-utils/src/learningMaterial/validateMaterial.js';
 import {

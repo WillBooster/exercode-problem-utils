@@ -1,8 +1,9 @@
-import http from 'node:http';
 import { once } from 'node:events';
-import { expect, test } from 'vitest';
-import { buildTomcatUrl } from '@exercode/problem-utils/presets/tomcat';
+import http from 'node:http';
+
 import { launchBrowser, verifyTomcatPath } from '@exercode/problem-utils-browser';
+import { buildTomcatUrl } from '@exercode/problem-utils/presets/tomcat';
+import { expect, test } from 'vitest';
 
 test('course navigation accepts the endpoint path and reports a wrong destination', { timeout: 30_000 }, async () => {
   await using server = http.createServer((request, response) => {

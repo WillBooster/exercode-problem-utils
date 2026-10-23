@@ -1,8 +1,9 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { expect, test } from 'vitest';
+
 import { DecisionCode, TEST_CASE_RESULT_PREFIX, testCaseResultSchema } from '@exercode/problem-utils';
+import { expect, test } from 'vitest';
 
 test('JavaScript grading preserves console previews in expected output files', { timeout: 30_000 }, () => {
   const fixture = 'test/fixtures/javascriptConsole';

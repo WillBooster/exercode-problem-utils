@@ -1,6 +1,8 @@
-import { afterEach, describe, expect, test } from 'vitest';
 import { mkdir, readdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+
+import { afterEach, describe, expect, test } from 'vitest';
+
 import { validateProblemDirectory } from '../../packages/problem-utils/src/learningMaterial/validateProblem.js';
 import { cleanupTempDirs, copyFixtureToTempDir, learningMaterialFixturesDir } from './learningMaterialTestHelpers.js';
 

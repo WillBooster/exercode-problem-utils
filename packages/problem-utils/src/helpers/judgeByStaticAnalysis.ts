@@ -5,7 +5,6 @@ import { DecisionCode } from '../types/decisionCode.js';
 import type { ProblemMarkdownFrontMatter } from '../types/problem.js';
 import { normalizeCodeRule } from '../types/problem.js';
 import type { TestCaseResult } from '../types/testCaseResult.js';
-
 import { findLanguageDefinitionByPath } from './findLanguageDefinitionByPath.js';
 import { removeCommentsInSourceCode } from './removeCommentsInSourceCode.js';
 

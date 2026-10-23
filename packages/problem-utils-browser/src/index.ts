@@ -1,5 +1,5 @@
 import { stripVTControlCharacters } from 'node:util';
-import { getErrorMessage } from '@willbooster/shared-lib';
+
 import {
   DecisionCode,
   parseArgs,
@@ -7,9 +7,10 @@ import {
   startLocalHttpServer,
   type TestCaseResult,
 } from '@exercode/problem-utils';
+import { getErrorMessage } from '@willbooster/shared-lib';
 import type { BrowserContextOptions, LaunchOptions, Page } from 'puppeteer';
 
-import { createBrowserPage, captureScreenshot, launchBrowser } from './browser.js';
+import { captureScreenshot, createBrowserPage, launchBrowser } from './browser.js';
 
 export {
   clickAndDetectCanceledSubmit,

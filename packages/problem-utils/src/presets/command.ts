@@ -1,6 +1,6 @@
 import path from 'node:path';
-import { getErrorMessage } from '@willbooster/shared-lib';
 
+import { getErrorMessage } from '@willbooster/shared-lib';
 import { z } from 'zod';
 
 import { cleanWorkingDirectory, snapshotWorkingDirectory } from '../helpers/cleanWorkingDirectory.js';
@@ -12,7 +12,6 @@ import { judgeByStaticAnalysis } from '../helpers/judgeByStaticAnalysis.js';
 import { parseArgs } from '../helpers/parseArgs.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readOutputFiles } from '../helpers/readOutputFiles.js';
-import { passesIsolationCheckInDebugMode } from '../helpers/runIsolationCheckInDebugMode.js';
 import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases as readFileTestCases } from '../helpers/readTestCases.js';
 import {
@@ -21,6 +20,7 @@ import {
   resolveCwds,
   type ResolvedCwd,
 } from '../helpers/resolveCwds.js';
+import { passesIsolationCheckInDebugMode } from '../helpers/runIsolationCheckInDebugMode.js';
 import { spawnWithTimeout } from '../helpers/spawnWithTimeout.js';
 import { DecisionCode } from '../types/decisionCode.js';
 import type { ProblemMarkdownFrontMatter } from '../types/problem.js';

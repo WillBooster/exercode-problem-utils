@@ -1,6 +1,8 @@
-import { afterEach, describe, expect, test } from 'vitest';
 import { readFile, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+
+import { afterEach, describe, expect, test } from 'vitest';
+
 import { validateContestFile } from '../../packages/problem-utils/src/learningMaterial/validateContest.js';
 import { cleanupTempDirs, createTempDir, learningMaterialFixturesDir } from './learningMaterialTestHelpers.js';
 

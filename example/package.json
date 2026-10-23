@@ -1,12 +1,12 @@
 {
   "name": "example",
   "private": true,
+  "license": "UNLICENSED",
+  "author": "WillBooster Inc.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WillBooster/exercode-problem-utils.git"
   },
-  "license": "UNLICENSED",
-  "author": "WillBooster Inc.",
   "type": "module",
   "main": "./src",
   "scripts": {
@@ -18,7 +18,6 @@
     "verify": "bun wb verify",
     "verify-full": "bun wb verify --full"
   },
-  "prettier": "@willbooster/prettier-config",
   "dependencies": {
     "@exercode/problem-utils": "workspace:*",
     "@exercode/problem-utils-browser": "workspace:*",
@@ -26,9 +25,9 @@
   },
   "devDependencies": {
     "@willbooster/prettier-config": "10.4.0",
-    "@willbooster/wb": "22.27.0",
+    "@willbooster/wb": "22.29.1",
     "prettier": "3.9.10",
-    "prettier-plugin-java": "2.11.0",
-    "sort-package-json": "4.1.0"
-  }
+    "prettier-plugin-java": "2.11.0"
+  },
+  "prettier": "@willbooster/prettier-config"
 }

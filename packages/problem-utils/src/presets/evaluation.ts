@@ -6,13 +6,13 @@ import { parseArgs } from '../helpers/parseArgs.js';
 import { CsvParseError, type CsvParseErrorReason, parseCsv, parseCsvRecords } from '../helpers/parseCsv.js';
 import { printTestCaseResult } from '../helpers/printTestCaseResult.js';
 import { readProblemMarkdownFrontMatter } from '../helpers/readProblemMarkdownFrontMatter.js';
-import { passesIsolationCheckInDebugMode } from '../helpers/runIsolationCheckInDebugMode.js';
 import {
   printDebugCwdBanner,
   printDebugExpectationFailureBanner,
   resolveCwds,
   type ResolvedCwd,
 } from '../helpers/resolveCwds.js';
+import { passesIsolationCheckInDebugMode } from '../helpers/runIsolationCheckInDebugMode.js';
 import { DecisionCode } from '../types/decisionCode.js';
 import type { TestCaseResult } from '../types/testCaseResult.js';
 

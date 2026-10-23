@@ -2,15 +2,21 @@
   "name": "@exercode/problem-utils-llm",
   "version": "0.0.0-semantically-released",
   "description": "Exercode llm judging utilities",
+  "license": "Apache-2.0",
+  "author": "WillBooster Inc.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WillBooster/exercode-problem-utils.git",
     "directory": "packages/problem-utils-llm"
   },
-  "license": "Apache-2.0",
-  "author": "WillBooster Inc.",
-  "sideEffects": false,
+  "files": [
+    "dist/"
+  ],
   "type": "module",
+  "sideEffects": false,
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -18,12 +24,10 @@
       "require": "./dist/index.cjs"
     }
   },
-  "main": "dist/index.cjs",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "files": [
-    "dist/"
-  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build": "build-ts lib --input src/index.ts",
     "cleanup": "bun wb lint --fix --format",
@@ -48,20 +52,13 @@
   "devDependencies": {
     "@tsconfig/bun": "1.0.11",
     "@types/bun": "1.4.3",
-    "@willbooster/oxfmt-config": "1.2.2",
-    "@willbooster/oxlint-config": "1.4.8",
-    "@willbooster/wb": "22.27.0",
+    "@willbooster/oxlint-config": "1.4.9",
+    "@willbooster/wb": "22.29.1",
     "build-ts": "21.0.27",
-    "oxfmt": "0.73.0",
     "oxlint": "1.88.0",
-    "oxlint-tsgolint": "7.0.2004",
-    "sort-package-json": "4.1.0"
+    "oxlint-tsgolint": "7.0.2004"
   },
   "engines": {
     "node": ">=24"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
   }
 }

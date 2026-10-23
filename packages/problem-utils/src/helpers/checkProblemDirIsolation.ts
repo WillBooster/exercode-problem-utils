@@ -1,9 +1,9 @@
 import path from 'node:path';
+
 import { getErrorMessage, isRecord } from '@willbooster/shared-lib';
 
 import { DecisionCode } from '../types/decisionCode.js';
 import { TEST_CASE_RESULT_PREFIX, testCaseResultSchema } from '../types/testCaseResult.js';
-
 import { printDebugBanner } from './printDebugBanner.js';
 import type { ResolvedCwd } from './resolveCwds.js';
 import { type HarnessProcessResult, runHarnessProcess } from './runHarnessProcess.js';

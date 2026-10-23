@@ -1,7 +1,9 @@
 import { lstat, readdir, readFile, realpath } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+
 import { getErrorMessage } from '@willbooster/shared-lib';
 import { parse as parseYaml } from 'yaml';
+
 import {
   collectProblemDefinitions,
   isDirectory,
@@ -13,12 +15,12 @@ import {
 } from './fsHelpers.js';
 import {
   CONTEST_MATERIAL_FILE_SUFFIX,
+  type CourseFile,
   courseFileSchema,
   LEARNING_MATERIAL_ID_REGEX,
-  type CourseFile,
 } from './schemas.js';
 import { validateContestFile } from './validateContest.js';
-import { validateMaterialFile, validateSubmissionPeriods, type MaterialValidationOptions } from './validateMaterial.js';
+import { type MaterialValidationOptions, validateMaterialFile, validateSubmissionPeriods } from './validateMaterial.js';
 import { formatZodIssues, reportDuplicateIds, type ValidationResult } from './validationResult.js';
 
 export interface CourseValidationOptions {
