@@ -6,6 +6,7 @@
     "importHelpers": false,
     "noEmit": true,
     "noUncheckedIndexedAccess": true,
+    "paths": {},
     "resolveJsonModule": true,
     "rootDir": "../..",
     "types": ["bun"]
