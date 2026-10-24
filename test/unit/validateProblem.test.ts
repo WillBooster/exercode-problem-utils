@@ -626,6 +626,73 @@ describe('validateProblemDirectory', () => {
     ]);
   });
 
+  test('accepts an agent challenge only without judging artifacts and with Markdown explanations', async () => {
+    const problemDir = await copyProblemFixture();
+    await setProblemFrontmatter(
+      problemDir,
+      'name: Post a greeting\nagentChallenge:\n  playgrounds: [bbs]\n  expectedRequest:\n    method: POST\n    path: /messages\n    body: { type: object }'
+    );
+    const result = await validateProblemDirectory(problemDir);
+    expect(result.errors).toEqual([
+      expect.stringContaining('test_cases is not used by an agent challenge'),
+      expect.stringContaining('templates is not used by an agent challenge'),
+      expect.stringContaining('model_answers/javascript is not used by an agent challenge'),
+      expect.stringContaining('model_answers/python is not used by an agent challenge'),
+      expect.stringContaining('no explanation found'),
+    ]);
+    expect(result.warnings).toEqual([]);
+
+    for (const name of ['test_cases', 'templates', 'model_answers']) {
+      await rm(join(problemDir, name), { recursive: true });
+    }
+    await mkdir(join(problemDir, 'model_answers', 'explanation'), { recursive: true });
+    await writeFile(join(problemDir, 'model_answers', 'explanation', 'explanation.md'), '# 解説\n');
+    await mkdir(join(problemDir, 'model_answers.fails', 'python'), { recursive: true });
+    await writeFile(join(problemDir, 'model_answers.fails', 'python', 'main.py'), 'print(0)\n');
+    const leftoverResult = await validateProblemDirectory(problemDir);
+    expect(leftoverResult.errors).toEqual([
+      expect.stringContaining('model_answers.fails is not used by an agent challenge'),
+    ]);
+    await rm(join(problemDir, 'model_answers.fails'), { recursive: true });
+    const fixedResult = await validateProblemDirectory(problemDir);
+    expect(fixedResult.errors).toEqual([]);
+    expect(fixedResult.warnings).toEqual([]);
+
+    await writeFile(join(problemDir, 'model_answers', 'explanation', 'notes'), 'forgot the extension');
+    await setProblemFrontmatter(
+      problemDir,
+      'name: Post a greeting\nagentChallenge:\n  playgrounds: [bbs]\n  expectedRequest:\n    method: post\n    path: /messages'
+    );
+    const invalidResult = await validateProblemDirectory(problemDir);
+    expect(invalidResult.errors).toEqual([
+      expect.stringContaining('agentChallenge.expectedRequest.method'),
+      expect.stringContaining('model_answers/explanation/notes must be a Markdown (.md) file'),
+    ]);
+    expect(invalidResult.warnings).toEqual([]);
+  });
+
+  test.each([
+    ['/a?x=1', '{}', 'path must not carry a query or fragment'],
+    ['/a/x{id}', '{}', 'a {name} placeholder must be one whole path segment'],
+    ['/a', "{ properties: { 'Content-Type': {} } }", 'header names in properties and required must be lower case'],
+    ['/a', '{ allOf: [{ required: [Accept] }] }', 'header names in properties and required must be lower case'],
+    ['/a/{id}', '{ required: [content-type], properties: { content-type: {} } }', undefined],
+  ])('validates the agent challenge path %s with headers %s', async (path, headers, expectedError) => {
+    const problemDir = await copyProblemFixture();
+    for (const name of ['test_cases', 'templates', 'model_answers']) {
+      await rm(join(problemDir, name), { recursive: true });
+    }
+    await mkdir(join(problemDir, 'model_answers', 'explanation'), { recursive: true });
+    await writeFile(join(problemDir, 'model_answers', 'explanation', 'explanation.md'), '# 解説\n');
+    await writeFile(join(problemDir, 'model_answers', 'explanation', '.DS_Store'), '');
+    await setProblemFrontmatter(
+      problemDir,
+      `name: Get a resource\nagentChallenge:\n  playgrounds: [bbs]\n  expectedRequest:\n    method: GET\n    path: '${path}'\n    headers: ${headers}`
+    );
+    const result = await validateProblemDirectory(problemDir);
+    expect(result.errors).toEqual(expectedError ? [expect.stringContaining(expectedError)] : []);
+  });
+
   test('rejects an expected stdout the stdio judge could never accept', async () => {
     const problemDir = await copyProblemFixture();
     await writeFile(join(problemDir, 'test_cases', 'test_1.out'), 'x'.repeat(50_001));

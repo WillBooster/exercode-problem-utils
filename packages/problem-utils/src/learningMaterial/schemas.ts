@@ -1,3 +1,4 @@
+import { isRecord } from '@willbooster/shared-lib';
 import { z } from 'zod';
 
 import { languageIdToDefinition } from '../types/language.js';
@@ -14,6 +15,35 @@ export const availableLanguageIds = Object.keys(languageIdToDefinition);
 const availableLanguageIdSchema = z.enum(availableLanguageIds);
 
 const environmentVariableNameSchema = z.string().regex(/^\w+$/);
+
+const jsonSchemaSchema = z.record(z.string(), z.unknown());
+const httpStatusSchema = z.number().int().min(100).max(599);
+const pathTemplateSchema = z
+  .string()
+  .startsWith('/')
+  .refine((path) => !path.includes('?') && !path.includes('#'), 'path must not carry a query or fragment; use query')
+  .refine(
+    (path) => path.split('/').every((segment) => !/[{}]/.test(segment) || /^\{[^{}]+\}$/.test(segment)),
+    'a {name} placeholder must be one whole path segment'
+  );
+// Header names are lower-cased before matching, so a capitalized name could never match.
+const headersJsonSchemaSchema = jsonSchemaSchema.refine(
+  (schema) => declaresOnlyLowerCaseNames(schema),
+  'header names in properties and required must be lower case'
+);
+
+// Mirrors the judge server's `agentChallengeSchema`.
+export const agentChallengeSchema = z.strictObject({
+  playgrounds: z.array(z.enum(['bbs', 'backlog', 'hosting'])).min(1),
+  expectedRequest: z.strictObject({
+    method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
+    path: pathTemplateSchema,
+    status: z.union([httpStatusSchema, z.array(httpStatusSchema).min(1)]).optional(),
+    query: jsonSchemaSchema.optional(),
+    headers: headersJsonSchemaSchema.optional(),
+    body: jsonSchemaSchema.optional(),
+  }),
+});
 
 // Mirrors the judge server's strict problem frontmatter schema; keys the server removed with the
 // v1 judge (judgeEnvironmentId, generalJudgeEnvironmentConfigOverrides, testCases, isGui) are
@@ -34,6 +64,7 @@ export const problemFrontmatterSchema = z.strictObject({
   requiredEnvironmentVariables: z.array(environmentVariableNameSchema).default([]),
   requiredOutputFilePaths: z.string().min(1).array().default([]),
   requiredSubmissionFilePaths: z.string().min(1).array().default([]),
+  agentChallenge: agentChallengeSchema.optional(),
 });
 
 export type ProblemFrontmatter = z.infer<typeof problemFrontmatterSchema>;
@@ -199,3 +230,18 @@ export const contestFileSchema = z.strictObject({
   divisions: z.array(contestDivisionSchema).min(1),
   problems: z.array(contestProblemSchema).min(1),
 });
+
+/** Checks every `properties` key and `required` item at any depth, so composed schemas (allOf, $defs, if/then) count too. */
+function declaresOnlyLowerCaseNames(schema: unknown, visited = new WeakSet<object>()): boolean {
+  // A YAML alias can make the schema cyclic.
+  if (typeof schema !== 'object' || schema === null || visited.has(schema)) return true;
+  visited.add(schema);
+  if (Array.isArray(schema)) return schema.every((item) => declaresOnlyLowerCaseNames(item, visited));
+  if (!isRecord(schema)) return true;
+  const propertyNames = isRecord(schema.properties) ? Object.keys(schema.properties) : [];
+  const requiredNames: unknown[] = Array.isArray(schema.required) ? schema.required : [];
+  return (
+    [...propertyNames, ...requiredNames].every((name) => typeof name !== 'string' || name === name.toLowerCase()) &&
+    Object.values(schema).every((value) => declaresOnlyLowerCaseNames(value, visited))
+  );
+}

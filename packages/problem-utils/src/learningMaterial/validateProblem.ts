@@ -113,7 +113,13 @@ export async function validateProblemDirectory(problemDirectoryPath: string): Pr
     return result;
   }
 
-  const frontmatter = await parseProblemFrontmatter(problemFilePath, errors);
+  const { frontmatter, declaresAgentChallenge } = await parseProblemFrontmatter(problemFilePath, errors);
+  // An invalid agentChallenge block fails the schema, but the stdio checks would only add errors
+  // asking for test cases and source model answers that an agent challenge must not have.
+  if (declaresAgentChallenge) {
+    await validateAgentChallengeProblem(absoluteDirectoryPath, errors);
+    return result;
+  }
   const harness = await readHarnessFiles(absoluteDirectoryPath);
   const requiresExpectedOutput = frontmatter === undefined || !judgesTestCasesWithoutExpectations(frontmatter);
   const fileTestCases = await readFileTestCases(
@@ -159,6 +165,47 @@ export async function validateProblemDirectory(problemDirectoryPath: string): Pr
   await validateTemplates(absoluteDirectoryPath, usableModelAnswers, harness.hasCustomJudgeTs, errors, warnings);
 
   return result;
+}
+
+const AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH = join('model_answers', 'explanation');
+
+/**
+ * Exercode judges an agent challenge from playground requests and shows the Markdown files under
+ * `model_answers/explanation/` as its explanation, so judging artifacts would never be used.
+ */
+async function validateAgentChallengeProblem(problemDirectoryPath: string, errors: string[]): Promise<void> {
+  const entryNames = new Set(await readdir(problemDirectoryPath));
+  for (const name of ['judge.ts', 'debug.ts', 'test_cases', 'templates', 'model_answers.fails']) {
+    if (entryNames.has(name)) {
+      errors.push(`${name} is not used by an agent challenge (agentChallenge in problem.md); delete it`);
+    }
+  }
+  const modelAnswerDirents = await readdir(join(problemDirectoryPath, 'model_answers'), { withFileTypes: true }).catch(
+    () => []
+  );
+  for (const dirent of modelAnswerDirents.toSorted((d1, d2) => d1.name.localeCompare(d2.name))) {
+    // The judge reads only directories as model answers and skips __pycache__.
+    if (!dirent.isDirectory() || dirent.name === '__pycache__' || dirent.name === 'explanation') continue;
+    errors.push(
+      `model_answers/${dirent.name} is not used by an agent challenge; put its explanation in ${AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH}/*.md`
+    );
+  }
+  const explanationDirectoryPath = join(problemDirectoryPath, AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH);
+  const explanationDirents = await readdir(explanationDirectoryPath, { recursive: true, withFileTypes: true }).catch(
+    () => []
+  );
+  const explanationFilePaths = explanationDirents
+    .filter((dirent) => dirent.isFile() && dirent.name !== '.DS_Store')
+    .map((dirent) => relative(explanationDirectoryPath, join(dirent.parentPath, dirent.name)))
+    .toSorted();
+  for (const filePath of explanationFilePaths) {
+    if (!filePath.endsWith('.md')) {
+      errors.push(`${AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH}/${filePath} must be a Markdown (.md) file`);
+    }
+  }
+  if (explanationFilePaths.length === 0) {
+    errors.push(`no explanation found; add ${AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH}/explanation.md`);
+  }
 }
 
 interface HarnessFiles {
@@ -216,7 +263,7 @@ function validateHarnessFiles(
 async function parseProblemFrontmatter(
   problemFilePath: string,
   errors: string[]
-): Promise<ProblemFrontmatter | undefined> {
+): Promise<{ frontmatter: ProblemFrontmatter | undefined; declaresAgentChallenge: boolean }> {
   let attributes: unknown;
   try {
     let body: string;
@@ -225,14 +272,16 @@ async function parseProblemFrontmatter(
     reportExcessChatMarkers(body, errors);
   } catch (error) {
     errors.push(`problem.md: invalid YAML frontmatter: ${getErrorMessage(error)}`);
-    return undefined;
+    return { frontmatter: undefined, declaresAgentChallenge: false };
   }
+  const declaresAgentChallenge =
+    typeof attributes === 'object' && attributes !== null && 'agentChallenge' in attributes;
   const parsed = problemFrontmatterSchema.safeParse(attributes);
   if (!parsed.success) {
     errors.push(...formatZodIssues(parsed.error, 'problem.md frontmatter'));
-    return undefined;
+    return { frontmatter: undefined, declaresAgentChallenge };
   }
-  return parsed.data;
+  return { frontmatter: parsed.data, declaresAgentChallenge };
 }
 
 async function readFileTestCases(
