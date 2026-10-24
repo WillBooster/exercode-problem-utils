@@ -18,6 +18,14 @@ const environmentVariableNameSchema = z.string().regex(/^\w+$/);
 
 const jsonSchemaSchema = z.record(z.string(), z.unknown());
 const httpStatusSchema = z.number().int().min(100).max(599);
+const pathTemplateSchema = z
+  .string()
+  .startsWith('/')
+  .refine((path) => !path.includes('?') && !path.includes('#'), 'path must not carry a query or fragment; use query')
+  .refine(
+    (path) => path.split('/').every((segment) => !/[{}]/.test(segment) || /^\{[^{}]+\}$/.test(segment)),
+    'a {name} placeholder must be one whole path segment'
+  );
 // Header names are lower-cased before matching, so a capitalized name could never match.
 const headersJsonSchemaSchema = jsonSchemaSchema.refine(
   (schema) => declaresOnlyLowerCaseNames(schema),
@@ -29,7 +37,7 @@ export const agentChallengeSchema = z.strictObject({
   playgrounds: z.array(z.enum(['bbs', 'backlog', 'hosting'])).min(1),
   expectedRequest: z.strictObject({
     method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
-    path: z.string().startsWith('/'),
+    path: pathTemplateSchema,
     status: z.union([httpStatusSchema, z.array(httpStatusSchema).min(1)]).optional(),
     query: jsonSchemaSchema.optional(),
     headers: headersJsonSchemaSchema.optional(),
