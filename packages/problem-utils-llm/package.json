@@ -45,7 +45,7 @@
     "@ai-sdk/openai": "4.0.96",
     "@ai-sdk/xai": "5.0.24",
     "@exercode/problem-utils": "workspace:*",
-    "@willbooster/shared-lib": "10.20.0",
+    "@willbooster/shared-lib": "10.23.0",
     "ai": "7.0.143",
     "zod": "4.6.7"
   },
