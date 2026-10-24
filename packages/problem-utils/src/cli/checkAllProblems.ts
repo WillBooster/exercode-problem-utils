@@ -38,8 +38,8 @@ interface CheckRun {
 /**
  * Judge all model answers of all problems (directories containing `problem.md` or
  * `<id>.problem.md`) under a root directory: `model_answers/*` must be fully accepted and
- * `model_answers.fails/*` must fail at least one test case. Agent challenges are skipped because
- * they have no harness. Returns the process exit code.
+ * `model_answers.fails/*` must fail at least one test case. Agent challenges have no harness, so
+ * they are not judged but fail when their `agentChallenge` is invalid or their explanation is missing.
  */
 export async function checkAllProblems(args: readonly string[]): Promise<number> {
   const options = parseCheckArgs(args);

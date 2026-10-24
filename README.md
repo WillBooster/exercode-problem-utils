@@ -233,7 +233,7 @@ bun x exercode-problem debug model_answers/python '{ "stdin": "1 2" }'
 
 The all-problem check judges serially by default because time limits are measured in wall-clock time; pass `--concurrency <n>` to parallelize when the checked problems are not timing-sensitive.
 
-A problem whose frontmatter has `agentChallenge` is solved by the learner's AI agent calling an Exercode playground API, so it has no harness, test cases or templates: the all-problem check skips it, and `validate-problem` accepts only Markdown explanations under `model_answers/explanation/`.
+A problem whose frontmatter has `agentChallenge` is solved by the learner's AI agent calling an Exercode playground API, so it has no harness, test cases or templates: its explanation is required as Markdown under `model_answers/explanation/`. The all-problem check does not judge it, but fails it when its `agentChallenge` is invalid or the explanation is missing; `validate-problem` reports the details.
 
 A standard stdin/stdout problem must NOT commit a `judge.ts` or `debug.ts` that is identical to the default stdio harness: the absence of `judge.ts` marks the problem as standard, and committed copies would drift from the server's defaults. The CLI rejects such files; a file kept intentionally (e.g. to demonstrate the default harness) can add an explanatory comment to be treated as custom.
 
