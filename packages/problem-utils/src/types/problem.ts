@@ -29,7 +29,7 @@ export const problemMarkdownFrontMatterSchema = z.object({
   requiredOutputFilePaths: z.array(z.string().min(1)).optional(),
   requiredSubmissionFilePaths: z.array(z.string().min(1)).optional(),
   /** Exercode judges an agent challenge from playground requests, so no harness runs it. */
-  agentChallenge: z.unknown().optional(),
+  agentChallenge: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type ProblemMarkdownFrontMatter = z.infer<typeof problemMarkdownFrontMatterSchema>;

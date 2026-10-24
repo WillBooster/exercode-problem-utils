@@ -113,8 +113,10 @@ export async function validateProblemDirectory(problemDirectoryPath: string): Pr
     return result;
   }
 
-  const frontmatter = await parseProblemFrontmatter(problemFilePath, errors);
-  if (frontmatter?.agentChallenge) {
+  const { frontmatter, declaresAgentChallenge } = await parseProblemFrontmatter(problemFilePath, errors);
+  // An invalid agentChallenge block fails the schema, but the stdio checks would only add errors
+  // asking for test cases and source model answers that an agent challenge must not have.
+  if (declaresAgentChallenge) {
     await validateAgentChallengeProblem(absoluteDirectoryPath, errors, warnings);
     return result;
   }
@@ -186,21 +188,26 @@ async function validateAgentChallengeProblem(
     () => []
   );
   for (const dirent of modelAnswerDirents) {
-    if (dirent.name !== 'explanation') {
-      errors.push(
-        `model_answers/${dirent.name} is not used by an agent challenge; put its explanation in ${AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH}/*.md`
-      );
+    // The judge reads only directories as model answers and skips __pycache__.
+    if (!dirent.isDirectory() || dirent.name === '__pycache__' || dirent.name === 'explanation') continue;
+    errors.push(
+      `model_answers/${dirent.name} is not used by an agent challenge; put its explanation in ${AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH}/*.md`
+    );
+  }
+  const explanationDirectoryPath = join(problemDirectoryPath, AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH);
+  const explanationDirents = await readdir(explanationDirectoryPath, { recursive: true, withFileTypes: true }).catch(
+    () => []
+  );
+  const explanationFilePaths = explanationDirents
+    .filter((dirent) => dirent.isFile() && dirent.name !== '.DS_Store')
+    .map((dirent) => relative(explanationDirectoryPath, join(dirent.parentPath, dirent.name)))
+    .toSorted();
+  for (const filePath of explanationFilePaths) {
+    if (!filePath.endsWith('.md')) {
+      errors.push(`${AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH}/${filePath} must be a Markdown (.md) file`);
     }
   }
-  const explanationFiles = await readSourceFilesRecursively(
-    join(problemDirectoryPath, AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH)
-  ).catch(() => []);
-  for (const file of explanationFiles) {
-    if (!file.path.endsWith('.md')) {
-      errors.push(`${AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH}/${file.path} must be a Markdown (.md) file`);
-    }
-  }
-  if (explanationFiles.length === 0) {
+  if (explanationFilePaths.length === 0) {
     warnings.push(`no explanation found; add ${AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH}/explanation.md`);
   }
 }
@@ -260,7 +267,7 @@ function validateHarnessFiles(
 async function parseProblemFrontmatter(
   problemFilePath: string,
   errors: string[]
-): Promise<ProblemFrontmatter | undefined> {
+): Promise<{ frontmatter: ProblemFrontmatter | undefined; declaresAgentChallenge: boolean }> {
   let attributes: unknown;
   try {
     let body: string;
@@ -269,14 +276,16 @@ async function parseProblemFrontmatter(
     reportExcessChatMarkers(body, errors);
   } catch (error) {
     errors.push(`problem.md: invalid YAML frontmatter: ${getErrorMessage(error)}`);
-    return undefined;
+    return { frontmatter: undefined, declaresAgentChallenge: false };
   }
+  const declaresAgentChallenge =
+    typeof attributes === 'object' && attributes !== null && 'agentChallenge' in attributes;
   const parsed = problemFrontmatterSchema.safeParse(attributes);
   if (!parsed.success) {
     errors.push(...formatZodIssues(parsed.error, 'problem.md frontmatter'));
-    return undefined;
+    return { frontmatter: undefined, declaresAgentChallenge };
   }
-  return parsed.data;
+  return { frontmatter: parsed.data, declaresAgentChallenge };
 }
 
 async function readFileTestCases(

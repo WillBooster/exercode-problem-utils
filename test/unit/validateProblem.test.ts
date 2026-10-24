@@ -646,9 +646,22 @@ describe('validateProblemDirectory', () => {
     }
     await mkdir(join(problemDir, 'model_answers', 'explanation'), { recursive: true });
     await writeFile(join(problemDir, 'model_answers', 'explanation', 'explanation.md'), '# 解説\n');
+    await writeFile(join(problemDir, 'model_answers', '.DS_Store'), '');
     const fixedResult = await validateProblemDirectory(problemDir);
     expect(fixedResult.errors).toEqual([]);
     expect(fixedResult.warnings).toEqual([]);
+
+    await writeFile(join(problemDir, 'model_answers', 'explanation', 'notes'), 'forgot the extension');
+    await setProblemFrontmatter(
+      problemDir,
+      'name: Post a greeting\nagentChallenge:\n  playgrounds: [bbs]\n  expectedRequest:\n    method: post\n    path: /messages'
+    );
+    const invalidResult = await validateProblemDirectory(problemDir);
+    expect(invalidResult.errors).toEqual([
+      expect.stringContaining('agentChallenge.expectedRequest.method'),
+      expect.stringContaining('model_answers/explanation/notes must be a Markdown (.md) file'),
+    ]);
+    expect(invalidResult.warnings).toEqual([]);
   });
 
   test('rejects an expected stdout the stdio judge could never accept', async () => {
