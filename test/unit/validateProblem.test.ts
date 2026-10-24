@@ -648,6 +648,13 @@ describe('validateProblemDirectory', () => {
     await mkdir(join(problemDir, 'model_answers', 'explanation'), { recursive: true });
     await writeFile(join(problemDir, 'model_answers', 'explanation', 'explanation.md'), '# 解説\n');
     await writeFile(join(problemDir, 'model_answers', '.DS_Store'), '');
+    await mkdir(join(problemDir, 'model_answers.fails', 'python'), { recursive: true });
+    await writeFile(join(problemDir, 'model_answers.fails', 'python', 'main.py'), 'print(0)\n');
+    const leftoverResult = await validateProblemDirectory(problemDir);
+    expect(leftoverResult.errors).toEqual([
+      expect.stringContaining('model_answers.fails is not used by an agent challenge'),
+    ]);
+    await rm(join(problemDir, 'model_answers.fails'), { recursive: true });
     const fixedResult = await validateProblemDirectory(problemDir);
     expect(fixedResult.errors).toEqual([]);
     expect(fixedResult.warnings).toEqual([]);

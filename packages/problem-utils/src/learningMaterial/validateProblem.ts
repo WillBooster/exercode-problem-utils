@@ -175,7 +175,7 @@ const AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH = join('model_answers', 'explan
  */
 async function validateAgentChallengeProblem(problemDirectoryPath: string, errors: string[]): Promise<void> {
   const entryNames = new Set(await readdir(problemDirectoryPath));
-  for (const name of ['judge.ts', 'debug.ts', 'test_cases', 'templates']) {
+  for (const name of ['judge.ts', 'debug.ts', 'test_cases', 'templates', 'model_answers.fails']) {
     if (entryNames.has(name)) {
       errors.push(`${name} is not used by an agent challenge (agentChallenge in problem.md); delete it`);
     }
