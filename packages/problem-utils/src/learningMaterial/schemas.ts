@@ -1,3 +1,4 @@
+import { isRecord } from '@willbooster/shared-lib';
 import { z } from 'zod';
 
 import { languageIdToDefinition } from '../types/language.js';
@@ -17,6 +18,11 @@ const environmentVariableNameSchema = z.string().regex(/^\w+$/);
 
 const jsonSchemaSchema = z.record(z.string(), z.unknown());
 const httpStatusSchema = z.number().int().min(100).max(599);
+// Header names are lower-cased before matching, so a capitalized name could never match.
+const headersJsonSchemaSchema = jsonSchemaSchema.refine(
+  declaresOnlyLowerCaseNames,
+  'header names in properties and required must be lower case'
+);
 
 // Mirrors the judge server's `agentChallengeSchema`.
 const agentChallengeSchema = z.strictObject({
@@ -26,7 +32,7 @@ const agentChallengeSchema = z.strictObject({
     path: z.string().startsWith('/'),
     status: z.union([httpStatusSchema, z.array(httpStatusSchema).min(1)]).optional(),
     query: jsonSchemaSchema.optional(),
-    headers: jsonSchemaSchema.optional(),
+    headers: headersJsonSchemaSchema.optional(),
     body: jsonSchemaSchema.optional(),
   }),
 });
@@ -216,3 +222,9 @@ export const contestFileSchema = z.strictObject({
   divisions: z.array(contestDivisionSchema).min(1),
   problems: z.array(contestProblemSchema).min(1),
 });
+
+function declaresOnlyLowerCaseNames(schema: Record<string, unknown>): boolean {
+  const propertyNames = isRecord(schema.properties) ? Object.keys(schema.properties) : [];
+  const requiredNames: unknown[] = Array.isArray(schema.required) ? schema.required : [];
+  return [...propertyNames, ...requiredNames].every((name) => typeof name !== 'string' || name === name.toLowerCase());
+}
