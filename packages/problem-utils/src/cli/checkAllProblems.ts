@@ -101,7 +101,8 @@ type ProblemCheckPlan =
   { type: 'agentChallenge' } | { type: 'failure'; message: string } | { type: 'runs'; runs: CheckRun[] };
 
 async function planProblemCheck(problemDir: string): Promise<ProblemCheckPlan> {
-  if (await isAgentChallenge(problemDir)) return { type: 'agentChallenge' };
+  const agentChallengePlan = await planAgentChallengeCheck(problemDir);
+  if (agentChallengePlan) return agentChallengePlan;
 
   const defaultHarnessFileNames = await findDefaultStdioHarnessFiles(problemDir);
   if (defaultHarnessFileNames.length > 0) {
@@ -142,11 +143,15 @@ async function planProblemCheck(problemDir: string): Promise<ProblemCheckPlan> {
   };
 }
 
-async function isAgentChallenge(problemDir: string): Promise<boolean> {
+/** Skips a valid agent challenge and fails an invalid one instead of judging it as a stdio problem. */
+async function planAgentChallengeCheck(problemDir: string): Promise<ProblemCheckPlan | undefined> {
   // A front matter that fails to parse is reported by the checks below that need it.
   const frontMatter = await readProblemMarkdownFrontMatter(problemDir).catch(() => {});
-  // Only a valid block is skipped; an invalid one is checked like any other problem.
-  return agentChallengeSchema.safeParse(frontMatter?.agentChallenge).success;
+  if (frontMatter?.agentChallenge === undefined) return undefined;
+  const parsed = agentChallengeSchema.safeParse(frontMatter.agentChallenge);
+  if (parsed.success) return { type: 'agentChallenge' };
+  const issues = parsed.error.issues.map((issue) => `${['agentChallenge', ...issue.path].join('.')}: ${issue.message}`);
+  return { type: 'failure', message: `invalid agentChallenge (see validate-problem): ${issues.join('; ')}` };
 }
 
 /**
