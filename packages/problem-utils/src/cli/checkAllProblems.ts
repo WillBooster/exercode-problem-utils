@@ -37,7 +37,8 @@ interface CheckRun {
 /**
  * Judge all model answers of all problems (directories containing `problem.md` or
  * `<id>.problem.md`) under a root directory: `model_answers/*` must be fully accepted and
- * `model_answers.fails/*` must fail at least one test case. Returns the process exit code.
+ * `model_answers.fails/*` must fail at least one test case. Agent challenges are skipped because
+ * they have no harness. Returns the process exit code.
  */
 export async function checkAllProblems(args: readonly string[]): Promise<number> {
   const options = parseCheckArgs(args);
@@ -62,46 +63,16 @@ export async function checkAllProblems(args: readonly string[]): Promise<number>
 
   const failures: string[] = [];
   const runs: CheckRun[] = [];
+  let agentChallengeCount = 0;
   for (const problemDir of problemDirs) {
-    const defaultHarnessFileNames = await findDefaultStdioHarnessFiles(problemDir);
-    if (defaultHarnessFileNames.length > 0) {
-      failures.push(`${toRelative(problemDir)}: ${formatDefaultHarnessError(defaultHarnessFileNames)}`);
-      continue;
+    const plan = await planProblemCheck(problemDir);
+    if (plan.type === 'agentChallenge') {
+      agentChallengeCount++;
+    } else if (plan.type === 'failure') {
+      failures.push(`${toRelative(problemDir)}: ${plan.message}`);
+    } else {
+      runs.push(...plan.runs);
     }
-
-    const modelAnswerDirs = await findModelAnswerDirs(problemDir);
-    if (modelAnswerDirs.length === 0) {
-      failures.push(`${toRelative(problemDir)}: no model answers found under model_answers/`);
-      continue;
-    }
-
-    // Without test cases, stdioJudgePreset prints a single accepted sentinel result, so a standard
-    // problem with an empty or missing test_cases/ would otherwise pass without being judged —
-    // unless static-analysis rules or manual scoring make the problem judgeable without them.
-    if (!(await fileExists(path.join(problemDir, 'judge.ts')))) {
-      const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
-      if (testCases.length === 0) {
-        let frontMatter;
-        try {
-          frontMatter = await readProblemMarkdownFrontMatter(problemDir);
-        } catch (error) {
-          failures.push(
-            `${toRelative(problemDir)}: failed to read the problem markdown front matter: ${getErrorMessage(error)}`
-          );
-          continue;
-        }
-        if (!judgesWithoutTestCases(frontMatter)) {
-          failures.push(`${toRelative(problemDir)}: ${MISSING_TEST_CASES_ERROR}`);
-          continue;
-        }
-      }
-    }
-
-    const failingModelAnswerDirs = await findFailingModelAnswerDirs(problemDir);
-    runs.push(
-      ...modelAnswerDirs.map((answerDir): CheckRun => ({ problemDir, answerDir, expectation: 'accepted' })),
-      ...failingModelAnswerDirs.map((answerDir): CheckRun => ({ problemDir, answerDir, expectation: 'rejected' }))
-    );
   }
   for (const failure of failures) console.error(`✗ ${failure}`);
 
@@ -120,9 +91,60 @@ export async function checkAllProblems(args: readonly string[]): Promise<number>
   });
 
   console.info(
-    `\n${passedCount} passed, ${failures.length} failed (${runs.length} runs, ${problemDirs.length} problems)`
+    `\n${passedCount} passed, ${failures.length} failed (${runs.length} runs, ${problemDirs.length} problems${agentChallengeCount > 0 ? `, agent challenges skipped: ${agentChallengeCount}` : ''})`
   );
   return failures.length === 0 ? 0 : 1;
+}
+
+type ProblemCheckPlan =
+  { type: 'agentChallenge' } | { type: 'failure'; message: string } | { type: 'runs'; runs: CheckRun[] };
+
+async function planProblemCheck(problemDir: string): Promise<ProblemCheckPlan> {
+  if (await isAgentChallenge(problemDir)) return { type: 'agentChallenge' };
+
+  const defaultHarnessFileNames = await findDefaultStdioHarnessFiles(problemDir);
+  if (defaultHarnessFileNames.length > 0) {
+    return { type: 'failure', message: formatDefaultHarnessError(defaultHarnessFileNames) };
+  }
+
+  const modelAnswerDirs = await findModelAnswerDirs(problemDir);
+  if (modelAnswerDirs.length === 0) {
+    return { type: 'failure', message: 'no model answers found under model_answers/' };
+  }
+
+  // Without test cases, stdioJudgePreset prints a single accepted sentinel result, so a standard
+  // problem with an empty or missing test_cases/ would otherwise pass without being judged —
+  // unless static-analysis rules or manual scoring make the problem judgeable without them.
+  if (!(await fileExists(path.join(problemDir, 'judge.ts')))) {
+    const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
+    if (testCases.length === 0) {
+      let frontMatter;
+      try {
+        frontMatter = await readProblemMarkdownFrontMatter(problemDir);
+      } catch (error) {
+        return {
+          type: 'failure',
+          message: `failed to read the problem markdown front matter: ${getErrorMessage(error)}`,
+        };
+      }
+      if (!judgesWithoutTestCases(frontMatter)) return { type: 'failure', message: MISSING_TEST_CASES_ERROR };
+    }
+  }
+
+  const failingModelAnswerDirs = await findFailingModelAnswerDirs(problemDir);
+  return {
+    type: 'runs',
+    runs: [
+      ...modelAnswerDirs.map((answerDir): CheckRun => ({ problemDir, answerDir, expectation: 'accepted' })),
+      ...failingModelAnswerDirs.map((answerDir): CheckRun => ({ problemDir, answerDir, expectation: 'rejected' })),
+    ],
+  };
+}
+
+async function isAgentChallenge(problemDir: string): Promise<boolean> {
+  // A front matter that fails to parse is reported by the checks below that need it.
+  const frontMatter = await readProblemMarkdownFrontMatter(problemDir).catch(() => {});
+  return frontMatter?.agentChallenge !== undefined;
 }
 
 /**

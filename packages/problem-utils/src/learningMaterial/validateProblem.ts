@@ -114,6 +114,10 @@ export async function validateProblemDirectory(problemDirectoryPath: string): Pr
   }
 
   const frontmatter = await parseProblemFrontmatter(problemFilePath, errors);
+  if (frontmatter?.agentChallenge) {
+    await validateAgentChallengeProblem(absoluteDirectoryPath, errors, warnings);
+    return result;
+  }
   const harness = await readHarnessFiles(absoluteDirectoryPath);
   const requiresExpectedOutput = frontmatter === undefined || !judgesTestCasesWithoutExpectations(frontmatter);
   const fileTestCases = await readFileTestCases(
@@ -159,6 +163,46 @@ export async function validateProblemDirectory(problemDirectoryPath: string): Pr
   await validateTemplates(absoluteDirectoryPath, usableModelAnswers, harness.hasCustomJudgeTs, errors, warnings);
 
   return result;
+}
+
+const AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH = join('model_answers', 'explanation');
+
+/**
+ * Exercode judges an agent challenge from playground requests and shows the Markdown files under
+ * `model_answers/explanation/` as its explanation, so judging artifacts would never be used.
+ */
+async function validateAgentChallengeProblem(
+  problemDirectoryPath: string,
+  errors: string[],
+  warnings: string[]
+): Promise<void> {
+  const entryNames = new Set(await readdir(problemDirectoryPath));
+  for (const name of ['judge.ts', 'debug.ts', 'test_cases', 'templates']) {
+    if (entryNames.has(name)) {
+      errors.push(`${name} is not used by an agent challenge (agentChallenge in problem.md); delete it`);
+    }
+  }
+  const modelAnswerDirents = await readdir(join(problemDirectoryPath, 'model_answers'), { withFileTypes: true }).catch(
+    () => []
+  );
+  for (const dirent of modelAnswerDirents) {
+    if (dirent.name !== 'explanation') {
+      errors.push(
+        `model_answers/${dirent.name} is not used by an agent challenge; put its explanation in ${AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH}/*.md`
+      );
+    }
+  }
+  const explanationFiles = await readSourceFilesRecursively(
+    join(problemDirectoryPath, AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH)
+  ).catch(() => []);
+  for (const file of explanationFiles) {
+    if (!file.path.endsWith('.md')) {
+      errors.push(`${AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH}/${file.path} must be a Markdown (.md) file`);
+    }
+  }
+  if (explanationFiles.length === 0) {
+    warnings.push(`no explanation found; add ${AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH}/explanation.md`);
+  }
 }
 
 interface HarnessFiles {

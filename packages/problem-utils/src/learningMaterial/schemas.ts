@@ -15,6 +15,21 @@ const availableLanguageIdSchema = z.enum(availableLanguageIds);
 
 const environmentVariableNameSchema = z.string().regex(/^\w+$/);
 
+const jsonSchemaSchema = z.record(z.string(), z.unknown());
+
+// Mirrors the judge server's `agentChallengeSchema`.
+const agentChallengeSchema = z.strictObject({
+  playgrounds: z.array(z.enum(['bbs', 'backlog', 'hosting'])).min(1),
+  expectedRequest: z.strictObject({
+    method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
+    path: z.string().startsWith('/'),
+    status: z.union([z.number().int(), z.array(z.number().int()).min(1)]).optional(),
+    query: jsonSchemaSchema.optional(),
+    headers: jsonSchemaSchema.optional(),
+    body: jsonSchemaSchema.optional(),
+  }),
+});
+
 // Mirrors the judge server's strict problem frontmatter schema; keys the server removed with the
 // v1 judge (judgeEnvironmentId, generalJudgeEnvironmentConfigOverrides, testCases, isGui) are
 // rejected here as unknown keys as well.
@@ -34,6 +49,7 @@ export const problemFrontmatterSchema = z.strictObject({
   requiredEnvironmentVariables: z.array(environmentVariableNameSchema).default([]),
   requiredOutputFilePaths: z.string().min(1).array().default([]),
   requiredSubmissionFilePaths: z.string().min(1).array().default([]),
+  agentChallenge: agentChallengeSchema.optional(),
 });
 
 export type ProblemFrontmatter = z.infer<typeof problemFrontmatterSchema>;

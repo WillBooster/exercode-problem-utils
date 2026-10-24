@@ -626,6 +626,31 @@ describe('validateProblemDirectory', () => {
     ]);
   });
 
+  test('accepts an agent challenge only without judging artifacts and with Markdown explanations', async () => {
+    const problemDir = await copyProblemFixture();
+    await setProblemFrontmatter(
+      problemDir,
+      'name: Post a greeting\nagentChallenge:\n  playgrounds: [bbs]\n  expectedRequest:\n    method: POST\n    path: /messages\n    body: { type: object }'
+    );
+    const result = await validateProblemDirectory(problemDir);
+    expect(result.errors).toEqual([
+      expect.stringContaining('test_cases is not used by an agent challenge'),
+      expect.stringContaining('templates is not used by an agent challenge'),
+      expect.stringContaining('model_answers/javascript is not used by an agent challenge'),
+      expect.stringContaining('model_answers/python is not used by an agent challenge'),
+    ]);
+    expect(result.warnings).toEqual([expect.stringContaining('no explanation found')]);
+
+    for (const name of ['test_cases', 'templates', 'model_answers']) {
+      await rm(join(problemDir, name), { recursive: true });
+    }
+    await mkdir(join(problemDir, 'model_answers', 'explanation'), { recursive: true });
+    await writeFile(join(problemDir, 'model_answers', 'explanation', 'explanation.md'), '# 解説\n');
+    const fixedResult = await validateProblemDirectory(problemDir);
+    expect(fixedResult.errors).toEqual([]);
+    expect(fixedResult.warnings).toEqual([]);
+  });
+
   test('rejects an expected stdout the stdio judge could never accept', async () => {
     const problemDir = await copyProblemFixture();
     await writeFile(join(problemDir, 'test_cases', 'test_1.out'), 'x'.repeat(50_001));
