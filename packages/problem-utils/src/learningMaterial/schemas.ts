@@ -16,6 +16,7 @@ const availableLanguageIdSchema = z.enum(availableLanguageIds);
 const environmentVariableNameSchema = z.string().regex(/^\w+$/);
 
 const jsonSchemaSchema = z.record(z.string(), z.unknown());
+const httpStatusSchema = z.number().int().min(100).max(599);
 
 // Mirrors the judge server's `agentChallengeSchema`.
 const agentChallengeSchema = z.strictObject({
@@ -23,7 +24,7 @@ const agentChallengeSchema = z.strictObject({
   expectedRequest: z.strictObject({
     method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
     path: z.string().startsWith('/'),
-    status: z.union([z.number().int(), z.array(z.number().int()).min(1)]).optional(),
+    status: z.union([httpStatusSchema, z.array(httpStatusSchema).min(1)]).optional(),
     query: jsonSchemaSchema.optional(),
     headers: jsonSchemaSchema.optional(),
     body: jsonSchemaSchema.optional(),
