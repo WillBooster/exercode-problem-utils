@@ -152,3 +152,35 @@ process.kill(process.pid, ${JSON.stringify(signal)});
     }
   }
 );
+
+test('check skips a valid agent challenge and fails an invalid or unexplained one', { timeout: 120_000 }, async () => {
+  await fs.promises.mkdir('temp', { recursive: true });
+  const tempRoot = await fs.promises.mkdtemp(path.join('temp', 'check_'));
+  tempRoots.push(tempRoot);
+  const writeAgentChallenge = async (name: string, method: string, hasExplanation: boolean): Promise<void> => {
+    const problemDir = path.join(tempRoot, name);
+    await fs.promises.mkdir(path.join(problemDir, 'model_answers', 'explanation'), { recursive: true });
+    await fs.promises.writeFile(
+      path.join(problemDir, 'problem.md'),
+      `---\nname: ${name}\nagentChallenge:\n  playgrounds: [bbs]\n  expectedRequest:\n    method: ${method}\n    path: /messages\n---\n\nPost a greeting.\n`
+    );
+    if (hasExplanation) {
+      await fs.promises.writeFile(path.join(problemDir, 'model_answers', 'explanation', 'explanation.md'), '# 解説\n');
+    }
+  };
+  await writeAgentChallenge('valid', 'POST', true);
+
+  const validResult = runCheck(tempRoot);
+
+  expect(validResult.stdout).toContain('0 passed, 0 failed (0 runs, 1 problems, agent challenges skipped: 1)');
+  expect(validResult.status).toBe(0);
+
+  await writeAgentChallenge('invalid', 'post', true);
+  await writeAgentChallenge('unexplained', 'POST', false);
+
+  const invalidResult = runCheck(tempRoot);
+
+  expect(invalidResult.stderr).toContain('✗ invalid: invalid agentChallenge');
+  expect(invalidResult.stderr).toContain('✗ unexplained: no explanation found');
+  expect(invalidResult.status).toBe(1);
+});
