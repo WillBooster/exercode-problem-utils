@@ -9,6 +9,7 @@ import { judgesWithoutTestCases, readProblemMarkdownFrontMatter } from '../helpe
 import { readTestCases } from '../helpers/readTestCases.js';
 import { type HarnessProcessResult, runHarnessProcess } from '../helpers/runHarnessProcess.js';
 import { copyProblemDirToTemporaryRoot, forciblyRemoveDirectory } from '../helpers/temporaryProblemDirCopy.js';
+import { agentChallengeSchema } from '../learningMaterial/schemas.js';
 import { DecisionCode } from '../types/decisionCode.js';
 import { TEST_CASE_RESULT_PREFIX, testCaseResultSchema } from '../types/testCaseResult.js';
 import { formatDefaultHarnessError, MISSING_TEST_CASES_ERROR } from './runSingleHarness.js';
@@ -144,7 +145,8 @@ async function planProblemCheck(problemDir: string): Promise<ProblemCheckPlan> {
 async function isAgentChallenge(problemDir: string): Promise<boolean> {
   // A front matter that fails to parse is reported by the checks below that need it.
   const frontMatter = await readProblemMarkdownFrontMatter(problemDir).catch(() => {});
-  return frontMatter?.agentChallenge !== undefined;
+  // Only a valid block is skipped; an invalid one is checked like any other problem.
+  return agentChallengeSchema.safeParse(frontMatter?.agentChallenge).success;
 }
 
 /**

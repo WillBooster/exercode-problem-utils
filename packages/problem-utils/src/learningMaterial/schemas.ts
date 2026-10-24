@@ -25,7 +25,7 @@ const headersJsonSchemaSchema = jsonSchemaSchema.refine(
 );
 
 // Mirrors the judge server's `agentChallengeSchema`.
-const agentChallengeSchema = z.strictObject({
+export const agentChallengeSchema = z.strictObject({
   playgrounds: z.array(z.enum(['bbs', 'backlog', 'hosting'])).min(1),
   expectedRequest: z.strictObject({
     method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
