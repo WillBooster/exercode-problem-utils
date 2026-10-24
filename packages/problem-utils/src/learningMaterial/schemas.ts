@@ -223,8 +223,14 @@ export const contestFileSchema = z.strictObject({
   problems: z.array(contestProblemSchema).min(1),
 });
 
-function declaresOnlyLowerCaseNames(schema: Record<string, unknown>): boolean {
+/** Checks every `properties` key and `required` item at any depth, so composed schemas (allOf, $defs, if/then) count too. */
+function declaresOnlyLowerCaseNames(schema: unknown): boolean {
+  if (Array.isArray(schema)) return schema.every((item) => declaresOnlyLowerCaseNames(item));
+  if (!isRecord(schema)) return true;
   const propertyNames = isRecord(schema.properties) ? Object.keys(schema.properties) : [];
   const requiredNames: unknown[] = Array.isArray(schema.required) ? schema.required : [];
-  return [...propertyNames, ...requiredNames].every((name) => typeof name !== 'string' || name === name.toLowerCase());
+  return (
+    [...propertyNames, ...requiredNames].every((name) => typeof name !== 'string' || name === name.toLowerCase()) &&
+    Object.values(schema).every((value) => declaresOnlyLowerCaseNames(value))
+  );
 }
