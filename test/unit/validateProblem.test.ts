@@ -638,8 +638,9 @@ describe('validateProblemDirectory', () => {
       expect.stringContaining('templates is not used by an agent challenge'),
       expect.stringContaining('model_answers/javascript is not used by an agent challenge'),
       expect.stringContaining('model_answers/python is not used by an agent challenge'),
+      expect.stringContaining('no explanation found'),
     ]);
-    expect(result.warnings).toEqual([expect.stringContaining('no explanation found')]);
+    expect(result.warnings).toEqual([]);
 
     for (const name of ['test_cases', 'templates', 'model_answers']) {
       await rm(join(problemDir, name), { recursive: true });

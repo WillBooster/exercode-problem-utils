@@ -149,7 +149,14 @@ async function planAgentChallengeCheck(problemDir: string): Promise<ProblemCheck
   const frontMatter = await readProblemMarkdownFrontMatter(problemDir).catch(() => {});
   if (frontMatter?.agentChallenge === undefined) return undefined;
   const parsed = agentChallengeSchema.safeParse(frontMatter.agentChallenge);
-  if (parsed.success) return { type: 'agentChallenge' };
+  if (parsed.success) {
+    const explanationDirents = await fs
+      .readdir(path.join(problemDir, 'model_answers', 'explanation'), { recursive: true, withFileTypes: true })
+      .catch(() => []);
+    return explanationDirents.some((dirent) => dirent.isFile() && dirent.name.endsWith('.md'))
+      ? { type: 'agentChallenge' }
+      : { type: 'failure', message: 'no explanation found under model_answers/explanation/' };
+  }
   const issues = parsed.error.issues.map((issue) => `${['agentChallenge', ...issue.path].join('.')}: ${issue.message}`);
   return { type: 'failure', message: `invalid agentChallenge (see validate-problem): ${issues.join('; ')}` };
 }

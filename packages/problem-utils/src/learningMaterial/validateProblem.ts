@@ -117,7 +117,7 @@ export async function validateProblemDirectory(problemDirectoryPath: string): Pr
   // An invalid agentChallenge block fails the schema, but the stdio checks would only add errors
   // asking for test cases and source model answers that an agent challenge must not have.
   if (declaresAgentChallenge) {
-    await validateAgentChallengeProblem(absoluteDirectoryPath, errors, warnings);
+    await validateAgentChallengeProblem(absoluteDirectoryPath, errors);
     return result;
   }
   const harness = await readHarnessFiles(absoluteDirectoryPath);
@@ -173,11 +173,7 @@ const AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH = join('model_answers', 'explan
  * Exercode judges an agent challenge from playground requests and shows the Markdown files under
  * `model_answers/explanation/` as its explanation, so judging artifacts would never be used.
  */
-async function validateAgentChallengeProblem(
-  problemDirectoryPath: string,
-  errors: string[],
-  warnings: string[]
-): Promise<void> {
+async function validateAgentChallengeProblem(problemDirectoryPath: string, errors: string[]): Promise<void> {
   const entryNames = new Set(await readdir(problemDirectoryPath));
   for (const name of ['judge.ts', 'debug.ts', 'test_cases', 'templates']) {
     if (entryNames.has(name)) {
@@ -208,7 +204,7 @@ async function validateAgentChallengeProblem(
     }
   }
   if (explanationFilePaths.length === 0) {
-    warnings.push(`no explanation found; add ${AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH}/explanation.md`);
+    errors.push(`no explanation found; add ${AGENT_CHALLENGE_EXPLANATION_DIRECTORY_PATH}/explanation.md`);
   }
 }
 
