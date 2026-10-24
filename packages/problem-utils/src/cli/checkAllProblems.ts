@@ -101,8 +101,15 @@ type ProblemCheckPlan =
   { type: 'agentChallenge' } | { type: 'failure'; message: string } | { type: 'runs'; runs: CheckRun[] };
 
 async function planProblemCheck(problemDir: string): Promise<ProblemCheckPlan> {
-  const agentChallengePlan = await planAgentChallengeCheck(problemDir);
-  if (agentChallengePlan) return agentChallengePlan;
+  // As before agent challenges existed, a front matter that fails to parse fails the problem only
+  // when the test-case check below needs the front matter.
+  const frontMatterResult = await readProblemMarkdownFrontMatter(problemDir).then(
+    (frontMatter) => ({ frontMatter }),
+    (error: unknown) => ({ error })
+  );
+  if ('frontMatter' in frontMatterResult && frontMatterResult.frontMatter.agentChallenge !== undefined) {
+    return planAgentChallengeCheck(problemDir, frontMatterResult.frontMatter.agentChallenge);
+  }
 
   const defaultHarnessFileNames = await findDefaultStdioHarnessFiles(problemDir);
   if (defaultHarnessFileNames.length > 0) {
@@ -120,16 +127,15 @@ async function planProblemCheck(problemDir: string): Promise<ProblemCheckPlan> {
   if (!(await fileExists(path.join(problemDir, 'judge.ts')))) {
     const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
     if (testCases.length === 0) {
-      let frontMatter;
-      try {
-        frontMatter = await readProblemMarkdownFrontMatter(problemDir);
-      } catch (error) {
+      if ('error' in frontMatterResult) {
         return {
           type: 'failure',
-          message: `failed to read the problem markdown front matter: ${getErrorMessage(error)}`,
+          message: `failed to read the problem markdown front matter: ${getErrorMessage(frontMatterResult.error)}`,
         };
       }
-      if (!judgesWithoutTestCases(frontMatter)) return { type: 'failure', message: MISSING_TEST_CASES_ERROR };
+      if (!judgesWithoutTestCases(frontMatterResult.frontMatter)) {
+        return { type: 'failure', message: MISSING_TEST_CASES_ERROR };
+      }
     }
   }
 
@@ -144,11 +150,8 @@ async function planProblemCheck(problemDir: string): Promise<ProblemCheckPlan> {
 }
 
 /** Skips a valid agent challenge and fails an invalid one instead of judging it as a stdio problem. */
-async function planAgentChallengeCheck(problemDir: string): Promise<ProblemCheckPlan | undefined> {
-  // A front matter that fails to parse is reported by the checks below that need it.
-  const frontMatter = await readProblemMarkdownFrontMatter(problemDir).catch(() => {});
-  if (frontMatter?.agentChallenge === undefined) return undefined;
-  const parsed = agentChallengeSchema.safeParse(frontMatter.agentChallenge);
+async function planAgentChallengeCheck(problemDir: string, agentChallenge: unknown): Promise<ProblemCheckPlan> {
+  const parsed = agentChallengeSchema.safeParse(agentChallenge);
   if (parsed.success) {
     const explanationDirents = await fs
       .readdir(path.join(problemDir, 'model_answers', 'explanation'), { recursive: true, withFileTypes: true })
