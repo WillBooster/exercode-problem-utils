@@ -20,7 +20,7 @@ const jsonSchemaSchema = z.record(z.string(), z.unknown());
 const httpStatusSchema = z.number().int().min(100).max(599);
 // Header names are lower-cased before matching, so a capitalized name could never match.
 const headersJsonSchemaSchema = jsonSchemaSchema.refine(
-  declaresOnlyLowerCaseNames,
+  (schema) => declaresOnlyLowerCaseNames(schema),
   'header names in properties and required must be lower case'
 );
 
@@ -224,13 +224,16 @@ export const contestFileSchema = z.strictObject({
 });
 
 /** Checks every `properties` key and `required` item at any depth, so composed schemas (allOf, $defs, if/then) count too. */
-function declaresOnlyLowerCaseNames(schema: unknown): boolean {
-  if (Array.isArray(schema)) return schema.every((item) => declaresOnlyLowerCaseNames(item));
+function declaresOnlyLowerCaseNames(schema: unknown, visited = new WeakSet<object>()): boolean {
+  // A YAML alias can make the schema cyclic.
+  if (typeof schema !== 'object' || schema === null || visited.has(schema)) return true;
+  visited.add(schema);
+  if (Array.isArray(schema)) return schema.every((item) => declaresOnlyLowerCaseNames(item, visited));
   if (!isRecord(schema)) return true;
   const propertyNames = isRecord(schema.properties) ? Object.keys(schema.properties) : [];
   const requiredNames: unknown[] = Array.isArray(schema.required) ? schema.required : [];
   return (
     [...propertyNames, ...requiredNames].every((name) => typeof name !== 'string' || name === name.toLowerCase()) &&
-    Object.values(schema).every((value) => declaresOnlyLowerCaseNames(value))
+    Object.values(schema).every((value) => declaresOnlyLowerCaseNames(value, visited))
   );
 }
