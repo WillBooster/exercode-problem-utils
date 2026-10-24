@@ -187,7 +187,7 @@ async function validateAgentChallengeProblem(
   const modelAnswerDirents = await readdir(join(problemDirectoryPath, 'model_answers'), { withFileTypes: true }).catch(
     () => []
   );
-  for (const dirent of modelAnswerDirents) {
+  for (const dirent of modelAnswerDirents.toSorted((d1, d2) => d1.name.localeCompare(d2.name))) {
     // The judge reads only directories as model answers and skips __pycache__.
     if (!dirent.isDirectory() || dirent.name === '__pycache__' || dirent.name === 'explanation') continue;
     errors.push(
