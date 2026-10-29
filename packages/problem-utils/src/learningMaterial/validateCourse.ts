@@ -89,7 +89,7 @@ export async function validateCourseDirectory(
   for (const lecture of lectures) {
     await validateLectureDirectory(
       absoluteDirectoryPath,
-      { courseId, courseSubmissionPeriods: courseFile, problemsDirectoryPath, availableProblemIds },
+      { courseSubmissionPeriods: courseFile, problemsDirectoryPath, availableProblemIds },
       lecture.id,
       errors,
       warnings

@@ -6,12 +6,7 @@ import { parse as parseYaml } from 'yaml';
 
 import { collectProblemIdsFromDirectory, isFile, isRegularFile, reportDanglingProblemReferences } from './fsHelpers.js';
 import { CONTEST_MATERIAL_FILE_SUFFIX, contestFileSchema, LEARNING_MATERIAL_ID_REGEX } from './schemas.js';
-import {
-  mergeSubmissionPeriods,
-  reportForeignProblemCourseIds,
-  type SubmissionPeriods,
-  validateSubmissionPeriods,
-} from './validateMaterial.js';
+import { mergeSubmissionPeriods, type SubmissionPeriods, validateSubmissionPeriods } from './validateMaterial.js';
 import { formatZodIssues, reportDuplicateIds, type ValidationResult } from './validationResult.js';
 
 export interface ContestValidationOptions {
@@ -19,8 +14,6 @@ export interface ContestValidationOptions {
   problemsDirectoryPath?: string;
   /** Problem IDs already collected for the enclosing course; collected from `problemsDirectoryPath` otherwise. */
   availableProblemIds?: ReadonlySet<string>;
-  /** Enclosing course ID; the judge rejects problem references whose `courseId` differs from it. */
-  courseId?: string;
   /** Course-level submission periods; the judge merges them as `material[field] ?? course[field]`. */
   courseSubmissionPeriods?: SubmissionPeriods;
   /** Set by course validation, which already warns once about a missing problems directory. */
@@ -71,7 +64,6 @@ export async function validateContestFile(
   }
 
   validateSubmissionPeriods(mergeSubmissionPeriods(parsed.data, options.courseSubmissionPeriods), errors, parsed.data);
-  reportForeignProblemCourseIds(parsed.data.problems, options.courseId, errors);
   reportDuplicateIds(
     parsed.data.divisions.map((division) => division.id),
     'division',

@@ -180,10 +180,7 @@ export type MaterialQuestion = z.infer<typeof questionInFrontmatterSchema>;
 export const materialFrontmatterSchema = z.strictObject({
   ...materialConfigShape,
   name: z.string().min(1),
-  problems: z
-    .object({ id: learningMaterialIdSchema, courseId: learningMaterialIdSchema.optional() })
-    .array()
-    .optional(),
+  problems: z.strictObject({ id: learningMaterialIdSchema }).array().optional(),
   questions: z.array(questionInFrontmatterSchema).optional(),
   turtleGraphicsQuestions: z.object({ id: learningMaterialIdSchema }).array().optional(),
   isExamination: z.boolean().optional(),
@@ -208,7 +205,6 @@ const contestDivisionSchema = z
 const contestProblemSchema = z.strictObject({
   id: learningMaterialIdSchema,
   score: z.number().int().nonnegative(),
-  courseId: learningMaterialIdSchema.optional(),
   // Per-problem overrides reuse the shared material-config fields, mirroring the judge schema.
   areTestCasesHidden: materialConfigShape.areTestCasesHidden,
   isDebugHintDisabled: materialConfigShape.isDebugHintDisabled,
