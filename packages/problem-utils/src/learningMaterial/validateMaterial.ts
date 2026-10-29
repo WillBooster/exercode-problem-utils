@@ -43,8 +43,6 @@ export interface MaterialValidationOptions {
   availableProblemIds?: ReadonlySet<string>;
   /** When set, every referenced problem ID must be a problem discovered under this path. */
   problemsDirectoryPath?: string;
-  /** Enclosing course ID; the judge rejects problem references whose `courseId` differs from it. */
-  courseId?: string;
   /** Course-level submission periods; the judge merges them as `material[field] ?? course[field]`. */
   courseSubmissionPeriods?: SubmissionPeriods;
 }
@@ -136,7 +134,6 @@ export async function validateMaterialFile(
     ...new Set(collectLinkedIds(bodyWithoutQuestionBlocks, PROBLEM_LINK_REGEX)),
   ];
   reportDuplicateIds(problemIds, 'problem', errors);
-  reportForeignProblemCourseIds(frontmatter?.problems ?? [], options.courseId, errors);
   const availableProblemIds =
     options.availableProblemIds ??
     (options.problemsDirectoryPath === undefined
@@ -179,20 +176,6 @@ export function reportExcessChatMarkers(body: string, errors: string[]): void {
   const chatMarkerCount = [...body.matchAll(STANDALONE_CHAT_MARKER_REGEX)].length;
   if (chatMarkerCount > 1) {
     errors.push(`at most one \`${CHAT_MARKER}\` marker is allowed, but found ${chatMarkerCount}`);
-  }
-}
-
-/** The judge's resolveProblemCourseId throws when a problem reference names a different course. */
-export function reportForeignProblemCourseIds(
-  problems: readonly { id: string; courseId?: string }[],
-  courseId: string | undefined,
-  errors: string[]
-): void {
-  if (courseId === undefined) return;
-  for (const problem of problems) {
-    if (problem.courseId !== undefined && problem.courseId !== courseId) {
-      errors.push(`problem "${problem.id}": courseId must be "${courseId}" but is "${problem.courseId}"`);
-    }
   }
 }
 

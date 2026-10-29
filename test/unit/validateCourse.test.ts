@@ -28,6 +28,18 @@ describe('validateMaterialFile', () => {
 });
 
 describe('validateMaterialFile', () => {
+  afterEach(cleanupTempDirs);
+
+  test('rejects a frontmatter problem that names a course', async () => {
+    const materialPath = join(await createTempDir(), 'material.md');
+    await writeFile(
+      materialPath,
+      '---\nname: Material\nproblems:\n  - id: a_plus_b\n    courseId: example_course\n---\n\nBody\n'
+    );
+    const result = await validateMaterialFile(materialPath, { problemsDirectoryPath: problemsDir });
+    expect(result.errors).toEqual([expect.stringContaining('courseId')]);
+  });
+
   test('reports a missing problems directory instead of throwing', async () => {
     const result = await validateMaterialFile(join(validCourseDir, 'lecture_1', '10_intro.md'), {
       problemsDirectoryPath: join(learningMaterialFixturesDir, 'no_such_dir'),

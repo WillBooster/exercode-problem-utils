@@ -50,7 +50,7 @@ lectures:
 Each material file is YAML frontmatter + markdown body. Frontmatter schema (strict):
 
 - `name` (required)
-- `problems`: array of `{ id, courseId? }`
+- `problems`: array of `{ id }`
 - `questions`: array of question objects (same schema as embedded question blocks; prefer embedding questions in the body instead)
 - `turtleGraphicsQuestions`: array of `{ id }`
 - `isExamination`, `isMockExamination`, `isRealtimeSurvey` (optional booleans)

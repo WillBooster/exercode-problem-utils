@@ -11,7 +11,7 @@ A contest is a `<contestId>.contest.yaml` file (id = filename without `.contest.
 - `divisions` (required, min 1): array of `{ id, name, openedAt, closedAt, password? }`
   - `openedAt` / `closedAt`: ISO datetimes with offset (e.g. `2025-01-01T00:00:00+09:00`), `openedAt < closedAt`
   - Division ids must be unique.
-- `problems` (required, min 1): array of `{ id, score }` plus optional per-problem overrides `courseId`, `areTestCasesHidden`, `isDebugHintDisabled`, `isFixHintDisabled`, `isDiffHintDisabled`, `debugHintWaitingSeconds`, `fixHintWaitingSeconds`, `diffHintWaitingSeconds`, `isMaterialChatDisabled`
+- `problems` (required, min 1): array of `{ id, score }` plus optional per-problem overrides `areTestCasesHidden`, `isDebugHintDisabled`, `isFixHintDisabled`, `isDiffHintDisabled`, `debugHintWaitingSeconds`, `fixHintWaitingSeconds`, `diffHintWaitingSeconds`, `isMaterialChatDisabled`
   - `score`: integer >= 0. Problem ids must be unique and each must resolve to an existing problem directory.
 - Shared material-config fields (e.g. `availableLanguageIds`; see [../../generate-course-materials/references/course-format.md](../../generate-course-materials/references/course-format.md)) may also be set contest-wide.
 

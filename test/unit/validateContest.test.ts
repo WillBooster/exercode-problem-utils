@@ -54,6 +54,14 @@ describe('validateContestFile', () => {
     expect(result.warnings).toEqual([]);
   });
 
+  test('rejects a problem that names a course', async () => {
+    const contestPath = await copyContestFixture('sample_contest.contest.yaml', (content) =>
+      content.replace('  - id: a_plus_b\n', '  - id: a_plus_b\n    courseId: example_course\n')
+    );
+    const result = await validateContestFile(contestPath, { problemsDirectoryPath: problemsDir });
+    expect(result.errors).toEqual([expect.stringContaining('courseId')]);
+  });
+
   test('rejects a file name without the .contest.yaml suffix', async () => {
     const contestPath = await copyContestFixture('sample_contest.yaml');
     const result = await validateContestFile(contestPath);
