@@ -98,7 +98,9 @@ export async function checkAllProblems(args: readonly string[]): Promise<number>
 }
 
 type ProblemCheckPlan =
-  { type: 'agentChallenge' } | { type: 'failure'; message: string } | { type: 'runs'; runs: CheckRun[] };
+  | { type: 'agentChallenge' }
+  | { type: 'failure'; message: string }
+  | { type: 'runs'; runs: CheckRun[] };
 
 async function planProblemCheck(problemDir: string): Promise<ProblemCheckPlan> {
   // As before agent challenges existed, a front matter that fails to parse fails the problem only

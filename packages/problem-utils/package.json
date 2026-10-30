@@ -60,12 +60,12 @@
   },
   "devDependencies": {
     "@tsconfig/bun": "1.0.11",
-    "@types/bun": "1.4.3",
+    "@types/bun": "1.4.4",
     "@willbooster/oxlint-config": "1.4.9",
-    "@willbooster/wb": "22.29.3",
+    "@willbooster/wb": "23.0.0",
     "build-ts": "21.0.29",
-    "oxlint": "1.88.0",
-    "oxlint-tsgolint": "7.0.2004",
+    "oxlint": "1.89.0",
+    "oxlint-tsgolint": "7.0.2005",
     "undici-types": "8.12.2"
   },
   "prettier": "@willbooster/prettier-config",
