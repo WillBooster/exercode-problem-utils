@@ -51,7 +51,7 @@
         "exercode-problem": "bin/exercode-problem.mjs",
       },
       "dependencies": {
-        "@willbooster/shared-lib": "11.0.0",
+        "@willbooster/shared-lib": "11.1.0",
         "front-matter": "4.0.2",
         "yaml": "2.9.1",
         "zod": "4.6.7",
@@ -75,7 +75,7 @@
       },
       "dependencies": {
         "@exercode/problem-utils": "workspace:*",
-        "@willbooster/shared-lib": "11.0.0",
+        "@willbooster/shared-lib": "11.1.0",
         "highlight.js": "11.12.0",
         "html-encoding-sniffer": "7.0.0",
         "marked": "18.1.1",
@@ -106,7 +106,7 @@
         "@ai-sdk/openai": "4.0.101",
         "@ai-sdk/xai": "5.0.29",
         "@exercode/problem-utils": "workspace:*",
-        "@willbooster/shared-lib": "11.0.0",
+        "@willbooster/shared-lib": "11.1.0",
         "ai": "7.0.152",
         "zod": "4.6.7",
       },
@@ -716,7 +716,7 @@
 
     "@willbooster/prettier-config": ["@willbooster/prettier-config@10.4.0", "", { "peerDependencies": { "prettier": ">=3", "prettier-plugin-java": ">=2.6" } }, "sha512-oFnP2z/Huifbg8SuDzaNfrJGSWkixbldsidquHiZPAsSi4rIV3GG7JXBkqaoAixz3FvRPZ8JAdOJskeEBt+fqg=="],
 
-    "@willbooster/shared-lib": ["@willbooster/shared-lib@11.0.0", "", {}, "sha512-F2IXFW8ZDiagpN1zvxbRV0fjwsXMxWb0c99lxwoyodIXcfnljq4Z6CZLx1yT6d0/PwGaKD0+6nnijPNfxASGVw=="],
+    "@willbooster/shared-lib": ["@willbooster/shared-lib@11.1.0", "", {}, "sha512-TmwbLj2nJwATkxbBsWg7kDRp2n8AwnduaEKLwk6FQMpO6dYdGM0eCBtfUnTUNEFcpt6/Jkv+j4K3yXG9wydUpg=="],
 
     "@willbooster/shared-lib-node": ["@willbooster/shared-lib-node@13.10.0", "", { "dependencies": { "@types/yargs": "17.0.35", "dotenv-expand": "13.0.0", "fast-glob": "3.3.3" } }, "sha512-MRUkXyP7F1cHeB6BtPABWzg+LpoCxSkCprcAa9O7CuF9en8Iz6B4TtwwO/pIR75wSwKyPvAygSnsSeAwyWH7pA=="],
 
