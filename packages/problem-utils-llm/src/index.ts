@@ -3,7 +3,8 @@ import path from 'node:path';
 
 import { bedrock } from '@ai-sdk/amazon-bedrock';
 import { google } from '@ai-sdk/google';
-import { createOpenAI, openai } from '@ai-sdk/openai';
+import { openai } from '@ai-sdk/openai';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { xai } from '@ai-sdk/xai';
 import {
   DecisionCode,
@@ -43,7 +44,7 @@ const jsonObjectSchema = z.record(z.string(), z.unknown());
 interface OpenAiCompatibleOptions {
   /** Defaults to `OPENAI_COMPATIBLE_BASE_URL`. The endpoint is used only when a base URL is resolved. */
   baseURL?: string;
-  /** Defaults to `OPENAI_COMPATIBLE_API_KEY`. Required with a base URL. */
+  /** Defaults to `OPENAI_COMPATIBLE_API_KEY`. */
   apiKey?: string;
   /** Top-level request body fields. Defaults to the JSON object in `OPENAI_COMPATIBLE_EXTRA_BODY`. */
   extraBody?: Record<string, unknown>;
@@ -151,29 +152,18 @@ function toOpenAiCompatibleModel(model: string, options?: OpenAiCompatibleOption
   const baseURL = options?.baseURL ?? process.env.OPENAI_COMPATIBLE_BASE_URL;
   if (!baseURL) return undefined;
 
-  // Without a key, `createOpenAI` would send `OPENAI_API_KEY` to this endpoint.
-  const apiKey = options?.apiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_COMPATIBLE_API_KEY is required with an OpenAI-compatible base URL');
-
   const extraBody = options?.extraBody ?? readExtraBodyFromEnv();
-  return createOpenAI({
+  return createOpenAICompatible({
+    name: 'openAiCompatible',
     baseURL,
-    apiKey,
-    fetch: extraBody ? withExtraBody(extraBody) : undefined,
-  }).chat(model);
+    apiKey: options?.apiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY,
+    transformRequestBody: extraBody && ((body) => ({ ...body, ...extraBody })),
+  }).chatModel(model);
 }
 
 function readExtraBodyFromEnv(): Record<string, unknown> | undefined {
   const json = process.env.OPENAI_COMPATIBLE_EXTRA_BODY;
   return json ? jsonObjectSchema.parse(JSON.parse(json)) : undefined;
-}
-
-function withExtraBody(extraBody: Record<string, unknown>): typeof fetch {
-  const extendedFetch = (input: Parameters<typeof fetch>[0], init: Parameters<typeof fetch>[1]): Promise<Response> => {
-    const body = jsonObjectSchema.parse(JSON.parse(z.string().parse(init?.body)));
-    return fetch(input, { ...init, body: JSON.stringify({ ...body, ...extraBody }) });
-  };
-  return Object.assign(extendedFetch, fetch);
 }
 
 function toLanguageModel(model: string): LanguageModel {
