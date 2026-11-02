@@ -43,6 +43,7 @@
     "@ai-sdk/amazon-bedrock": "5.0.123",
     "@ai-sdk/google": "4.0.104",
     "@ai-sdk/openai": "4.0.101",
+    "@ai-sdk/openai-compatible": "3.0.78",
     "@ai-sdk/xai": "5.0.29",
     "@exercode/problem-utils": "workspace:*",
     "@willbooster/shared-lib": "11.1.0",
