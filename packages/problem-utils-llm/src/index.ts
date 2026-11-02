@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { bedrock } from '@ai-sdk/amazon-bedrock';
 import { google } from '@ai-sdk/google';
-import { openai } from '@ai-sdk/openai';
+import { createOpenAI, openai } from '@ai-sdk/openai';
 import { xai } from '@ai-sdk/xai';
 import {
   DecisionCode,
@@ -34,6 +34,21 @@ const judgeParamsSchema = z.object({
   model: z.string().min(1),
 });
 
+const jsonObjectSchema = z.record(z.string(), z.unknown());
+
+/**
+ * Connection to an OpenAI-compatible Chat Completions endpoint. Each field falls back to its environment variable.
+ * Never hard-code `apiKey` or a secret in `extraBody`: `judge.ts` is distributed with the problem.
+ */
+interface OpenAiCompatibleOptions {
+  /** Defaults to `OPENAI_COMPATIBLE_BASE_URL`. The endpoint is used only when a base URL is resolved. */
+  baseURL?: string;
+  /** Defaults to `OPENAI_COMPATIBLE_API_KEY`. */
+  apiKey?: string;
+  /** Top-level request body fields. Defaults to the JSON object in `OPENAI_COMPATIBLE_EXTRA_BODY`. */
+  extraBody?: Record<string, unknown>;
+}
+
 /** A `test_cases/` entry; the preset uses `input` for the prompt and hands everything to `test`. */
 interface LlmTestCase {
   id: string;
@@ -51,6 +66,8 @@ interface LlmJudgePresetOptions {
     testCase: LlmTestCase;
     result: { output: string };
   }) => Partial<TestCaseResult> | Promise<Partial<TestCaseResult>>;
+  /** Sends every test case to this endpoint, with the `model` parameter passed verbatim as the model ID. */
+  openAiCompatible?: OpenAiCompatibleOptions;
 }
 
 /**
@@ -87,7 +104,7 @@ export async function llmJudgePreset(problemDir: string, options: LlmJudgePreset
     const startTimeMilliseconds = Date.now();
     try {
       const { text } = await generateText({
-        model: toLanguageModel(params.model),
+        model: toOpenAiCompatibleModel(params.model, options.openAiCompatible) ?? toLanguageModel(params.model),
         ...toPromptOptions(
           options.buildPrompt?.({ prompt, testCase }) ?? prompt.replaceAll('{input}', testCase.input ?? '')
         ),
@@ -128,6 +145,31 @@ function toPromptOptions(
   built: string | ModelMessage[]
 ): { prompt: string } | { messages: ModelMessage[]; allowSystemInMessages: true } {
   return typeof built === 'string' ? { prompt: built } : { messages: built, allowSystemInMessages: true };
+}
+
+function toOpenAiCompatibleModel(model: string, options?: OpenAiCompatibleOptions): LanguageModel | undefined {
+  const baseURL = options?.baseURL ?? process.env.OPENAI_COMPATIBLE_BASE_URL;
+  if (!baseURL) return undefined;
+
+  const extraBody = options?.extraBody ?? readExtraBodyFromEnv();
+  return createOpenAI({
+    baseURL,
+    apiKey: options?.apiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY,
+    fetch: extraBody ? withExtraBody(extraBody) : undefined,
+  }).chat(model);
+}
+
+function readExtraBodyFromEnv(): Record<string, unknown> | undefined {
+  const json = process.env.OPENAI_COMPATIBLE_EXTRA_BODY;
+  return json ? jsonObjectSchema.parse(JSON.parse(json)) : undefined;
+}
+
+function withExtraBody(extraBody: Record<string, unknown>): typeof fetch {
+  const extendedFetch = (input: Parameters<typeof fetch>[0], init: Parameters<typeof fetch>[1]): Promise<Response> => {
+    const body = jsonObjectSchema.parse(JSON.parse(z.string().parse(init?.body)));
+    return fetch(input, { ...init, body: JSON.stringify({ ...body, ...extraBody }) });
+  };
+  return Object.assign(extendedFetch, fetch);
 }
 
 function toLanguageModel(model: string): LanguageModel {

@@ -100,6 +100,19 @@ and page-error listeners. `afterTests` runs after the checks, including a failin
 while the page remains open. An exception in initialization, navigation, or a check
 propagates to the caller and skips `afterTests`; browser cleanup still runs.
 
+## OpenAI-compatible LLM endpoints
+
+`llmJudgePreset` sends every test case to an OpenAI-compatible Chat Completions endpoint when a base URL is set, passing the `model` parameter verbatim as the model ID.
+Pass `openAiCompatible` to the preset, or set the environment variables each field defaults to:
+
+| Option      | Environment variable           | Description                                                   |
+| ----------- | ------------------------------ | ------------------------------------------------------------- |
+| `baseURL`   | `OPENAI_COMPATIBLE_BASE_URL`   | URL that `/chat/completions` is appended to                   |
+| `apiKey`    | `OPENAI_COMPATIBLE_API_KEY`    | Bearer token                                                  |
+| `extraBody` | `OPENAI_COMPATIBLE_EXTRA_BODY` | Top-level request body fields (a JSON object in the variable) |
+
+`judge.ts` is distributed with the problem, so read secrets from the environment instead of writing them in `judge.ts`.
+
 ## Spring Boot courses
 
 Import `springBootJudgePreset` from `@exercode/problem-utils/presets/springBoot` and pass
