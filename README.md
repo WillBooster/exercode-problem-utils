@@ -111,7 +111,7 @@ Pass `openAiCompatible` to the preset, or set the environment variables each fie
 | `apiKey`    | `OPENAI_COMPATIBLE_API_KEY`    | Bearer token                                                  |
 | `extraBody` | `OPENAI_COMPATIBLE_EXTRA_BODY` | Top-level request body fields (a JSON object in the variable) |
 
-`judge.ts` is distributed with the problem, so read secrets from the environment instead of writing them in `judge.ts`.
+The API key is required with a base URL, so that `OPENAI_API_KEY` is never sent to the endpoint. `judge.ts` is distributed with the problem, so read secrets from the environment instead of writing them in `judge.ts`.
 
 ## Spring Boot courses
 

@@ -43,7 +43,7 @@ const jsonObjectSchema = z.record(z.string(), z.unknown());
 interface OpenAiCompatibleOptions {
   /** Defaults to `OPENAI_COMPATIBLE_BASE_URL`. The endpoint is used only when a base URL is resolved. */
   baseURL?: string;
-  /** Defaults to `OPENAI_COMPATIBLE_API_KEY`. */
+  /** Defaults to `OPENAI_COMPATIBLE_API_KEY`. Required with a base URL. */
   apiKey?: string;
   /** Top-level request body fields. Defaults to the JSON object in `OPENAI_COMPATIBLE_EXTRA_BODY`. */
   extraBody?: Record<string, unknown>;
@@ -151,10 +151,14 @@ function toOpenAiCompatibleModel(model: string, options?: OpenAiCompatibleOption
   const baseURL = options?.baseURL ?? process.env.OPENAI_COMPATIBLE_BASE_URL;
   if (!baseURL) return undefined;
 
+  // Without a key, `createOpenAI` would send `OPENAI_API_KEY` to this endpoint.
+  const apiKey = options?.apiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY;
+  if (!apiKey) throw new Error('OPENAI_COMPATIBLE_API_KEY is required with an OpenAI-compatible base URL');
+
   const extraBody = options?.extraBody ?? readExtraBodyFromEnv();
   return createOpenAI({
     baseURL,
-    apiKey: options?.apiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY,
+    apiKey,
     fetch: extraBody ? withExtraBody(extraBody) : undefined,
   }).chat(model);
 }

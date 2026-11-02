@@ -5,7 +5,10 @@ import path from 'node:path';
 
 import { afterAll, beforeAll, expect, test } from 'vitest';
 
-import { TEST_CASE_RESULT_PREFIX } from '../../packages/problem-utils/src/types/testCaseResult.js';
+import {
+  TEST_CASE_RESULT_PREFIX,
+  testCaseResultSchema,
+} from '../../packages/problem-utils/src/types/testCaseResult.js';
 
 interface ReceivedRequest {
   url?: string;
@@ -29,7 +32,7 @@ const server = http.createServer((request, response) => {
         id: 'chatcmpl-test',
         created: 0,
         model: 'test',
-        choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: 'short' } }],
+        choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: '富士山' } }],
         usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
       })
     );
@@ -52,8 +55,12 @@ test('llmJudgePreset sends test cases to the OpenAI-compatible endpoint from the
     OPENAI_COMPATIBLE_EXTRA_BODY: JSON.stringify({ reasoning_effort: 'low', vendor: { fallback_models: ['b/c'] } }),
   });
 
-  expect(stdout).toContain(TEST_CASE_RESULT_PREFIX);
-  expect(requests.length).toBeGreaterThan(0);
+  const results = stdout
+    .split('\n')
+    .filter((line) => line.startsWith(TEST_CASE_RESULT_PREFIX))
+    .map((line) => testCaseResultSchema.parse(JSON.parse(line.slice(TEST_CASE_RESULT_PREFIX.length))));
+  expect(results.map((result) => result.decisionCode)).toEqual([2000, 2000]);
+  expect(requests).toHaveLength(2);
   expect(requests[0]).toMatchObject({
     url: '/v1/chat/completions',
     authorization: 'Bearer test-key',
