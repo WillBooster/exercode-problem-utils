@@ -44,11 +44,15 @@ afterAll(() => {
 });
 
 test(
-  'llmJudgePreset sends test cases to the OpenAI-compatible endpoint from the environment',
+  'llmJudgePreset sends test cases with the model parameter to the OpenAI-compatible endpoint from the environment',
   { timeout: 30_000 },
   async () => {
     const stdout = await runJudge('example/prompt_summary', {
-      OPENAI_COMPATIBLE_EXTRA_BODY: JSON.stringify({ reasoning_effort: 'low', vendor: { fallback_models: ['b/c'] } }),
+      OPENAI_COMPATIBLE_EXTRA_BODY: JSON.stringify({
+        model: 'vendor/extra-body-model',
+        reasoning_effort: 'low',
+        vendor: { fallback_models: ['b/c'] },
+      }),
     });
 
     expect(parseDecisionCodes(stdout)).toEqual([DecisionCode.ACCEPTED, DecisionCode.ACCEPTED]);
