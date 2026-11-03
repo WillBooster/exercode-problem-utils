@@ -102,14 +102,15 @@ propagates to the caller and skips `afterTests`; browser cleanup still runs.
 
 ## OpenAI-compatible LLM endpoints
 
-`llmJudgePreset` sends every test case to an OpenAI-compatible Chat Completions endpoint when a base URL is set, passing the `model` parameter verbatim as the model ID.
+`llmJudgePreset` sends every test case to an OpenAI-compatible Chat Completions endpoint when a base URL is set, passing the model verbatim as the model ID.
+The model is the preset's `model` option when set (for a problem that must be judged by a specific model), otherwise the `model` judge parameter; it also wins over a `model` field in the extra body.
 Pass `openAiCompatible` to the preset, or set the environment variables each field defaults to:
 
-| Option      | Environment variable           | Description                                                   |
-| ----------- | ------------------------------ | ------------------------------------------------------------- |
-| `baseURL`   | `OPENAI_COMPATIBLE_BASE_URL`   | URL that `/chat/completions` is appended to                   |
-| `apiKey`    | `OPENAI_COMPATIBLE_API_KEY`    | Bearer token                                                  |
-| `extraBody` | `OPENAI_COMPATIBLE_EXTRA_BODY` | Top-level request body fields (a JSON object in the variable) |
+| Option      | Environment variable           | Description                                                                  |
+| ----------- | ------------------------------ | ---------------------------------------------------------------------------- |
+| `baseURL`   | `OPENAI_COMPATIBLE_BASE_URL`   | URL that `/chat/completions` is appended to                                  |
+| `apiKey`    | `OPENAI_COMPATIBLE_API_KEY`    | Bearer token                                                                 |
+| `extraBody` | `OPENAI_COMPATIBLE_EXTRA_BODY` | Top-level request body fields except `model` (a JSON object in the variable) |
 
 `judge.ts` is distributed with the problem, so read secrets from the environment instead of writing them in `judge.ts`.
 

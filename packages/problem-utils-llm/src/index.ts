@@ -46,7 +46,7 @@ interface OpenAiCompatibleOptions {
   baseURL?: string;
   /** Defaults to `OPENAI_COMPATIBLE_API_KEY`. */
   apiKey?: string;
-  /** Top-level request body fields. Defaults to the JSON object in `OPENAI_COMPATIBLE_EXTRA_BODY`. */
+  /** Top-level request body fields except `model`. Defaults to the JSON object in `OPENAI_COMPATIBLE_EXTRA_BODY`. */
   extraBody?: Record<string, unknown>;
 }
 
@@ -67,7 +67,9 @@ interface LlmJudgePresetOptions {
     testCase: LlmTestCase;
     result: { output: string };
   }) => Partial<TestCaseResult> | Promise<Partial<TestCaseResult>>;
-  /** Sends every test case to this endpoint, with the `model` parameter passed verbatim as the model ID. */
+  /** Overrides the `model` judge parameter, e.g., for a problem whose prompt must be judged by a specific model. */
+  model?: string;
+  /** Sends every test case to this endpoint, with the model passed verbatim as the model ID. */
   openAiCompatible?: OpenAiCompatibleOptions;
 }
 
@@ -96,6 +98,7 @@ export async function llmJudgePreset(problemDir: string, options: LlmJudgePreset
   const args = parseArgs(process.argv);
   if (!args.cwd) throw new Error('cwd argument required');
   const params = judgeParamsSchema.parse(args.params);
+  const model = options.model ?? params.model;
 
   const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
 
@@ -105,7 +108,7 @@ export async function llmJudgePreset(problemDir: string, options: LlmJudgePreset
     const startTimeMilliseconds = Date.now();
     try {
       const { text } = await generateText({
-        model: toOpenAiCompatibleModel(params.model, options.openAiCompatible) ?? toLanguageModel(params.model),
+        model: toOpenAiCompatibleModel(model, options.openAiCompatible) ?? toLanguageModel(model),
         ...toPromptOptions(
           options.buildPrompt?.({ prompt, testCase }) ?? prompt.replaceAll('{input}', testCase.input ?? '')
         ),
@@ -157,7 +160,7 @@ function toOpenAiCompatibleModel(model: string, options?: OpenAiCompatibleOption
     name: 'openAiCompatible',
     baseURL,
     apiKey: options?.apiKey ?? process.env.OPENAI_COMPATIBLE_API_KEY,
-    transformRequestBody: extraBody && ((body) => ({ ...body, ...extraBody })),
+    transformRequestBody: extraBody && ((body) => ({ ...body, ...extraBody, model: body.model })),
   }).chatModel(model);
 }
 
