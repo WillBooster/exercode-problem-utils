@@ -98,6 +98,7 @@ export const courseFileSchema = z.strictObject({
   author: z.string().min(1).optional(),
   isMotivationFeatureEnabled: z.boolean().optional(),
   isPublic: z.boolean().optional(),
+  startsAt: z.iso.datetime({ offset: true }).optional(),
   // The importer strips unknown keys of a lecture entry (plain object) while the course object is strict.
   lectures: z
     .array(
