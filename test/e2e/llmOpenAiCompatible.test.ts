@@ -47,18 +47,11 @@ test(
   'llmJudgePreset sends test cases to the OpenAI-compatible endpoint from the environment',
   { timeout: 30_000 },
   async () => {
-    const { port } = server.address() as AddressInfo;
-    const stdout = await runJudge({
-      OPENAI_COMPATIBLE_BASE_URL: `http://127.0.0.1:${port}/v1`,
-      OPENAI_COMPATIBLE_API_KEY: 'test-key',
+    const stdout = await runJudge('example/prompt_summary', {
       OPENAI_COMPATIBLE_EXTRA_BODY: JSON.stringify({ reasoning_effort: 'low', vendor: { fallback_models: ['b/c'] } }),
     });
 
-    const results = stdout
-      .split('\n')
-      .filter((line) => line.startsWith(TEST_CASE_RESULT_PREFIX))
-      .map((line) => testCaseResultSchema.parse(JSON.parse(line.slice(TEST_CASE_RESULT_PREFIX.length))));
-    expect(results.map((result) => result.decisionCode)).toEqual([DecisionCode.ACCEPTED, DecisionCode.ACCEPTED]);
+    expect(parseDecisionCodes(stdout)).toEqual([DecisionCode.ACCEPTED, DecisionCode.ACCEPTED]);
     expect(requests).toHaveLength(2);
     expect(requests[0]).toMatchObject({
       url: '/v1/chat/completions',
@@ -68,14 +61,42 @@ test(
   }
 );
 
-async function runJudge(env: Record<string, string>): Promise<string> {
+test(
+  'llmJudgePreset sends the model option instead of the model parameter or an extra body model',
+  { timeout: 30_000 },
+  async () => {
+    const stdout = await runJudge('test/fixtures/llmJudgeModelOption', {
+      OPENAI_COMPATIBLE_EXTRA_BODY: JSON.stringify({ model: 'vendor/extra-body-model', reasoning_effort: 'low' }),
+    });
+
+    expect(parseDecisionCodes(stdout)).toEqual([DecisionCode.ACCEPTED]);
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.body).toMatchObject({ model: 'vendor/option-model', reasoning_effort: 'low' });
+  }
+);
+
+function parseDecisionCodes(stdout: string): number[] {
+  return stdout
+    .split('\n')
+    .filter((line) => line.startsWith(TEST_CASE_RESULT_PREFIX))
+    .map((line) => testCaseResultSchema.parse(JSON.parse(line.slice(TEST_CASE_RESULT_PREFIX.length))).decisionCode);
+}
+
+async function runJudge(problemDir: string, env: Record<string, string>): Promise<string> {
+  requests.length = 0;
+  const { port } = server.address() as AddressInfo;
   // Asynchronous because the endpoint runs in this process.
   const child = child_process.spawn(
     'bun',
     ['run', 'judge.ts', 'model_answers/default', JSON.stringify({ model: 'vendor/model-name' })],
     {
-      cwd: path.resolve('example/prompt_summary'),
-      env: { ...process.env, ...env },
+      cwd: path.resolve(problemDir),
+      env: {
+        ...process.env,
+        OPENAI_COMPATIBLE_BASE_URL: `http://127.0.0.1:${port}/v1`,
+        OPENAI_COMPATIBLE_API_KEY: 'test-key',
+        ...env,
+      },
       stdio: ['ignore', 'pipe', 'inherit'],
       timeout: 25_000,
     }
