@@ -15,6 +15,8 @@
     01_variables.md
 ```
 
+A course managed by an organization ends 15 months after it is created: it becomes read-only and is deleted 4 years after its end. Give a course taught every academic year a new course ID per year, e.g. with a year suffix (`kawahara_java_basic_2026`), instead of reusing one directory.
+
 All IDs (course, lecture, material, problem, contest, division, question) must match `/^[0-9_a-z-]+$/`.
 
 Prefix lecture IDs with zero-padded sequence numbers in course order (`01_`, `02_`, ...), followed by a descriptive name. Prefix markdown material filenames with sequence numbers that restart at `01_` in every lecture.
@@ -27,6 +29,7 @@ The schema is strict: unknown keys are errors.
 - `description` (required)
 - `author` (optional)
 - `isMotivationFeatureEnabled`, `isPublic` (optional booleans)
+- `startsAt` (optional): ISO datetime with offset (e.g. `2026-04-01T00:00:00+09:00`); learners cannot see the course before it. Omitted, a new course starts when it is imported and an existing course keeps its start.
 - `lectures`: array of `{ id, name, description }`. Each lecture `id` must have a matching sibling directory. Optional for the importer (a course without lectures imports no materials), but every generated course lists its lectures here.
 - Any shared material-config field (see below) as a course-wide default.
 
