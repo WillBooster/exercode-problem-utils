@@ -55,7 +55,7 @@
     "prettier": "3.9.10",
     "prettier-plugin-java": "2.11.0",
     "semantic-release": "25.0.9",
-    "vitest": "5.0.5",
+    "vitest": "5.1.0",
     "zod": "4.6.7"
   },
   "prettier": "@willbooster/prettier-config",
