@@ -64,8 +64,8 @@
     "@willbooster/oxlint-config": "1.4.9",
     "@willbooster/wb": "23.3.0",
     "build-ts": "21.0.31",
-    "oxlint": "1.90.0",
-    "oxlint-tsgolint": "7.0.2005",
+    "oxlint": "1.92.0",
+    "oxlint-tsgolint": "7.0.2006",
     "undici-types": "8.12.3"
   },
   "prettier": "@willbooster/prettier-config",
