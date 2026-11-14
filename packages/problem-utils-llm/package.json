@@ -40,22 +40,22 @@
     "verify-full": "bun wb verify --full"
   },
   "dependencies": {
-    "@ai-sdk/amazon-bedrock": "5.0.130",
-    "@ai-sdk/google": "4.0.109",
-    "@ai-sdk/openai": "4.0.106",
-    "@ai-sdk/openai-compatible": "3.0.82",
-    "@ai-sdk/xai": "5.0.35",
+    "@ai-sdk/amazon-bedrock": "5.0.134",
+    "@ai-sdk/google": "4.0.113",
+    "@ai-sdk/openai": "4.0.110",
+    "@ai-sdk/openai-compatible": "3.0.86",
+    "@ai-sdk/xai": "5.0.39",
     "@exercode/problem-utils": "workspace:*",
     "@willbooster/shared-lib": "11.1.0",
-    "ai": "7.0.159",
+    "ai": "7.0.164",
     "zod": "4.6.7"
   },
   "devDependencies": {
     "@tsconfig/bun": "1.0.11",
     "@types/bun": "1.4.4",
     "@willbooster/oxlint-config": "1.4.9",
-    "@willbooster/wb": "23.3.0",
-    "build-ts": "21.0.31",
+    "@willbooster/wb": "23.3.4",
+    "build-ts": "21.0.33",
     "oxlint": "1.92.0",
     "oxlint-tsgolint": "7.0.2006"
   },
