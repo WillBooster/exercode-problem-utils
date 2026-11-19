@@ -44,6 +44,7 @@
     "@tsconfig/node24": "24.0.5",
     "@types/bun": "1.4.4",
     "@types/node": "26.6.6",
+    "@visulima/yaml": "2.0.0",
     "@willbooster/oxlint-config": "1.4.9",
     "@willbooster/prettier-config": "10.4.0",
     "@willbooster/wb": "23.3.4",

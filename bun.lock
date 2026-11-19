@@ -15,6 +15,7 @@
         "@tsconfig/node24": "24.0.5",
         "@types/bun": "1.4.4",
         "@types/node": "26.6.6",
+        "@visulima/yaml": "2.0.0",
         "@willbooster/oxlint-config": "1.4.9",
         "@willbooster/prettier-config": "10.4.0",
         "@willbooster/wb": "23.3.4",
@@ -548,6 +549,8 @@
     "@visulima/fs": ["@visulima/fs@7.0.0", "", { "dependencies": { "@visulima/path": "5.0.0" }, "peerDependencies": { "@visulima/yaml": "2.0.0", "ini": "^7.0.0", "json5": "^2.2.3", "jsonc-parser": "^3.3.1", "smol-toml": "^1.8.1" }, "optionalPeers": ["@visulima/yaml", "ini", "json5", "jsonc-parser", "smol-toml"], "os": [ "linux", "win32", "darwin", ] }, "sha512-6XPkHW+d4t8jZjXl7a9r7DjvoMPjbzVbQVklmHQmvDYaSAYX5jEpBrAL4ZpuS9voSw2Mfzj8cccaZuGcMZYkyA=="],
 
     "@visulima/path": ["@visulima/path@3.1.0", "", { "os": [ "linux", "win32", "darwin", ] }, "sha512-vCncF9YVP4zf+GKPRx7PTyxtivlUqJP22jWFcFpLhrM8raGX+WckNQWV/uxeOpfkEWN363zBi9TWcc5XQLcagw=="],
+
+    "@visulima/yaml": ["@visulima/yaml@2.0.0", "", {}, "sha512-4/JYuxyzAhHmoI49qBqQ60WkX7mjUiNYv2Z4WvIaV6iVdNjLwq2Xq8MmF/bWagb4aDo4oQg6Uhenv4woItkmAg=="],
 
     "@vitest/mocker": ["@vitest/mocker@5.1.0", "", { "dependencies": { "@jridgewell/trace-mapping": "0.3.31", "@vitest/spy": "5.1.0", "estree-walker": "^3.0.3", "magic-string": "^1.4.3" }, "peerDependencies": { "msw": "^2.4.9 || ^3.0.0", "vite": "^6.0.0 || ^7.0.0 || ^8.0.0" }, "optionalPeers": ["msw", "vite"] }, "sha512-5umB9/jlWcqVS6fsrFmv5Gdnpu6wAUio/lEOwAmvB7v+lFo/IW2B9FhAD0p19GCULTgMzLCdUmuCDCnAzWgppQ=="],
 
