@@ -1,5 +1,5 @@
 [tools]
-bun = "1.4.4"
+bun = "1.4.5"
 fnox = "1.48.0"
 java = "temurin-25.0.5+8.0.LTS"
 kotlin = "2.4.21"
