@@ -29,7 +29,7 @@
     "@tsconfig/bun/tsconfig.json",
     "@tsconfig/node-lts/tsconfig.json",
     "@tsconfig/node-ts/tsconfig.json",
-    "@tsconfig/node24/tsconfig.json"
+    "@tsconfig/node26/tsconfig.json"
   ],
   "include": [
     "*.config.mts",
