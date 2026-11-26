@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const SHARED_TEST_CASE_NAME = '_shared';
+/** The `test_cases/` entry name (`_shared.fin/`) whose input files every run receives besides its own case's. */
+export const SHARED_TEST_CASE_ID = '_shared';
 
 /**
  * Read the test cases of a `test_cases/` directory. A test case id is the name of every
@@ -9,6 +10,8 @@ const SHARED_TEST_CASE_NAME = '_shared';
  * and what an absent part means is up to the harness (the presets document their rules).
  * Other entries (e.g. `.json` configuration read by a custom `judge.ts`) are ignored.
  */
+// code-gauge-allow functionCognitiveComplexity 26 -- one pass over the directory entries classifies every entry kind; splitting it would only pass the five maps around
+// code-gauge-allow functionNcss 33 -- one pass over the directory entries classifies every entry kind; splitting it would only pass the five maps around
 export async function readTestCases(directory: string): Promise<
   { id: string; input?: string; output?: string; fileInputPath?: string; fileOutputPath?: string }[] & {
     shared?: { fileInputPath?: string };
@@ -43,7 +46,7 @@ export async function readTestCases(directory: string): Promise<
   }
 
   const testCases: Awaited<ReturnType<typeof readTestCases>> = [...idSet]
-    .filter((id) => id !== SHARED_TEST_CASE_NAME)
+    .filter((id) => id !== SHARED_TEST_CASE_ID)
     .toSorted()
     .map((id) => ({
       id,
@@ -53,8 +56,8 @@ export async function readTestCases(directory: string): Promise<
       fileOutputPath: idToFileOutputPath.get(id),
     }));
 
-  if (idSet.has(SHARED_TEST_CASE_NAME)) {
-    testCases.shared = { fileInputPath: idToFileInputPath.get(SHARED_TEST_CASE_NAME) };
+  if (idSet.has(SHARED_TEST_CASE_ID)) {
+    testCases.shared = { fileInputPath: idToFileInputPath.get(SHARED_TEST_CASE_ID) };
   }
 
   return testCases;
