@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import { SHARED_TEST_CASE_ID } from './readTestCases.js';
 import { EXAMPLE_TEST_CASE_ID_PATTERN } from './stdioJudgeRules.js';
 
@@ -12,13 +14,13 @@ const FILE_INPUT_EXTENSION = '.fin';
  * debug a problem without exposing anything the debug run would not expose anyway.
  *
  * @param problemFilePaths Paths relative to the problem directory, separated by `/`
- *   (e.g. `test_cases/_shared.fin/members.csv`).
+ *   (e.g. `test_cases/_shared.fin/members.csv` or `./test_cases/_shared.fin/members.csv`).
  * @returns The selected paths, in the given order.
  */
 export function selectDebugInputFilePaths(problemFilePaths: readonly string[]): string[] {
   const pathToTestCaseId = new Map<string, string>();
   for (const filePath of problemFilePaths) {
-    const [directoryName, entryName, ...rest] = filePath.split('/');
+    const [directoryName, entryName, ...rest] = path.posix.normalize(filePath).split('/');
     if (directoryName !== TEST_CASES_DIRECTORY_NAME || !entryName?.endsWith(FILE_INPUT_EXTENSION)) continue;
     if (rest.length === 0) continue;
     pathToTestCaseId.set(filePath, entryName.slice(0, -FILE_INPUT_EXTENSION.length));
