@@ -18,7 +18,7 @@ import {
   readProblemMarkdownFrontMatter,
 } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases, SHARED_TEST_CASE_ID } from '../helpers/readTestCases.js';
-import { selectDebugFileInputTestCaseIds } from '../helpers/selectDebugInputFilePaths.js';
+import { parseFileInputTestCaseId, selectDebugInputFilePaths } from '../helpers/selectDebugInputFilePaths.js';
 import { spawnWithTimeout } from '../helpers/spawnWithTimeout.js';
 import { MAX_STDOUT_LENGTH } from '../helpers/stdioJudgeRules.js';
 import {
@@ -259,8 +259,9 @@ async function hasExpectedFiles(fileOutputPath: string | undefined): Promise<boo
 
 /**
  * A preset debug function using stdin and stdout as test cases. The answer directory is copied to a
- * temporary directory where it is built and run together with `_shared.fin/` and the first example
- * case's `.fin/`; files the program writes are reported only through `requiredOutputFilePaths`.
+ * temporary directory where it is built and run together with the files `selectDebugInputFilePaths`
+ * selects: `_shared.fin/` and the `.fin/` of the first example case that has input files. Files the
+ * program writes are reported only through `requiredOutputFilePaths`.
  * Callers that own and remove the working directory can set `disposableWorkingDirectory` to run
  * directly there; they are responsible for cleanup even when the harness is terminated.
  *
@@ -443,24 +444,43 @@ async function debugInWorkingDirectory(problemDir: string, cwd: string, params: 
 }
 
 /**
- * A debug run has no test case of its own: it gets the learner-visible input files, placed the way
- * the judge does. Clients that ship only those files rely on `selectDebugInputFilePaths`, which
- * shares this selection rule.
+ * A debug run has no test case of its own: it gets the `.fin/` directories whose files
+ * `selectDebugInputFilePaths` selects, copied the way the judge copies a test case's input files.
  */
 async function copyDebugFileInputs(problemDir: string, cwd: string): Promise<void> {
   const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
   const idToFileInputPath = new Map(
     testCases.flatMap((testCase) => (testCase.fileInputPath ? [[testCase.id, testCase.fileInputPath] as const] : []))
   );
-  const hasCaseFileInput = idToFileInputPath.size > 0;
   if (testCases.shared?.fileInputPath) idToFileInputPath.set(SHARED_TEST_CASE_ID, testCases.shared.fileInputPath);
 
-  const ids = selectDebugFileInputTestCaseIds(idToFileInputPath.keys());
-  for (const id of ids) {
+  const problemFilePaths = await listFileInputFilePaths(idToFileInputPath);
+  const selectedIds = new Set(
+    selectDebugInputFilePaths(problemFilePaths).flatMap((filePath) => parseFileInputTestCaseId(filePath) ?? [])
+  );
+  const exampleId = [...selectedIds].find((id) => id !== SHARED_TEST_CASE_ID);
+  // The example's files go last so that they overwrite shared files at the same path, as in judging.
+  for (const id of [...selectedIds].toSorted((a, b) => Number(a === exampleId) - Number(b === exampleId))) {
     const fileInputPath = idToFileInputPath.get(id);
     if (fileInputPath) await copyTestCaseFileInput(fileInputPath, cwd);
   }
-  if (hasCaseFileInput && ids.every((id) => id === SHARED_TEST_CASE_ID)) {
+  const hasCaseFileInput = problemFilePaths.some(
+    (filePath) => parseFileInputTestCaseId(filePath) !== SHARED_TEST_CASE_ID
+  );
+  if (exampleId === undefined && hasCaseFileInput) {
     console.error('debug: no example test case has input files, so the program runs without them');
   }
+}
+
+async function listFileInputFilePaths(idToFileInputPath: ReadonlyMap<string, string>): Promise<string[]> {
+  const problemFilePaths: string[] = [];
+  for (const [id, fileInputPath] of idToFileInputPath) {
+    const dirents = await fs.promises.readdir(fileInputPath, { recursive: true, withFileTypes: true });
+    for (const dirent of dirents) {
+      if (dirent.isDirectory()) continue;
+      const pathInFileInput = path.relative(fileInputPath, path.join(dirent.parentPath, dirent.name));
+      problemFilePaths.push(`test_cases/${id}.fin/${pathInFileInput}`);
+    }
+  }
+  return problemFilePaths;
 }

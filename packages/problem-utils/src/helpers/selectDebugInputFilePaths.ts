@@ -19,27 +19,25 @@ const FILE_INPUT_EXTENSION = '.fin';
  * @returns The selected paths, in the given order.
  */
 export function selectDebugInputFilePaths(problemFilePaths: readonly string[]): string[] {
-  const pathToTestCaseId = new Map<string, string>();
-  for (const filePath of problemFilePaths) {
-    const [directoryName, entryName, ...rest] = path.posix.normalize(filePath).split('/');
-    if (directoryName !== TEST_CASES_DIRECTORY_NAME || !entryName?.endsWith(FILE_INPUT_EXTENSION)) continue;
-    if (rest.length === 0) continue;
-    pathToTestCaseId.set(filePath, entryName.slice(0, -FILE_INPUT_EXTENSION.length));
-  }
-  const selectedIds = new Set(selectDebugFileInputTestCaseIds(pathToTestCaseId.values()));
+  const fileInputTestCaseIds = new Set(
+    problemFilePaths.flatMap((filePath) => parseFileInputTestCaseId(filePath) ?? [])
+  );
+  const exampleId = [...fileInputTestCaseIds]
+    .toSorted()
+    .find((id) => id !== SHARED_TEST_CASE_ID && EXAMPLE_TEST_CASE_ID_PATTERN.test(id));
   return problemFilePaths.filter((filePath) => {
-    const id = pathToTestCaseId.get(filePath);
-    return id !== undefined && selectedIds.has(id);
+    const id = parseFileInputTestCaseId(filePath);
+    return id === SHARED_TEST_CASE_ID || (id !== undefined && id === exampleId);
   });
 }
 
 /**
- * The ids of the `test_cases/<id>.fin/` directories a debug run receives, in the order they are copied
- * (later ones overwrite earlier ones), given the ids of every such directory (`_shared` included).
+ * The test case id of a problem-relative path of a file inside a `test_cases/<id>.fin/` directory,
+ * or `undefined` for any other path.
  */
-export function selectDebugFileInputTestCaseIds(fileInputTestCaseIds: Iterable<string>): string[] {
-  const ids = [...new Set(fileInputTestCaseIds)].toSorted();
-  const sharedIds = ids.filter((id) => id === SHARED_TEST_CASE_ID);
-  const exampleId = ids.find((id) => id !== SHARED_TEST_CASE_ID && EXAMPLE_TEST_CASE_ID_PATTERN.test(id));
-  return exampleId === undefined ? sharedIds : [...sharedIds, exampleId];
+export function parseFileInputTestCaseId(problemFilePath: string): string | undefined {
+  const [directoryName, entryName, ...rest] = path.posix.normalize(problemFilePath).split('/');
+  if (directoryName !== TEST_CASES_DIRECTORY_NAME || !entryName?.endsWith(FILE_INPUT_EXTENSION)) return;
+  if (rest.length === 0) return;
+  return entryName.slice(0, -FILE_INPUT_EXTENSION.length);
 }
