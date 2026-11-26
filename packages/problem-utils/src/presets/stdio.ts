@@ -17,9 +17,10 @@ import {
   judgesTestCasesWithoutExpectations,
   readProblemMarkdownFrontMatter,
 } from '../helpers/readProblemMarkdownFrontMatter.js';
-import { readTestCases } from '../helpers/readTestCases.js';
+import { readTestCases, SHARED_TEST_CASE_ID } from '../helpers/readTestCases.js';
+import { selectDebugFileInputTestCaseIds } from '../helpers/selectDebugInputFilePaths.js';
 import { spawnWithTimeout } from '../helpers/spawnWithTimeout.js';
-import { EXAMPLE_TEST_CASE_ID_PATTERN, MAX_STDOUT_LENGTH } from '../helpers/stdioJudgeRules.js';
+import { MAX_STDOUT_LENGTH } from '../helpers/stdioJudgeRules.js';
 import {
   copyProblemDirToTemporaryRoot,
   forciblyRemoveDirectory,
@@ -310,6 +311,8 @@ export async function stdioDebugPreset(
   }
 }
 
+// code-gauge-allow functionCognitiveComplexity 26 -- the build, run, and verdict steps of one debug run share its limits and results
+// code-gauge-allow functionNcss 56 -- the build, run, and verdict steps of one debug run share its limits and results
 async function debugInWorkingDirectory(problemDir: string, cwd: string, params: DebugParams): Promise<void> {
   const problemMarkdownFrontMatter = await readProblemMarkdownFrontMatter(problemDir);
 
@@ -396,19 +399,7 @@ async function debugInWorkingDirectory(problemDir: string, cwd: string, params: 
     }
   }
 
-  // A debug run has no test case of its own: it gets the shared input files and the `.fin/` of the
-  // first example case (the cases a learner may see), placed the way the judge does. Hidden cases'
-  // input files are never handed to learner code.
-  const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
-  if (testCases.shared?.fileInputPath) await copyTestCaseFileInput(testCases.shared.fileInputPath, cwd);
-  const exampleFileInputPath = testCases.find(
-    (testCase) => EXAMPLE_TEST_CASE_ID_PATTERN.test(testCase.id) && testCase.fileInputPath
-  )?.fileInputPath;
-  if (exampleFileInputPath) {
-    await copyTestCaseFileInput(exampleFileInputPath, cwd);
-  } else if (testCases.some((testCase) => testCase.fileInputPath)) {
-    console.error('debug: no example test case has input files, so the program runs without them');
-  }
+  await copyDebugFileInputs(problemDir, cwd);
 
   const timeoutSeconds = Math.max(DEBUG_DEFAULT_TIMEOUT_SECONDS, (problemMarkdownFrontMatter.timeLimitMs ?? 0) / 1000);
 
@@ -449,4 +440,27 @@ async function debugInWorkingDirectory(problemDir: string, cwd: string, params: 
     memoryBytes: spawnResult.memoryBytes,
     outputFiles: outputFiles.length > 0 ? outputFiles : undefined,
   });
+}
+
+/**
+ * A debug run has no test case of its own: it gets the learner-visible input files, placed the way
+ * the judge does. Clients that ship only those files rely on `selectDebugInputFilePaths`, which
+ * shares this selection rule.
+ */
+async function copyDebugFileInputs(problemDir: string, cwd: string): Promise<void> {
+  const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
+  const idToFileInputPath = new Map(
+    testCases.flatMap((testCase) => (testCase.fileInputPath ? [[testCase.id, testCase.fileInputPath] as const] : []))
+  );
+  const hasCaseFileInput = idToFileInputPath.size > 0;
+  if (testCases.shared?.fileInputPath) idToFileInputPath.set(SHARED_TEST_CASE_ID, testCases.shared.fileInputPath);
+
+  const ids = selectDebugFileInputTestCaseIds(idToFileInputPath.keys());
+  for (const id of ids) {
+    const fileInputPath = idToFileInputPath.get(id);
+    if (fileInputPath) await copyTestCaseFileInput(fileInputPath, cwd);
+  }
+  if (hasCaseFileInput && ids.every((id) => id === SHARED_TEST_CASE_ID)) {
+    console.error('debug: no example test case has input files, so the program runs without them');
+  }
 }
