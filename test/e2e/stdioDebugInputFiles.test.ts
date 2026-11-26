@@ -35,6 +35,9 @@ test(
       'test_cases/_shared.fin/nested/notes.txt',
       'test_cases/example_2.fin/visible.txt',
     ]);
+    expect(
+      selectDebugInputFilePaths(['./test_cases/example_2.fin/visible.txt', './test_cases/test_1.fin/secret.txt'])
+    ).toEqual(['./test_cases/example_2.fin/visible.txt']);
 
     await fs.mkdir('.tmp', { recursive: true });
     const root = await fs.mkdtemp(path.resolve('.tmp/stdio-debug-input-'));
