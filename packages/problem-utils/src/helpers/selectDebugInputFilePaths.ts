@@ -8,10 +8,11 @@ const FILE_INPUT_EXTENSION = '.fin';
 
 /**
  * Select, from the files of a problem directory, the input files that the stdio debug preset hands
- * to the debugged program: those in `test_cases/_shared.fin/` and in the `.fin/` directory of the
- * first example test case that has one. Hidden test cases' files, `.in`/`.out` files, and every file
- * outside `test_cases/` are never selected, so a client can ship the result (plus `problem.md`) to
- * debug a problem without exposing anything the debug run would not expose anyway.
+ * to the debugged program: every file (of any name) in `test_cases/_shared.fin/` and in the `.fin/`
+ * directory of the first example test case, in sorted id order, that has one. The `<id>.in`/`<id>.out`
+ * entries directly under `test_cases/`, hidden test cases' `.fin/` files, and every file outside
+ * `test_cases/` are never selected, so a client can ship the result (plus `problem.md`) to debug a
+ * problem without exposing anything the debug run would not expose anyway.
  *
  * @param problemFilePaths Paths relative to the problem directory, separated by `/`
  *   (e.g. `test_cases/_shared.fin/members.csv` or `./test_cases/_shared.fin/members.csv`).
