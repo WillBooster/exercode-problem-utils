@@ -259,8 +259,9 @@ async function hasExpectedFiles(fileOutputPath: string | undefined): Promise<boo
 
 /**
  * A preset debug function using stdin and stdout as test cases. The answer directory is copied to a
- * temporary directory where it is built and run together with `_shared.fin/` and the first example
- * case's `.fin/`; files the program writes are reported only through `requiredOutputFilePaths`.
+ * temporary directory where it is built and run together with the files `selectDebugInputFilePaths`
+ * selects: `_shared.fin/` and the `.fin/` of the first example case that has input files. Files the
+ * program writes are reported only through `requiredOutputFilePaths`.
  * Callers that own and remove the working directory can set `disposableWorkingDirectory` to run
  * directly there; they are responsible for cleanup even when the harness is terminated.
  *
