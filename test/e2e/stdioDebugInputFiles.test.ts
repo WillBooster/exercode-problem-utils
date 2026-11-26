@@ -18,6 +18,7 @@ const problemFiles: Record<string, string> = {
   'test_cases/example_1.in': '1\n',
   'test_cases/example_1.out': '1\n',
   'test_cases/example_3.fin/later.txt': 'example 3\n',
+  'test_cases/example_2.fin/members.csv': 'example 2 members\n',
   'test_cases/example_2.fin/visible.txt': 'example 2\n',
   'test_cases/a_hidden.fin/secret.txt': 'hidden\n',
   'test_cases/test_1.fin/secret.txt': 'hidden\n',
@@ -33,6 +34,7 @@ test(
     expect(selectedPaths).toEqual([
       'test_cases/_shared.fin/members.csv',
       'test_cases/_shared.fin/nested/notes.txt',
+      'test_cases/example_2.fin/members.csv',
       'test_cases/example_2.fin/visible.txt',
     ]);
     expect(
@@ -50,7 +52,7 @@ test(
       await fs.mkdir(answer);
       await fs.writeFile(
         path.join(answer, 'main.js'),
-        String.raw`import fs from 'node:fs'; console.log(fs.readdirSync('.', { recursive: true }).filter((p) => p !== 'main.js' && fs.statSync(p).isFile()).toSorted().join('\n'));`
+        String.raw`import fs from 'node:fs'; console.log(fs.readdirSync('.', { recursive: true }).filter((p) => p !== 'main.js' && fs.statSync(p).isFile()).toSorted().map((p) => p + '=' + fs.readFileSync(p, 'utf8').trim()).join('\n'));`
       );
       await fs.writeFile(
         path.join(root, 'debug.ts'),
@@ -65,12 +67,8 @@ test(
       const line = run.stdout.split('\n').find((value) => value.startsWith(TEST_CASE_RESULT_PREFIX));
       expect(line).toBeDefined();
       const result = testCaseResultSchema.parse(JSON.parse(line!.slice(TEST_CASE_RESULT_PREFIX.length)));
-      expect(result.stdout).toBe(
-        `${selectedPaths
-          .map((filePath) => filePath.split('/').slice(2).join('/'))
-          .toSorted()
-          .join('\n')}\n`
-      );
+      // The example's files overwrite the shared ones at the same path, as in judging.
+      expect(result.stdout).toBe('members.csv=example 2 members\nnested/notes.txt=shared\nvisible.txt=example 2\n');
     } finally {
       await fs.rm(root, { recursive: true, force: true });
     }
