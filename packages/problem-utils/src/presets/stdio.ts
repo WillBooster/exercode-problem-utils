@@ -18,7 +18,7 @@ import {
   readProblemMarkdownFrontMatter,
 } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases, SHARED_TEST_CASE_ID } from '../helpers/readTestCases.js';
-import { selectDebugFileInputTestCaseIds } from '../helpers/selectDebugInputFilePaths.js';
+import { parseFileInputFilePath, selectDebugInputFilePaths } from '../helpers/selectDebugInputFilePaths.js';
 import { spawnWithTimeout } from '../helpers/spawnWithTimeout.js';
 import { MAX_STDOUT_LENGTH } from '../helpers/stdioJudgeRules.js';
 import {
@@ -443,24 +443,32 @@ async function debugInWorkingDirectory(problemDir: string, cwd: string, params: 
 }
 
 /**
- * A debug run has no test case of its own: it gets the learner-visible input files, placed the way
- * the judge does. Clients that ship only those files rely on `selectDebugInputFilePaths`, which
- * shares this selection rule.
+ * A debug run has no test case of its own: it gets the files `selectDebugInputFilePaths` selects,
+ * placed the way the judge places a test case's input files.
  */
 async function copyDebugFileInputs(problemDir: string, cwd: string): Promise<void> {
-  const testCases = await readTestCases(path.join(problemDir, 'test_cases'));
-  const idToFileInputPath = new Map(
-    testCases.flatMap((testCase) => (testCase.fileInputPath ? [[testCase.id, testCase.fileInputPath] as const] : []))
-  );
-  const hasCaseFileInput = idToFileInputPath.size > 0;
-  if (testCases.shared?.fileInputPath) idToFileInputPath.set(SHARED_TEST_CASE_ID, testCases.shared.fileInputPath);
+  const testCasesDir = path.join(problemDir, 'test_cases');
+  if (!fs.existsSync(testCasesDir)) return;
 
-  const ids = selectDebugFileInputTestCaseIds(idToFileInputPath.keys());
-  for (const id of ids) {
-    const fileInputPath = idToFileInputPath.get(id);
-    if (fileInputPath) await copyTestCaseFileInput(fileInputPath, cwd);
+  const dirents = await fs.promises.readdir(testCasesDir, { recursive: true, withFileTypes: true });
+  const fileInputs = dirents
+    .filter((dirent) => !dirent.isDirectory())
+    .flatMap((dirent) => {
+      const problemFilePath = path.relative(problemDir, path.join(dirent.parentPath, dirent.name));
+      const parsed = parseFileInputFilePath(problemFilePath);
+      return parsed ? [{ problemFilePath, ...parsed }] : [];
+    });
+  const selectedPaths = new Set(selectDebugInputFilePaths(fileInputs.map((fileInput) => fileInput.problemFilePath)));
+  const selected = fileInputs.filter((fileInput) => selectedPaths.has(fileInput.problemFilePath));
+  const sharedFileInputs = selected.filter((fileInput) => fileInput.testCaseId === SHARED_TEST_CASE_ID);
+  const exampleFileInputs = selected.filter((fileInput) => fileInput.testCaseId !== SHARED_TEST_CASE_ID);
+  // The example's files go last so that they overwrite shared files at the same path, as in judging.
+  for (const fileInput of [...sharedFileInputs, ...exampleFileInputs]) {
+    const destination = path.join(cwd, fileInput.pathInFileInput);
+    await fs.promises.mkdir(path.dirname(destination), { recursive: true });
+    await fs.promises.cp(path.join(problemDir, fileInput.problemFilePath), destination, { force: true });
   }
-  if (hasCaseFileInput && ids.every((id) => id === SHARED_TEST_CASE_ID)) {
+  if (exampleFileInputs.length === 0 && fileInputs.some((fileInput) => fileInput.testCaseId !== SHARED_TEST_CASE_ID)) {
     console.error('debug: no example test case has input files, so the program runs without them');
   }
 }
