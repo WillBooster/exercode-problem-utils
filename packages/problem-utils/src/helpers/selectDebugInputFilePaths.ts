@@ -20,26 +20,24 @@ const FILE_INPUT_EXTENSION = '.fin';
  */
 export function selectDebugInputFilePaths(problemFilePaths: readonly string[]): string[] {
   const fileInputTestCaseIds = new Set(
-    problemFilePaths.flatMap((filePath) => parseFileInputFilePath(filePath)?.testCaseId ?? [])
+    problemFilePaths.flatMap((filePath) => parseFileInputTestCaseId(filePath) ?? [])
   );
   const exampleId = [...fileInputTestCaseIds]
     .toSorted()
     .find((id) => id !== SHARED_TEST_CASE_ID && EXAMPLE_TEST_CASE_ID_PATTERN.test(id));
   return problemFilePaths.filter((filePath) => {
-    const id = parseFileInputFilePath(filePath)?.testCaseId;
+    const id = parseFileInputTestCaseId(filePath);
     return id === SHARED_TEST_CASE_ID || (id !== undefined && id === exampleId);
   });
 }
 
 /**
- * Split a problem-relative path of a file in a `test_cases/<id>.fin/` directory into the test case id
- * and the file's path inside that directory, or return `undefined` for any other path.
+ * The test case id of a problem-relative path of a file inside a `test_cases/<id>.fin/` directory,
+ * or `undefined` for any other path.
  */
-export function parseFileInputFilePath(
-  problemFilePath: string
-): { testCaseId: string; pathInFileInput: string } | undefined {
+export function parseFileInputTestCaseId(problemFilePath: string): string | undefined {
   const [directoryName, entryName, ...rest] = path.posix.normalize(problemFilePath).split('/');
   if (directoryName !== TEST_CASES_DIRECTORY_NAME || !entryName?.endsWith(FILE_INPUT_EXTENSION)) return;
   if (rest.length === 0) return;
-  return { testCaseId: entryName.slice(0, -FILE_INPUT_EXTENSION.length), pathInFileInput: rest.join('/') };
+  return entryName.slice(0, -FILE_INPUT_EXTENSION.length);
 }

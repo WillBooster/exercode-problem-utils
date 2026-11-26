@@ -18,7 +18,7 @@ import {
   readProblemMarkdownFrontMatter,
 } from '../helpers/readProblemMarkdownFrontMatter.js';
 import { readTestCases, SHARED_TEST_CASE_ID } from '../helpers/readTestCases.js';
-import { parseFileInputFilePath, selectDebugInputFilePaths } from '../helpers/selectDebugInputFilePaths.js';
+import { parseFileInputTestCaseId, selectDebugInputFilePaths } from '../helpers/selectDebugInputFilePaths.js';
 import { spawnWithTimeout } from '../helpers/spawnWithTimeout.js';
 import { MAX_STDOUT_LENGTH } from '../helpers/stdioJudgeRules.js';
 import {
@@ -456,9 +456,7 @@ async function copyDebugFileInputs(problemDir: string, cwd: string): Promise<voi
 
   const problemFilePaths = await listFileInputFilePaths(idToFileInputPath);
   const selectedIds = new Set(
-    selectDebugInputFilePaths(problemFilePaths).flatMap(
-      (filePath) => parseFileInputFilePath(filePath)?.testCaseId ?? []
-    )
+    selectDebugInputFilePaths(problemFilePaths).flatMap((filePath) => parseFileInputTestCaseId(filePath) ?? [])
   );
   const exampleId = [...selectedIds].find((id) => id !== SHARED_TEST_CASE_ID);
   // The example's files go last so that they overwrite shared files at the same path, as in judging.
@@ -467,7 +465,7 @@ async function copyDebugFileInputs(problemDir: string, cwd: string): Promise<voi
     if (fileInputPath) await copyTestCaseFileInput(fileInputPath, cwd);
   }
   const hasCaseFileInput = problemFilePaths.some(
-    (filePath) => parseFileInputFilePath(filePath)?.testCaseId !== SHARED_TEST_CASE_ID
+    (filePath) => parseFileInputTestCaseId(filePath) !== SHARED_TEST_CASE_ID
   );
   if (exampleId === undefined && hasCaseFileInput) {
     console.error('debug: no example test case has input files, so the program runs without them');
