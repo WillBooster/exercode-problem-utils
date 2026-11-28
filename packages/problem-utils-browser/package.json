@@ -51,7 +51,7 @@
   },
   "dependencies": {
     "@exercode/problem-utils": "workspace:*",
-    "@willbooster/shared-lib": "11.3.0",
+    "@willbooster/shared-lib": "11.4.1",
     "highlight.js": "11.12.0",
     "html-encoding-sniffer": "7.0.0",
     "marked": "18.2.0",
@@ -59,7 +59,7 @@
     "marked-gfm-heading-id": "4.1.4",
     "prettier": "3.10.1",
     "prettier-plugin-organize-attributes": "1.0.0",
-    "puppeteer": "25.17.0",
+    "puppeteer": "25.18.1",
     "zod": "4.6.7"
   },
   "devDependencies": {
@@ -67,7 +67,7 @@
     "@types/bun": "1.4.5",
     "@types/html-encoding-sniffer": "3.0.2",
     "@willbooster/oxlint-config": "1.4.9",
-    "@willbooster/wb": "23.5.0",
+    "@willbooster/wb": "23.7.0",
     "build-ts": "21.0.38",
     "oxlint": "1.94.0",
     "oxlint-tsgolint": "7.0.2007"
