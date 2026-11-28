@@ -46,7 +46,7 @@
     "@ai-sdk/openai-compatible": "3.0.94",
     "@ai-sdk/xai": "5.0.48",
     "@exercode/problem-utils": "workspace:*",
-    "@willbooster/shared-lib": "11.3.0",
+    "@willbooster/shared-lib": "11.4.1",
     "ai": "7.0.179",
     "zod": "4.6.7"
   },
@@ -54,7 +54,7 @@
     "@tsconfig/bun": "1.0.12",
     "@types/bun": "1.4.5",
     "@willbooster/oxlint-config": "1.4.9",
-    "@willbooster/wb": "23.5.0",
+    "@willbooster/wb": "23.7.0",
     "build-ts": "21.0.38",
     "oxlint": "1.94.0",
     "oxlint-tsgolint": "7.0.2007"
